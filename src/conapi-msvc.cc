@@ -18,13 +18,8 @@ bool WinCon::write_console_a(handle_t console_output, const void *buffer,
 }
 
 Console &Console::wincon() {
-  static WinCon *kInstance = NULL;
-  if (kInstance == NULL)
-    kInstance = new WinCon();
-  return *kInstance;
-}
-
-int main(int argc, char *argv[]) {
-  Console &con = Console::wincon();
-  con.write_console_a(NULL, NULL, 0, 0, 0);
+  static WinCon *instance = NULL;
+  if (instance == NULL)
+    instance = new WinCon();
+  return *instance;
 }

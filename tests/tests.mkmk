@@ -4,6 +4,7 @@
 import re
 
 filenames = [
+  "test_binpatch.cc",
   "test_conapi.cc"
 ]
 
@@ -35,6 +36,7 @@ for main_file_name in main_file_names:
   main_file = c.get_source_file(main_file_name)
   object_file = compile_test_file(main_file)
   test_main.add_object(object_file)
+  test_main.add_object(get_external('src', 'library'))
 
 run_tests = get_group("run-tests")
 

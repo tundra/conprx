@@ -3,17 +3,16 @@
 
 /// Declarations of the console api.
 
-#include "stdc.h"
+#ifndef _CONAPI
+#define _CONAPI
 
-#ifdef IS_MSVC
-#include "conapi-msvc.hh"
-#else
-#include "conapi-posix.hh"
-#endif
+#include "types.hh"
 
 // A virtual console api.
 class Console {
 public:
+  virtual ~Console();
+
   virtual bool write_console_a(handle_t console_output, const void *buffer,
     dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
     void *reserved) = 0;
@@ -22,3 +21,5 @@ public:
   // on windows.
   static Console &wincon();
 };
+
+#endif // _CONAPI
