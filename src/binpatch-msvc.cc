@@ -11,13 +11,13 @@ public:
   virtual bool try_close_page_for_writing(address_t addr, dword_t old_permissions);
 };
 
-bool WindowsPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_permissions) {
-  return VirtualProtect(addr, 5, PAGE_EXECUTE_READWRITE, old_permissions);
+bool WindowsPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_perms) {
+  return VirtualProtect(addr, kPatchSizeBytes, PAGE_EXECUTE_READWRITE, old_perms);
 }
 
-bool WindowsPatchEngine::try_close_page_for_writing(address_t addr, dword_t old_permissions) {
-  dword_t dummy = 0;
-  return VirtualProtect(addr, 5, old_permissions, &dummy);
+bool WindowsPatchEngine::try_close_page_for_writing(address_t addr, dword_t old_perms) {
+  dword_t dummy_perms = 0;
+  return VirtualProtect(addr, kPatchSizeBytes, old_perms, &dummy_perms);
 }
 
 PatchEngine &PatchEngine::get() {

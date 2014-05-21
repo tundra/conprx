@@ -14,11 +14,11 @@ BinaryPatch::BinaryPatch(function_t original, function_t replacement)
   : original_(original)
   , replacement_(replacement)
   , trampoline_(NULL)
-  , old_permissions_(0)
+  , old_perms_(0)
   , status_(NOT_APPLIED) { }
 
 bool BinaryPatch::is_tentatively_possible() {
-  int64_t distance64 = get_relative_distance() - 5;
+  int64_t distance64 = get_relative_distance() - kJmpSizeBytes;
   int32_t distance32 = static_cast<int32_t>(distance64);
   if (static_cast<int64_t>(distance32) != distance64)
     // If the distance doesn't fit in a 32-bit signed int we can't encode a
@@ -35,15 +35,15 @@ int64_t BinaryPatch::get_relative_distance() {
 
 bool BinaryPatch::apply(PatchEngine &engine) {
   address_t original_addr = static_cast<address_t>(original_);
-  if (!engine.try_open_page_for_writing(original_addr, &old_permissions_)) {
+  if (!engine.try_open_page_for_writing(original_addr, &old_perms_)) {
     status_ = FAILED;
     return false;
   }
-  memcpy(overwritten_, original_addr, 5);
-  int32_t dist = get_relative_distance() - 5;
-  original_addr[0] = 0xE9;
+  memcpy(overwritten_, original_addr, kPatchSizeBytes);
+  int32_t dist = get_relative_distance() - kJmpSizeBytes;
+  original_addr[0] = kJmpOp;
   reinterpret_cast<int32_t*>(original_addr + 1)[0] = dist;
-  if (!engine.try_close_page_for_writing(original_addr, old_permissions_)) {
+  if (!engine.try_close_page_for_writing(original_addr, old_perms_)) {
     status_ = FAILED;
     return false;
   }
@@ -53,10 +53,10 @@ bool BinaryPatch::apply(PatchEngine &engine) {
 
 bool BinaryPatch::revert(PatchEngine &engine) {
   address_t original_addr = static_cast<address_t>(original_);
-  if (!engine.try_open_page_for_writing(original_addr, &old_permissions_))
+  if (!engine.try_open_page_for_writing(original_addr, &old_perms_))
     return false;
-  memcpy(original_addr, overwritten_, 5);
-  if (!engine.try_close_page_for_writing(original_addr, old_permissions_))
+  memcpy(original_addr, overwritten_, kPatchSizeBytes);
+  if (!engine.try_close_page_for_writing(original_addr, old_perms_))
     return false;
   status_ = NOT_APPLIED;
   return true;

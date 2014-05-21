@@ -16,6 +16,16 @@
 
 #include "types.hh"
 
+// The size in bytes of a jmp instruction.
+#define kJmpSizeBytes 5
+
+// The opcode of a jmp.
+#define kJmpOp 0xE9
+
+// The size in bytes of the patch that will be written into the subject function
+// to redirect it.
+#define kPatchSizeBytes kJmpSizeBytes
+
 // Shorthand for bytes.
 typedef unsigned char byte_t;
 
@@ -43,12 +53,12 @@ public:
   // Attempts to open the page that holds the given address such that it can be
   // written. If successful the previous permissions should be stored in the
   // given out parameter.
-  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_permissions) = 0;
+  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms) = 0;
 
   // Attempts to close the currently open page that holds the given address
   // by restoring the permissions to the given value, which was the on stored
   // in the out parameter by the open method.
-  virtual bool try_close_page_for_writing(address_t addr, dword_t old_permissions) = 0;
+  virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms) = 0;
 
   // Returns the patch engine appropriate for this platform.
   static PatchEngine &get();
@@ -109,14 +119,14 @@ private:
 
   // When the code is open for writing this field holds the previous
   // permissions set on the code.
-  dword_t old_permissions_;
+  dword_t old_perms_;
 
   // The current status of this patch.
   Status status_;
 
   // When applied this array holds the code in the original function that was
   // overwritten.
-  byte_t overwritten_[5];
+  byte_t overwritten_[kPatchSizeBytes];
 };
 
 #endif // _BINPATCH
