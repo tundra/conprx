@@ -4,6 +4,7 @@
 filenames = [
   "binpatch.cc",
   "conapi.cc",
+  "log.cc",
 ]
 
 library = get_group("library")

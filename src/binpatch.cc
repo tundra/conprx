@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "binpatch.hh"
+#include "log.hh"
 
 bool PatchEngine::ensure_initialized() {
   return true;
@@ -80,8 +81,13 @@ bool BinaryPatch::revert(PatchEngine &engine) {
 byte_t *BinaryPatch::build_trampoline(PatchEngine &engine) {
   address_t original_addr = static_cast<address_t>(original_);
   size_t preamble_size = get_preamble_size(original_addr);
-  if (preamble_size == 0)
-    return 0;
+  if (preamble_size == 0) {
+    uint32_t *blocks = static_cast<uint32_t*>(original_);
+    ERROR("Couldn't determine preamble size of %p [code: %x %x %x %x]", original_,
+        blocks[0], blocks[1], blocks[2], blocks[3]);
+    // It wasn't possible to determine how long the preamble is so bail.
+    return NULL;
+  }
   size_t trampoline_size = preamble_size + kResumeSizeBytes;
   byte_t *result = engine.alloc_executable(original_addr, trampoline_size);
   if (result == NULL)

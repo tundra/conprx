@@ -9,7 +9,22 @@
 /// you're calling is replaced with a different one under your feet.
 ///
 /// The way this is done is by destructively overwriting the first instructions
-/// of the function to be replaced with a jump to the replacement.
+/// of the function to be replaced with a jump to the replacement. The process
+/// works as follows.
+///
+/// The function to patch and its replacement are assumed to be no more than
+/// 2^32 bytes apart in memory. The first 5 bytes in the original function is
+/// replaced with a jump to the replacement. Note that this may not happen
+/// cleanly -- the end of the 5 bytes may be in the middle of some instruction
+/// but it doesn't matter since we're jumping away from there anyway.
+///
+/// At the same time a trampoline function is constructed that first executes
+/// the instructions that were overwritten in the original, the _preamble_. That
+/// means not just the first 5 bytes since, as mentioned above, the 5-byte
+/// boundary may fall within an instruction and we need the full instruction to
+/// be executed by the trampoline. Then the trampoline jumps to the point in the
+/// original function immediately following the preamble at which point
+/// everything works as if the original function had been intact.
 
 #ifndef _BINPATCH
 #define _BINPATCH

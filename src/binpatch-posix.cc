@@ -6,6 +6,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "log.hh"
+
 
 class PosixPatchEngine : public PatchEngine {
 public:
@@ -31,9 +33,11 @@ bool PosixPatchEngine::ensure_initialized() {
   if (is_initialized_)
     return true;
   int page_size = sysconf(_SC_PAGE_SIZE);
-  if (page_size == -1)
+  if (page_size == -1) {
+    ERROR("Failed to determine page size");
     // Failed to get the page size; this is definitely not going to work.
     return false;
+  }
   page_size_ = page_size;
   is_initialized_ = true;
   return true;
@@ -44,11 +48,17 @@ bool PosixPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_pe
   //   far as I've been able to determine you're meant to get this info by
   //   parsing stuff from /proc which seems ridiculous.
   *old_perms = 0;
-  return try_set_page_permissions(addr, PROT_READ | PROT_WRITE | PROT_EXEC);
+  bool result = try_set_page_permissions(addr, PROT_READ | PROT_WRITE | PROT_EXEC);
+  if (!result)
+    ERROR("Failed to open %p for writing", addr);
+  return result;
 }
 
 bool PosixPatchEngine::try_close_page_for_writing(address_t addr, dword_t old_perms) {
-  return try_set_page_permissions(addr, PROT_READ | PROT_EXEC);
+  bool result = try_set_page_permissions(addr, PROT_READ | PROT_EXEC);
+  if (!result)
+    ERROR("Failed to close %p after writing", addr);
+  return result;
 }
 
 bool PosixPatchEngine::try_set_page_permissions(address_t addr, int prot) {
@@ -63,11 +73,13 @@ bool PosixPatchEngine::try_set_page_permissions(address_t addr, int prot) {
 
 address_t PosixPatchEngine::alloc_executable(address_t addr, size_t size) {
   address_arith_t addr_val = reinterpret_cast<address_arith_t>(addr);
-  if ((addr_val & 0xFFFFFFFF) != addr_val)
+  if ((addr_val & 0xFFFFFFFF) != addr_val) {
+    ERROR("Cannot allocate executable memory near %p (%ib)", addr, size);
     // All we can do to allocate near the given address is to rely on it being
     // in the bottom 2G and then ask mmap to give us memory there. If it's not
     // there there's nothing we can do.
     return NULL;
+  }
   void *result = mmap(NULL, page_size_, PROT_READ | PROT_WRITE | PROT_EXEC,
       MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, 0, 0);
   return static_cast<address_t>(result);
