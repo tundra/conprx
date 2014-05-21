@@ -1,0 +1,3 @@
+[submodule "deps/tclib"]
+	path = deps/tclib
+	url = https://github.com/goto-10/tclib.git

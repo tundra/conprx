@@ -1,0 +1,14 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+filenames = [
+  "conapi.cc"
+]
+
+library = get_group("library")
+
+for filename in filenames:
+  source_file = c.get_source_file(filename)
+  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
+  object_file = source_file.get_object()
+  library.add_member(object_file)
