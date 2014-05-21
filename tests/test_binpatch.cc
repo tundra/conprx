@@ -31,6 +31,8 @@ TEST(binpatch, simple_patching) {
   ASSERT_TRUE(patch.apply(engine));
   ASSERT_EQ(BinaryPatch::APPLIED, patch.status());
   ASSERT_EQ(9, add(3, 5));
+  int (*old_add)(int, int) = patch.get_trampoline(add);
+  ASSERT_EQ(8, old_add(3, 5));
   ASSERT_TRUE(patch.revert(engine));
   ASSERT_EQ(BinaryPatch::NOT_APPLIED, patch.status());
   ASSERT_EQ(8, add(3, 5));

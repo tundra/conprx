@@ -26,6 +26,10 @@
 // to redirect it.
 #define kPatchSizeBytes kJmpSizeBytes
 
+// The size in bytes of the instruction that resumes the original method after
+// executing the preamble in the trampoline.
+#define kResumeSizeBytes kJmpSizeBytes
+
 // Shorthand for bytes.
 typedef unsigned char byte_t;
 
@@ -59,6 +63,11 @@ public:
   // by restoring the permissions to the given value, which was the on stored
   // in the out parameter by the open method.
   virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms) = 0;
+
+  // Allocates a piece of executable memory of the given size near enough to
+  // the given address that we can jump between them. If memory can't be
+  // successfully allocated returns NULL.
+  virtual address_t alloc_executable(address_t addr, size_t size) = 0;
 
   // Returns the patch engine appropriate for this platform.
   static PatchEngine &get();
@@ -98,10 +107,28 @@ public:
   // Attempts to revert the patched code to its original state.
   bool revert(PatchEngine &engine);
 
+  // When this patch is applied, returns the trampoline that behaves the same
+  // way as the original implementation would have if it hadn't been patched.
+  // The argument is just a convenient way to ensure that the result is cast
+  // to the appropriate type if you pass in the original function.
+  template <typename T>
+  T get_trampoline(T prototype) {
+    return reinterpret_cast<T>(trampoline_);
+  }
+
 private:
   // Returns the distance a relative jump has to travel to get from the original
   // to the replacement.
   int64_t get_relative_distance();
+
+  // Builds the trampoline code that will implement the original function. If
+  // for some reason a trampoline can't be built NULL is returned.
+  byte_t *build_trampoline(PatchEngine &engine);
+
+  // Returns the size of the trampoline preamble to use for the trampoline that
+  // behaves like the function starting at the given address. If it is not
+  // possible to trampoline this returns 0.
+  static size_t get_preamble_size(address_t addr);
 
   // The address of the original function. Note that when the patch has been
   // applied the function at this address will effectively be the replacement,
