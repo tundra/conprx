@@ -1,0 +1,4 @@
+language: c
+compiler: gcc
+script: mkmk init --config conprx.mkmk && ./build.sh run-tests
+install: source ./tools/enter-devenv.sh
