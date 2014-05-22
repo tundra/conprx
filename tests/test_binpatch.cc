@@ -22,8 +22,10 @@ int new_add(int a, int b) {
 }
 
 TEST(binpatch, simple_patching) {
+  bool make_trampoline = IF_MSVC(false, IF_64_BIT(true, false));
   ASSERT_EQ(8, add(3, 5));
-  BinaryPatch patch(FUNCAST(add), FUNCAST(new_add));
+  uint32_t flags = make_trampoline ? BinaryPatch::MAKE_TRAMPOLINE : BinaryPatch::NONE;
+  BinaryPatch patch(FUNCAST(add), FUNCAST(new_add), flags);
   ASSERT_EQ(BinaryPatch::NOT_APPLIED, patch.status());
   ASSERT_TRUE(patch.is_tentatively_possible());
   PatchEngine &engine = PatchEngine::get();
@@ -31,8 +33,10 @@ TEST(binpatch, simple_patching) {
   ASSERT_TRUE(patch.apply(engine));
   ASSERT_EQ(BinaryPatch::APPLIED, patch.status());
   ASSERT_EQ(9, add(3, 5));
-  int (*old_add)(int, int) = patch.get_trampoline(add);
-  ASSERT_EQ(8, old_add(3, 5));
+  if (make_trampoline) {
+    int (*old_add)(int, int) = patch.get_trampoline(add);
+    ASSERT_EQ(8, old_add(3, 5));
+  }
   ASSERT_TRUE(patch.revert(engine));
   ASSERT_EQ(BinaryPatch::NOT_APPLIED, patch.status());
   ASSERT_EQ(8, add(3, 5));

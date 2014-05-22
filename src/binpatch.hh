@@ -102,9 +102,15 @@ public:
     FAILED
   };
 
+  // Flags that control how the patch is applied.
+  enum Flag {
+    NONE = 0x0,
+    MAKE_TRAMPOLINE = 0x1
+  };
+
   // Initializes a binary patch that replaces the given original function with
   // the given replacement.
-  BinaryPatch(function_t original, function_t replacement);
+  BinaryPatch(function_t original, function_t replacement, uint32_t flags = MAKE_TRAMPOLINE);
 
   // Checks, without making any changes, whether the given request may be
   // possible. This is to catch cases where we can tell early on that a patch
@@ -153,6 +159,9 @@ private:
 
   // The address of the replacement function.
   function_t replacement_;
+
+  // Flags that affect how this patch behaves.
+  int32_t flags_;
 
   // The trampoline function which provides the behavior of the original once
   // it is no longer available through the actual original because it has been

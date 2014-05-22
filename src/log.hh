@@ -11,6 +11,6 @@
 // Log a message.
 void log(const char *file, int line, const char *fmt, ...);
 
-#define ERROR(FMT, ...) log(__FILE__, __LINE__, FMT, ##__VA_ARGS__)
+#define LOG_ERROR(FMT, ...) log(__FILE__, __LINE__, FMT, ##__VA_ARGS__)
 
 #endif // _LOG

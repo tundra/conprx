@@ -34,7 +34,7 @@ bool PosixPatchEngine::ensure_initialized() {
     return true;
   int page_size = sysconf(_SC_PAGE_SIZE);
   if (page_size == -1) {
-    ERROR("Failed to determine page size");
+    LOG_ERROR("Failed to determine page size");
     // Failed to get the page size; this is definitely not going to work.
     return false;
   }
@@ -50,14 +50,14 @@ bool PosixPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_pe
   *old_perms = 0;
   bool result = try_set_page_permissions(addr, PROT_READ | PROT_WRITE | PROT_EXEC);
   if (!result)
-    ERROR("Failed to open %p for writing", addr);
+    LOG_ERROR("Failed to open %p for writing", addr);
   return result;
 }
 
 bool PosixPatchEngine::try_close_page_for_writing(address_t addr, dword_t old_perms) {
   bool result = try_set_page_permissions(addr, PROT_READ | PROT_EXEC);
   if (!result)
-    ERROR("Failed to close %p after writing", addr);
+    LOG_ERROR("Failed to close %p after writing", addr);
   return result;
 }
 
@@ -74,7 +74,7 @@ bool PosixPatchEngine::try_set_page_permissions(address_t addr, int prot) {
 address_t PosixPatchEngine::alloc_executable(address_t addr, size_t size) {
   address_arith_t addr_val = reinterpret_cast<address_arith_t>(addr);
   if ((addr_val & 0xFFFFFFFF) != addr_val) {
-    ERROR("Cannot allocate executable memory near %p (%ib)", addr, size);
+    LOG_ERROR("Cannot allocate executable memory near %p (%ib)", addr, size);
     // All we can do to allocate near the given address is to rely on it being
     // in the bottom 2G and then ask mmap to give us memory there. If it's not
     // there there's nothing we can do.

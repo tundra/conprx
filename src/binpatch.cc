@@ -11,9 +11,10 @@ bool PatchEngine::ensure_initialized() {
 PatchEngine::~PatchEngine() {
 }
 
-BinaryPatch::BinaryPatch(function_t original, function_t replacement)
+BinaryPatch::BinaryPatch(function_t original, function_t replacement, uint32_t flags)
   : original_(original)
   , replacement_(replacement)
+  , flags_(flags)
   , trampoline_(NULL)
   , old_perms_(0)
   , status_(NOT_APPLIED) { }
@@ -43,12 +44,14 @@ bool BinaryPatch::apply(PatchEngine &engine) {
   }
   // Try building the trampoline before patching since we need the contents of
   // the original function.
-  trampoline_ = build_trampoline(engine);
-  if (trampoline_ == NULL)
-    // TODO: This should really be moved to the tentative check since it's
-    //   possible and it would be safer to fail up front rather than during
-    //   application.
-    return false;
+  if ((flags_ & MAKE_TRAMPOLINE) != 0) {
+    trampoline_ = build_trampoline(engine);
+    if (trampoline_ == NULL)
+      // TODO: This should really be moved to the tentative check since it's
+      //   possible and it would be safer to fail up front rather than during
+      //   application.
+      return false;
+  }
   // Save the code we're overwriting so it can be restored.
   memcpy(overwritten_, original_addr, kPatchSizeBytes);
   // Write the patch.
@@ -83,8 +86,8 @@ byte_t *BinaryPatch::build_trampoline(PatchEngine &engine) {
   size_t preamble_size = get_preamble_size(original_addr);
   if (preamble_size == 0) {
     uint32_t *blocks = static_cast<uint32_t*>(original_);
-    ERROR("Couldn't determine preamble size of %p [code: %x %x %x %x]", original_,
-        blocks[0], blocks[1], blocks[2], blocks[3]);
+    LOG_ERROR("Couldn't determine preamble size of %p [code: %x %x %x %x]",
+        original_, blocks[0], blocks[1], blocks[2], blocks[3]);
     // It wasn't possible to determine how long the preamble is so bail.
     return NULL;
   }
@@ -106,7 +109,7 @@ size_t BinaryPatch::get_preamble_size(address_t code) {
       // mov %rsp,%rbp
       if (code[4] == 0x89 && code[5] == 0x7d && code[6] == 0xFC) {
         // mov %edi,-0x4(%rbp)
-        // Standard C calling conventions.
+        // Standard x64 C function preamble.
         return 7;
       }
     }
