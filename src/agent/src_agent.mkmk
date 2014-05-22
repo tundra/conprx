@@ -12,11 +12,14 @@ agent_files = [
   "conapi.cc",
 ]
 
-library = get_group("library")
+objects = get_group("objects")
 
 for filename in agent_files:
-  library.add_member(build_object(filename))
+  objects.add_member(build_object(filename))
 
+agent = c.get_shared_library("agent")
+agent.add_object(objects)
+agent.add_object(get_external('src', 'objects'))
 
 host_files = [
   "host.cc",
@@ -28,5 +31,6 @@ for filename in host_files:
   host.add_object(build_object(filename))
 
 all = get_group("all")
-all.add_dependency(library)
+all.add_dependency(objects)
 all.add_dependency(host)
+all.add_dependency(agent)
