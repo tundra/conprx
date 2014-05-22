@@ -3,7 +3,7 @@
 
 #include "test/asserts.hh"
 #include "test/unittest.hh"
-#include "conapi.hh"
+#include "agent/conapi.hh"
 
 TEST(conapi, datatypes) {
   size_t word_size = IF_64_BIT(8, 4);

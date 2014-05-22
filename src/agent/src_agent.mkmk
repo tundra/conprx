@@ -1,10 +1,9 @@
 # Copyright 2014 the Neutrino authors (see AUTHORS).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-include('agent', 'src_agent.mkmk')
-
 filenames = [
-  "log.cc",
+  "binpatch.cc",
+  "conapi.cc",
 ]
 
 library = get_group("library")

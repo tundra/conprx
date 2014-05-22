@@ -3,7 +3,7 @@
 
 /// Code patching.
 
-#include "binpatch.hh"
+#include "agent/binpatch.hh"
 #include "test.hh"
 
 TEST(binpatch, datatypes) {
