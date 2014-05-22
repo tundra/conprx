@@ -15,3 +15,5 @@ for filename in filenames:
   source_file.add_include(get_dep('tclib').get_child('src', 'c'))
   object_file = source_file.get_object()
   library.add_member(object_file)
+
+add_alias("all", get_external("src", "agent", "all"))

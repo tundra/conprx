@@ -1,16 +1,32 @@
 # Copyright 2014 the Neutrino authors (see AUTHORS).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-filenames = [
+def build_object(filename):
+  source_file = c.get_source_file(filename)
+  source_file.add_include(get_root().get_child('src'))
+  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
+  return source_file.get_object()
+
+agent_files = [
   "binpatch.cc",
   "conapi.cc",
 ]
 
 library = get_group("library")
 
-for filename in filenames:
-  source_file = c.get_source_file(filename)
-  source_file.add_include(get_root().get_child('src'))
-  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
-  object_file = source_file.get_object()
-  library.add_member(object_file)
+for filename in agent_files:
+  library.add_member(build_object(filename))
+
+
+host_files = [
+  "host.cc",
+  "subprocess.cc",
+]
+
+host = c.get_executable("host")
+for filename in host_files:
+  host.add_object(build_object(filename))
+
+all = get_group("all")
+all.add_dependency(library)
+all.add_dependency(host)
