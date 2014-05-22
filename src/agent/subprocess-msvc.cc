@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "subprocess.hh"
+#include "utils/log.hh"
 
 class WindowsSubprocess : public Subprocess {
 public:
@@ -46,7 +47,7 @@ bool WindowsSubprocess::start_suspended_child() {
 
   // Try creating the process in a suspended state.
   dword_t creation_flags = CREATE_SUSPENDED;
-  return CreateProcess(
+  bool result = CreateProcess(
       cmd_,             // lpApplicationName
       NULL,             // lpCommandLine
       NULL,             // lpProcessAttributes
@@ -57,10 +58,18 @@ bool WindowsSubprocess::start_suspended_child() {
       NULL,             // lpCurrentDirectory
       &startup_info,    // lpStartupInfo
       &child_info_);    // lpProcessInformation
+
+  if (!result)
+    LOG_ERROR("Failed to create child process '%s'", cmd_);
+
+  return result;
 }
 
 bool WindowsSubprocess::unsuspend_child() {
-  return ResumeThread(thread());
+  bool result = ResumeThread(thread());
+  if (!result)
+    LOG_ERROR("Failed to resume thread '%s'", cmd_);
+  return result;
 }
 
 bool WindowsSubprocess::join() {

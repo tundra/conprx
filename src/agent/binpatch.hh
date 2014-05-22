@@ -29,7 +29,7 @@
 #ifndef _BINPATCH
 #define _BINPATCH
 
-#include "types.hh"
+#include "utils/types.hh"
 
 // The size in bytes of a jmp instruction.
 #define kJmpSizeBytes 5

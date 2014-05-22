@@ -7,7 +7,7 @@
 #ifndef _HOST
 #define _HOST
 
-#include "types.hh"
+#include "utils/types.hh"
 
 class AgentHost {
 

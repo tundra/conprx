@@ -2,7 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "binpatch.hh"
-#include "log.hh"
+#include "utils/log.hh"
 
 bool PatchEngine::ensure_initialized() {
   return true;

@@ -6,7 +6,7 @@
 #ifndef _SUBPROCESS
 #define _SUBPROCESS
 
-#include "types.hh"
+#include "utils/types.hh"
 
 class Subprocess {
 public:

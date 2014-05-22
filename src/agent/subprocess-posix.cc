@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+#include "utils/log.hh"
+
 class PosixSubprocess : public Subprocess {
 public:
   PosixSubprocess(const char *cmd, char *const *argv)
@@ -20,8 +22,10 @@ private:
 
 bool PosixSubprocess::start() {
   pid_t pid = fork();
-  if (pid == -1)
+  if (pid == -1) {
+    LOG_ERROR("Failed to fork subprocess.");
     return false;
+  }
   if (pid == 0) {
     execv(cmd_, argv_);
   } else {

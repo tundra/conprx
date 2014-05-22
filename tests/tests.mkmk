@@ -37,7 +37,6 @@ for main_file_name in main_file_names:
   object_file = compile_test_file(main_file)
   test_main.add_object(object_file)
   test_main.add_object(get_external('src', 'objects'))
-  test_main.add_object(get_external('src', 'agent', 'objects'))
 
 run_tests = get_group("run-tests")
 

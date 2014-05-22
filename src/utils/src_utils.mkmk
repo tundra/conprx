@@ -1,0 +1,18 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+filenames = [
+  "log.cc",
+]
+
+objects = get_group("objects")
+
+for filename in filenames:
+  source_file = c.get_source_file(filename)
+  source_file.add_include(get_root().get_child('src'))
+  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
+  object_file = source_file.get_object()
+  objects.add_member(object_file)
+
+all = get_group("all")
+all.add_dependency(objects)

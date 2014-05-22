@@ -6,7 +6,7 @@
 #ifndef _CONAPI
 #define _CONAPI
 
-#include "types.hh"
+#include "utils/types.hh"
 
 // A virtual console api.
 class Console {

@@ -6,7 +6,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "log.hh"
+#include "utils/log.hh"
 
 
 class PosixPatchEngine : public PatchEngine {
