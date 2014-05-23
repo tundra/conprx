@@ -7,4 +7,15 @@
 /// compatible otherwise.
 
 typedef void *handle_t;
+typedef void *module_t;
 typedef long dword_t;
+
+// Because of the magic way windows handles strings we'll use this alias for
+// them even on posix.
+typedef const char *c_str_t;
+
+#define TEXT(STR) STR
+
+// Windows-specific directives that we can just ignore when building elsewhere.
+#define APIENTRY
+#define WINAPI

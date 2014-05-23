@@ -8,3 +8,7 @@
 #pragma warning(pop)
 
 #define dword_t DWORD
+#define word_t WORD
+#define win_size_t SIZE_T
+#define module_t HMODULE
+#define c_str_t LPCSTR

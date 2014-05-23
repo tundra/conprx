@@ -5,9 +5,11 @@
 
 #include "subprocess.hh"
 
-Subprocess::Subprocess(const char *cmd, char *const *argv)
-  : cmd_(cmd)
-  , argv_(argv) { }
+Subprocess::Subprocess(const char *library, const char *command,
+    char *const *arguments)
+  : library_(library)
+  , command_(command)
+  , arguments_(arguments) { }
 
 Subprocess::~Subprocess() { }
 

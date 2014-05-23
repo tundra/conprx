@@ -10,8 +10,9 @@
 
 class PosixSubprocess : public Subprocess {
 public:
-  PosixSubprocess(const char *cmd, char *const *argv)
-    : Subprocess(cmd, argv)
+  PosixSubprocess(const char *library, const char *command,
+      char *const *arguments)
+    : Subprocess(library, command, arguments)
     , child_pid_(-1) { }
 
   virtual bool start();
@@ -27,7 +28,7 @@ bool PosixSubprocess::start() {
     return false;
   }
   if (pid == 0) {
-    execv(cmd_, argv_);
+    execv(command_, arguments_);
   } else {
     child_pid_ = pid;
   }
@@ -41,6 +42,7 @@ bool PosixSubprocess::join() {
   return true;
 }
 
-Subprocess *Subprocess::create(const char *cmd, char *const *argv) {
-  return new PosixSubprocess(cmd, argv);
+Subprocess *Subprocess::create(const char *library, const char *command,
+    char *const *arguments) {
+  return new PosixSubprocess(library, command, arguments);
 }

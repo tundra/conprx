@@ -5,3 +5,4 @@
 /// translates an applications's use of the windows console api to messages with
 /// the console bridge.
 
+#include "utils/types.hh"

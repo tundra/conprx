@@ -8,6 +8,7 @@ def build_object(filename):
   return source_file.get_object()
 
 agent_files = [
+  "agent.cc",
   "binpatch.cc",
   "conapi.cc",
 ]

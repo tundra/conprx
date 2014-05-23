@@ -6,6 +6,7 @@
 
 #include "stdc.h"
 
+// Include the platform-specific type declarations.
 #ifdef IS_MSVC
 #include "types-msvc.hh"
 #else

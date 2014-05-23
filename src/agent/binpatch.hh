@@ -104,7 +104,6 @@ public:
 
   // Flags that control how the patch is applied.
   enum Flag {
-    NONE = 0x0,
     MAKE_TRAMPOLINE = 0x1
   };
 

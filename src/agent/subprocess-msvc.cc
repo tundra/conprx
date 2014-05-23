@@ -6,19 +6,23 @@
 
 class WindowsSubprocess : public Subprocess {
 public:
-  WindowsSubprocess(const char *cmd, char *const *argv);
+  WindowsSubprocess(const char *library, const char *command,
+      char *const *arguments);
 
   virtual bool start();
   virtual bool join();
 
   // Returns a handle for the child process.
-  handle_t process() { return child_info_.hProcess; }
+  handle_t child_process() { return child_info_.hProcess; }
 
   // Returns a handle for the main thread in the child process.
-  handle_t thread() { return child_info_.hThread; }
+  handle_t child_main_thread() { return child_info_.hThread; }
 
   // Creates the child process without starting it running.
   bool start_suspended_child();
+
+  // Injects the thread that loads the DLL into the suspended child.
+  bool inject_dll_thread();
 
   // Starts the child process running.
   bool unsuspend_child();
@@ -27,13 +31,16 @@ private:
   PROCESS_INFORMATION child_info_;
 };
 
-WindowsSubprocess::WindowsSubprocess(const char *cmd, char *const *argv)
-  : Subprocess(cmd, argv) {
+WindowsSubprocess::WindowsSubprocess(const char *library, const char *command,
+    char *const *arguments)
+  : Subprocess(library, command, arguments) {
   ZeroMemory(&child_info_, sizeof(child_info_));
 }
 
 bool WindowsSubprocess::start() {
   if (!start_suspended_child())
+    return false;
+  if (!inject_dll_thread())
     return false;
   if (!unsuspend_child())
     return false;
@@ -48,7 +55,7 @@ bool WindowsSubprocess::start_suspended_child() {
   // Try creating the process in a suspended state.
   dword_t creation_flags = CREATE_SUSPENDED;
   bool result = CreateProcess(
-      cmd_,             // lpApplicationName
+      command_,         // lpApplicationName
       NULL,             // lpCommandLine
       NULL,             // lpProcessAttributes
       NULL,             // lpThreadAttributes
@@ -60,23 +67,80 @@ bool WindowsSubprocess::start_suspended_child() {
       &child_info_);    // lpProcessInformation
 
   if (!result)
-    LOG_ERROR("Failed to create child process '%s'", cmd_);
+    LOG_ERROR("Failed to create child process '%s'", command_);
 
   return result;
 }
 
-bool WindowsSubprocess::unsuspend_child() {
-  bool result = ResumeThread(thread());
-  if (!result)
-    LOG_ERROR("Failed to resume thread '%s'", cmd_);
-  return result;
-}
+bool WindowsSubprocess::inject_dll_thread() {
+  // Allocate a block of memory in the child process to hold the DLL name.
+  size_t dll_name_size = strlen(library_) + 1;
+  void *remote_dll_name = VirtualAllocEx(child_process(), NULL, dll_name_size,
+      MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+  if (remote_dll_name == NULL) {
+    LOG_ERROR("Failed to allocate memory for DLL name in child process");
+    return false;
+  }
 
-bool WindowsSubprocess::join() {
-  WaitForSingleObject(process(), INFINITE);
+  // Write the name into the child process.
+  win_size_t bytes_written = 0;
+  bool written = WriteProcessMemory(child_process(), remote_dll_name,
+      (void*) library_, dll_name_size, &bytes_written);
+  if (!written) {
+    LOG_ERROR("Failed to write DLL name into child process");
+    return false;
+  }
+  if (bytes_written != dll_name_size) {
+    LOG_ERROR("Write of DLL name into child process was incomplete.");
+    return false;
+  }
+
+  // Grab the address of LoadLibrary. What we'll actually get is the address
+  // within this process but kernel32.dll is always located in the same place
+  // so the address will also work in the child process.
+  module_t kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
+  void *load_library_a = GetProcAddress(kernel32, TEXT("LoadLibraryA"));
+  if (load_library_a == NULL) {
+    LOG_ERROR("Failed to resolve LoadLibraryA");
+    return false;
+  }
+
+  // Create a thread in the child process that loads the DLL.
+  handle_t loader_thread = CreateRemoteThread(child_process(), NULL, 0,
+      (LPTHREAD_START_ROUTINE) load_library_a, remote_dll_name, NULL, NULL);
+  if (loader_thread == NULL) {
+    LOG_ERROR("Failed to create remote DLL loader thread");
+    return false;
+  }
+
+  // Start the loader thread running.
+  dword_t retval = ResumeThread(loader_thread);
+  if (retval == -1) {
+    LOG_ERROR("Failed to start loader thread (%i)", GetLastError());
+    return false;
+  }
+
+  // Wait the the loader thread to complete.
+  WaitForSingleObject(loader_thread, INFINITE);
+
   return true;
 }
 
-Subprocess *Subprocess::create(const char *cmd, char *const *argv) {
-  return new WindowsSubprocess(cmd, argv);
+bool WindowsSubprocess::unsuspend_child() {
+  dword_t retval = ResumeThread(child_main_thread());
+  if (retval == -1) {
+    LOG_ERROR("Failed to resume thread '%s'", command_);
+    return false;
+  }
+  return true;
+}
+
+bool WindowsSubprocess::join() {
+  WaitForSingleObject(child_process(), INFINITE);
+  return true;
+}
+
+Subprocess *Subprocess::create(const char *library, const char *command,
+    char *const *arguments) {
+  return new WindowsSubprocess(library, command, arguments);
 }

@@ -10,13 +10,14 @@
 
 class Subprocess {
 public:
-  Subprocess(const char *cmd, char *const *argv);
+  Subprocess(const char *library, const char *cpmmand, char *const *arguments);
 
   virtual ~Subprocess();
 
   // Creates and returns a new subprocess instance for running the given
-  // command.
-  static Subprocess *create(const char *cmd, char *const *argv);
+  // command with the given shared library injected into it.
+  static Subprocess *create(const char *library, const char *command,
+      char *const *arguments);
 
   // Attempts to start this subprocess.
   virtual bool start() = 0;
@@ -25,11 +26,14 @@ public:
   virtual bool join() = 0;
 
 protected:
+  // The library to inject when running the command.
+  const char *library_;
+
   // The executable command.
-  const char *cmd_;
+  const char *command_;
 
   // The NULL-terminated array of arguments.
-  char *const *argv_;
+  char *const *arguments_;
 };
 
 #endif // _SUBPROCESS
