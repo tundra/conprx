@@ -11,9 +11,9 @@ messages.add_source(get_source_file("log.mc"))
 
 for filename in filenames:
   source_file = c.get_source_file(filename)
-  source_file.add_include(get_root().get_child('src'))
-  source_file.add_include(get_bindir().get_child('src'))
-  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
+  source_file.add_include(get_root().get_child("src", "c"))
+  source_file.add_include(get_bindir().get_child("src", "c"))
+  source_file.add_include(get_dep("tclib").get_child("src", "c"))
   object_file = source_file.get_object()
   object_file.add_dependency(messages)
   objects.add_member(object_file)

@@ -1,13 +1,13 @@
 # Copyright 2014 the Neutrino authors (see AUTHORS).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-include('utils', 'src_utils.mkmk')
-include('agent', 'src_agent.mkmk')
+include("c", "utils", "src_c_utils.mkmk")
+include("c", "agent", "src_c_agent.mkmk")
 
 objects = get_group("objects")
-objects.add_dependency(get_external("src", "agent", "objects"))
-objects.add_dependency(get_external("src", "utils", "objects"))
+objects.add_dependency(get_external("src", "c", "agent", "objects"))
+objects.add_dependency(get_external("src", "c", "utils", "objects"))
 
 all = add_alias("all")
-all.add_member(get_external("src", "agent", "all"))
-all.add_member(get_external("src", "utils", "all"))
+all.add_member(get_external("src", "c", "agent", "all"))
+all.add_member(get_external("src", "c", "utils", "all"))

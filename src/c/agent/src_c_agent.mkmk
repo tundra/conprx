@@ -3,8 +3,8 @@
 
 def build_object(filename):
   source_file = c.get_source_file(filename)
-  source_file.add_include(get_root().get_child('src'))
-  source_file.add_include(get_dep('tclib').get_child('src', 'c'))
+  source_file.add_include(get_root().get_child("src", "c"))
+  source_file.add_include(get_dep('tclib').get_child("src", "c"))
   return source_file.get_object()
 
 agent_files = [
@@ -13,7 +13,7 @@ agent_files = [
   "conapi.cc",
 ]
 
-utils = get_external('src', 'utils', 'objects')
+utils = get_external("src", "c", "utils", "objects")
 
 objects = get_group("objects")
 
