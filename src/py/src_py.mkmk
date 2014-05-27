@@ -1,0 +1,58 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+import os.path
+import platform
+
+# Returns the string includepath to use to get Python.h. This is hacky but the
+# defaults do what the have to and you can always override with PYTHON_INCLUDE.
+def get_python_includepath():
+  env = os.environ.get("PYTHON_INCLUDE", None)
+  if not env is None:
+    return env
+  elif platform.system() == "Windows":
+    return "C:\\Python27\\include"
+  else:
+    return "/usr/include/python2.7"
+
+# Returns a list of libraries to link the extension with. Also a hack.
+def get_python_libs():
+  env = os.environ.get("PYTHON_LIBS", None)
+  if not env is None:
+    return env.split(";")
+  elif platform.system() == "Windows":
+    return ["C:\\Python27\\libs\\python27.lib"]
+  else:
+    return []
+
+def build_object(filename):
+  source_file = c.get_source_file(filename)
+  source_file.add_include(get_root().get_child("src", "c"))
+  source_file.add_include(get_dep('tclib').get_child("src", "c"))
+  python_includepath = get_python_includepath()
+  source_file.add_include(get_system_file(python_includepath))
+  return source_file.get_object()
+
+condrv_files = [
+  "condrv.cc",
+]
+
+objects = get_group("objects")
+for filename in condrv_files:
+  objects.add_member(build_object(filename))
+
+# Build the shared library containing the extension.
+condrv_lib = c.get_shared_library("condrv")
+condrv_lib.add_object(objects)
+condrv_lib.add_object(get_external("src", "c", "utils", "objects"))
+for python_lib in get_python_libs():
+  condrv_lib.add_library(get_system_file(python_lib))
+
+# Copy the library to a .pyd file.
+condrv_pyd = get_copy("condrv.pyd", condrv_lib)
+condrv_ext = get_group("condrv_ext")
+condrv_ext.add_member(condrv_pyd)
+
+all = get_group("all")
+all.add_dependency(objects)
+all.add_dependency(condrv_ext)

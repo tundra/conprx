@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 include("c", "tests_c.mkmk")
+include("py", "tests_py.mkmk")
 
 run_tests = get_group("run-tests")
 run_tests.add_dependency(get_external("tests", "c", "run-tests"))
+run_tests.add_dependency(get_external("tests", "py", "run-tests"))

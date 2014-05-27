@@ -1,0 +1,19 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+import re
+
+filenames = [
+  "test_condrv.py",
+]
+
+all = get_group("run-tests")
+extension = get_external("src", "py", "condrv_ext")
+
+for filename in filenames:
+  source_file = py.get_source_file(filename)
+  source_file.add_pythonpath(get_bindir().get_child("src", "py"))
+  test_case = test.get_exec_test_case(filename)
+  test_case.set_runner(source_file)
+  test_case.add_dependency(extension)
+  all.add_member(test_case)

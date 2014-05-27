@@ -3,6 +3,7 @@
 
 include("c", "utils", "src_c_utils.mkmk")
 include("c", "agent", "src_c_agent.mkmk")
+include("py", "src_py.mkmk")
 
 objects = get_group("objects")
 objects.add_dependency(get_external("src", "c", "agent", "objects"))
@@ -11,3 +12,4 @@ objects.add_dependency(get_external("src", "c", "utils", "objects"))
 all = add_alias("all")
 all.add_member(get_external("src", "c", "agent", "all"))
 all.add_member(get_external("src", "c", "utils", "all"))
+all.add_member(get_external("src", "py", "all"))

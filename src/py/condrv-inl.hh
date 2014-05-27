@@ -1,0 +1,74 @@
+// Copyright 2014 the Neutrino authors (see AUTHORS).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#ifndef _CONDRV_INL
+#define _CONDRV_INL
+
+#include "condrv.hh"
+
+namespace condrv {
+
+// Initializing structs without passing all the field initializers yields a
+// warning with strict warnings so we disable those selectively around the
+// constructor that uses them.
+
+#ifdef IS_GCC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif // IS_GCC
+
+template <typename T>
+PyType<T>::PyType() {
+  // Python appears to require inline initialization of type objects so we have
+  // to do a little song and dance here. Wa-hey!
+  PyTypeObject prototype = {PyObject_HEAD_INIT(NULL)};
+  *static_cast<PyTypeObject*>(this) = prototype;
+  this->tp_basicsize = sizeof(T);
+  this->tp_flags = Py_TPFLAGS_DEFAULT;
+  memset(&this->sequence_methods_, 0, sizeof(this->sequence_methods_));
+}
+
+#ifdef IS_GCC
+#  pragma GCC diagnostic pop
+#endif // IS_GCC
+
+template <typename T>
+PyType<T> &PyType<T>::set_name(const char *name) {
+  this->tp_name = name;
+  this->tp_doc = name;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::has_new() {
+  this->tp_new = T::create;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::has_str() {
+  this->tp_str = T::to_string;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::has_len() {
+  this->sequence_methods_.sq_length = T::length;
+  this->tp_as_sequence = &this->sequence_methods_;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::has_methods() {
+  this->tp_methods = T::methods;
+  return *this;
+}
+
+template <typename T>
+bool PyType<T>::complete() {
+  return PyType_Ready(this) >= 0;
+}
+
+} // condrv
+
+#endif // _CONDRV_INL
