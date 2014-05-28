@@ -15,12 +15,12 @@ PyObject *Console::get_console_title_a(PyObject *self, PyObject *args) {
   long size = 0;
   if (!PyArg_ParseTuple(args, "Ol", &console_title_obj, &size))
     return NULL;
-  if (!AnsiBuffer::type.is_instance(console_title_obj)) {
+  AnsiBuffer *console_title = AnsiBuffer::type.cast(console_title_obj);
+  if (!console_title) {
     PyErr_SetString(PyExc_TypeError, "Unexpected buffer to GetConsoleTitleA");
     return NULL;
   }
-  AnsiBuffer *console_title = static_cast<AnsiBuffer*>(console_title_obj);
-  long result = GetConsoleTitleA((LPSTR) console_title->data(), size);
+  long result = GetConsoleTitleA(console_title->as_c_str(), size);
   return PyInt_FromLong(result);
 }
 
@@ -31,12 +31,12 @@ PyObject *Console::set_console_title_a(PyObject *self, PyObject *args) {
   PyObject *console_title_obj = NULL;
   if (!PyArg_ParseTuple(args, "O", &console_title_obj))
     return NULL;
-  if (!AnsiBuffer::type.is_instance(console_title_obj)) {
+  AnsiBuffer *console_title = AnsiBuffer::type.cast(console_title_obj);
+  if (!console_title) {
     PyErr_SetString(PyExc_TypeError, "Unexpected buffer to SetConsoleTitleA");
     return NULL;
   }
-  AnsiBuffer *console_title = static_cast<AnsiBuffer*>(console_title_obj);
-  bool result = SetConsoleTitleA((LPSTR) console_title->data());
+  bool result = SetConsoleTitleA((LPSTR) console_title->as_c_str());
   return PyBool_FromLong(result);
 }
 

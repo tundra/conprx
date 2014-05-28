@@ -34,19 +34,18 @@ PyObject *AnsiBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return NULL;
   }
 
-  PyObject *object = type->tp_alloc(type, 0);
-  AnsiBuffer *self = static_cast<AnsiBuffer*>(object);
+  AnsiBuffer *self = AnsiBuffer::type.cast(type->tp_alloc(type, 0));
   self->data_ = data;
   self->is_const_ = is_const;
   self->data_size_ = data_size;
-  return object;
+  return self;
 }
 
 PyObject *AnsiBuffer::to_representation(PyObject *object) {
   // The representation explicitly includes the null terminator for null-
   // terminated strings.
-  AnsiBuffer *self = static_cast<AnsiBuffer*>(object);
-  const char *c_str = reinterpret_cast<char*>(self->data_);
+  AnsiBuffer *self = AnsiBuffer::type.cast(object);
+  const char *c_str = self->as_c_str();
   PyObject *data_str = PyString_FromStringAndSize(c_str, self->data_size_);
   PyObject *format = PyString_FromString("A\"%s\"");
   PyObject *args = Py_BuildValue("O", data_str);
@@ -57,15 +56,15 @@ PyObject *AnsiBuffer::to_representation(PyObject *object) {
 PyObject *AnsiBuffer::to_string(PyObject *object) {
   // The string conversion stops at the first null character if the string is
   // null-terminated.
-  AnsiBuffer *self = static_cast<AnsiBuffer*>(object);
-  const char *c_str = reinterpret_cast<char*>(self->data_);
+  AnsiBuffer *self = AnsiBuffer::type.cast(object);
+  const char *c_str = self->as_c_str();
   size_t data_size = self->data_size_ - 1;
   size_t length = (c_str[data_size] == '\0') ? strlen(c_str) : data_size - 1;
   return PyString_FromStringAndSize(c_str, length);
 }
 
 Py_ssize_t AnsiBuffer::length(PyObject *object) {
-  AnsiBuffer *self = static_cast<AnsiBuffer*>(object);
+  AnsiBuffer *self = AnsiBuffer::type.cast(object);
   return self->data_size_;
 }
 

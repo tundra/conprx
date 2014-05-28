@@ -31,8 +31,8 @@ public:
   // __len__
   static Py_ssize_t length(PyObject *object);
 
-  // Returns the raw underlying data buffer.
-  uint8_t *data() { return data_; }
+  // Returns this buffer's content viewed as an ansi c string.
+  ansi_c_str_t as_c_str() { return reinterpret_cast<ansi_c_str_t>(data_); }
 
   // Python helpers.
   static PyType<AnsiBuffer> type;

@@ -96,6 +96,11 @@ bool PyType<T>::is_instance(PyObject *obj) {
   return PyObject_IsInstance(obj, reinterpret_cast<PyObject*>(this));
 }
 
+template <typename T>
+T *PyType<T>::cast(PyObject *obj) {
+  return is_instance(obj) ? static_cast<T*>(obj) : NULL;
+}
+
 } // condrv
 
 #endif // _PYTH_INL

@@ -65,6 +65,10 @@ public:
   // Returns true iff the given object is an instance of this type.
   bool is_instance(PyObject *obj);
 
+  // Returns the given object viewed as this type if it is an instance,
+  // otherwise NULL.
+  T *cast(PyObject *obj);
+
 private:
   // The sequence methods to use if this type has any.
   PySequenceMethods sequence_methods_;

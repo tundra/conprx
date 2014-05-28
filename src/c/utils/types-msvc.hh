@@ -11,4 +11,5 @@
 #define word_t WORD
 #define win_size_t SIZE_T
 #define module_t HMODULE
+#define ansi_c_str_t LPSTR
 #define c_str_t LPCSTR

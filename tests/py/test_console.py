@@ -15,9 +15,8 @@ class ConDrvConsoleTest(unittest.TestCase):
     buf = condrv.AnsiBuffer(256)
     self.assertRaises(TypeError, console.GetConsoleTitleA, buf)
     self.assertRaises(TypeError, console.GetConsoleTitleA, [], 256)
-    print console.SetConsoleTitleA(condrv.AnsiBuffer("Looky here!"))
-    print console.GetConsoleTitleA(buf, 256)
-    print "{{{%s}}}" % buf
+    self.assertRaises(TypeError, console.SetConsoleTitleA)
+    self.assertRaises(TypeError, console.SetConsoleTitleA, [])
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
