@@ -4,7 +4,8 @@
 import re
 
 filenames = [
-  "test_condrv.py",
+  "test_console.py",
+  "test_data.py",
 ]
 
 all = get_group("run-tests")

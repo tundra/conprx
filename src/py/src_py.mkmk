@@ -35,6 +35,8 @@ def build_object(filename):
 
 condrv_files = [
   "condrv.cc",
+  "console.cc",
+  "data.cc",
 ]
 
 objects = get_group("objects")

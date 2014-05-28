@@ -5,9 +5,9 @@ import condrv
 import unittest
 
 
-class ConsoleDriverTest(unittest.TestCase):
+class ConDrvDataTest(unittest.TestCase):
 
-  def test_whatever(self):
+  def test_ansi_buffer(self):
     foo = condrv.AnsiBuffer("foo")
     self.assertEquals(4, len(foo))
     self.assertEquals('A"foo\0"', repr(foo))

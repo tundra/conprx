@@ -1,12 +1,27 @@
 // Copyright 2014 the Neutrino authors (see AUTHORS).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#ifndef _CONDRV_INL
-#define _CONDRV_INL
+// Python-related template method implementations.
 
-#include "condrv.hh"
+#ifndef _PYTH_INL
+#define _PYTH_INL
+
+#include "pyth.hh"
 
 namespace condrv {
+
+template <typename T>
+T &Python::incref(T &obj) {
+#ifdef IS_GCC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
+  Py_INCREF(&obj);
+#ifdef IS_GCC
+#  pragma GCC diagnostic pop
+#endif
+  return obj;
+}
 
 // Initializing structs without passing all the field initializers yields a
 // warning with strict warnings so we disable those selectively around the
@@ -31,19 +46,6 @@ PyType<T>::PyType() {
 #ifdef IS_GCC
 #  pragma GCC diagnostic pop
 #endif // IS_GCC
-
-template <typename T>
-T &Python::incref(T &obj) {
-#ifdef IS_GCC
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#endif
-  Py_INCREF(&obj);
-#ifdef IS_GCC
-#  pragma GCC diagnostic pop
-#endif
-  return obj;
-}
 
 
 template <typename T>
@@ -89,6 +91,11 @@ bool PyType<T>::complete() {
   return PyType_Ready(this) >= 0;
 }
 
+template <typename T>
+bool PyType<T>::is_instance(PyObject *obj) {
+  return PyObject_IsInstance(obj, reinterpret_cast<PyObject*>(this));
+}
+
 } // condrv
 
-#endif // _CONDRV_INL
+#endif // _PYTH_INL
