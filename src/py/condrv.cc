@@ -9,36 +9,31 @@ using namespace condrv;
 
 // Called by python during module load.
 PyMODINIT_FUNC initcondrv() {
+  PyObject* module = Py_InitModule3("condrv", NULL, "Console driver");
+
   if (!AnsiBuffer::type
       .set_name("condrv.AnsiBuffer")
-      .set_new().set_str().set_repr().set_len()
+      .set_new().set_dealloc().set_str().set_repr().set_len()
       .complete())
     return;
+  AnsiBuffer::type.bind(module, "AnsiBuffer");
 
   if (!Handle::type
       .set_name("condrv.Handle")
       .set_repr()
       .complete())
     return;
+  Handle::type.bind(module, "Handle");
 
   if (!DwordRef::type
       .set_name("condrv.DwordRef")
       .set_new().set_repr().set_members()
       .complete())
     return;
+  DwordRef::type.bind(module, "DwordRef");
 
   PyType<Console> *console = Console::type();
   if (!console)
     return;
-
-  PyObject* module = Py_InitModule3("condrv", NULL, "Console driver");
-
-  Python::incref(AnsiBuffer::type);
-  PyModule_AddObject(module, "AnsiBuffer", reinterpret_cast<PyObject*>(&AnsiBuffer::type));
-  Python::incref(Handle::type);
-  PyModule_AddObject(module, "Handle", reinterpret_cast<PyObject*>(&Handle::type));
-  Python::incref(DwordRef::type);
-  PyModule_AddObject(module, "DwordRef", reinterpret_cast<PyObject*>(&DwordRef::type));
-  Python::incref(*console);
-  PyModule_AddObject(module, "Console", reinterpret_cast<PyObject*>(console));
+  console->bind(module, "Console");
 }

@@ -25,6 +25,9 @@ public:
   // __new__
   static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
+  // __dealloc__
+  static void dispose(PyObject *object);
+
   // __str__
   static PyObject *to_string(PyObject *object);
 

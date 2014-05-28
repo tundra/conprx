@@ -42,6 +42,11 @@ PyObject *AnsiBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds)
   return self;
 }
 
+void AnsiBuffer::dispose(PyObject *object) {
+  AnsiBuffer *self = AnsiBuffer::type.cast(object);
+  delete[] self->data_;
+}
+
 PyObject *AnsiBuffer::to_representation(PyObject *object) {
   // The representation explicitly includes the null terminator for null-
   // terminated strings.

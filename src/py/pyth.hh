@@ -48,6 +48,9 @@ public:
   // Sets the new-function of this type to T::create.
   PyType<T> &set_new();
 
+  // Sets the dealloc-function of this type to T::dispose.
+  PyType<T> &set_dealloc();
+
   // Sets the str-function of this type to T::to_string.
   PyType<T> &set_str();
 
@@ -62,6 +65,9 @@ public:
 
   // Sets the length function of this type to T::length;
   PyType<T> &set_len();
+
+  // Binds this type to a name in the given module.
+  PyType<T> &bind(PyObject *module, const char *name);
 
   // Completes the construction of this type, returning true iff the completion
   // succeeded.

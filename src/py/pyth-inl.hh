@@ -38,6 +38,7 @@ PyType<T>::PyType() {
   // to do a little song and dance here. Wa-hey!
   PyTypeObject prototype = {PyObject_HEAD_INIT(NULL)};
   *static_cast<PyTypeObject*>(this) = prototype;
+  Python::incref(*this);
   this->tp_basicsize = sizeof(T);
   this->tp_flags = Py_TPFLAGS_DEFAULT;
   memset(&this->sequence_methods_, 0, sizeof(this->sequence_methods_));
@@ -58,6 +59,12 @@ PyType<T> &PyType<T>::set_name(const char *name) {
 template <typename T>
 PyType<T> &PyType<T>::set_new() {
   this->tp_new = T::create;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::set_dealloc() {
+  this->tp_dealloc = T::dispose;
   return *this;
 }
 
@@ -110,6 +117,12 @@ T *PyType<T>::cast(PyObject *obj) {
     PyErr_SetString(PyExc_TypeError, "Cast failed");
     return NULL;
   }
+}
+
+template <typename T>
+PyType<T> &PyType<T>::bind(PyObject *module, const char *name) {
+  PyModule_AddObject(module, name, reinterpret_cast<PyObject*>(this));
+  return *this;
 }
 
 } // condrv
