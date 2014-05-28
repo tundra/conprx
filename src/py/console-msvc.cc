@@ -6,6 +6,23 @@
 
 using namespace condrv;
 
+// BOOL WINAPI GetConsoleMode(
+//   _In_   HANDLE hConsoleHandle,
+//   _Out_  LPDWORD lpMode
+// );
+PyObject *Console::get_console_mode(PyObject *self, PyObject *args) {
+  PyObject *console_handle_obj = NULL;
+  PyObject *mode_obj = NULL;
+  if (!PyArg_ParseTuple(args, "OO", &console_handle_obj, &mode_obj))
+    return NULL;
+  Handle *console_handle = Handle::type.cast(console_handle_obj);
+  DwordRef *mode = DwordRef::type.cast(mode_obj);
+  if (!console_handle || !mode)
+    return NULL;
+  bool result = GetConsoleMode(console_handle->handle(), mode->ref());
+  return PyBool_FromLong(result);
+}
+
 // DWORD WINAPI GetConsoleTitle(
 //   _Out_  LPTSTR lpConsoleTitle,
 //   _In_   DWORD nSize
@@ -16,10 +33,8 @@ PyObject *Console::get_console_title_a(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "Ol", &console_title_obj, &size))
     return NULL;
   AnsiBuffer *console_title = AnsiBuffer::type.cast(console_title_obj);
-  if (!console_title) {
-    PyErr_SetString(PyExc_TypeError, "Unexpected buffer to GetConsoleTitleA");
+  if (!console_title)
     return NULL;
-  }
   long result = GetConsoleTitleA(console_title->as_c_str(), size);
   return PyInt_FromLong(result);
 }
@@ -43,11 +58,35 @@ PyObject *Console::set_console_title_a(PyObject *self, PyObject *args) {
   if (!PyArg_ParseTuple(args, "O", &console_title_obj))
     return NULL;
   AnsiBuffer *console_title = AnsiBuffer::type.cast(console_title_obj);
-  if (!console_title) {
-    PyErr_SetString(PyExc_TypeError, "Unexpected buffer to SetConsoleTitleA");
+  if (!console_title)
     return NULL;
-  }
-  bool result = SetConsoleTitleA((LPSTR) console_title->as_c_str());
+  bool result = SetConsoleTitleA(console_title->as_c_str());
+  return PyBool_FromLong(result);
+}
+
+// BOOL WINAPI WriteConsole(
+//   _In_        HANDLE hConsoleOutput,
+//   _In_        const VOID *lpBuffer,
+//   _In_        DWORD nNumberOfCharsToWrite,
+//   _Out_       LPDWORD lpNumberOfCharsWritten,
+//   _Reserved_  LPVOID lpReserved
+// );
+PyObject *Console::write_console_a(PyObject *self, PyObject *args) {
+  PyObject *console_output_obj = NULL;
+  PyObject *buffer_obj = NULL;
+  long number_of_chars_to_write = 0;
+  PyObject *number_of_chars_written_obj = NULL;
+  PyObject *reserved = NULL;
+  if (!PyArg_ParseTuple(args, "OOlOO", &console_output_obj, &buffer_obj,
+      &number_of_chars_to_write, &number_of_chars_written_obj, &reserved))
+    return NULL;
+  Handle *console_output = Handle::type.cast(console_output_obj);
+  AnsiBuffer *buffer = AnsiBuffer::type.cast(buffer_obj);
+  DwordRef *number_of_chars_written = DwordRef::type.cast(number_of_chars_written_obj);
+  if (!console_output || !buffer || !number_of_chars_written)
+    return NULL;
+  bool result = WriteConsoleA(console_output->handle(), buffer->as_c_str(),
+      number_of_chars_to_write, number_of_chars_written->ref(), NULL);
   return PyBool_FromLong(result);
 }
 

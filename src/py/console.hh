@@ -12,9 +12,11 @@ namespace condrv {
 
 // Expands the given macro for each api function the console object understands.
 #define FOR_EACH_CONSOLE_FUNCTION(F)                                           \
+  F(GetConsoleMode,             get_console_mode)                              \
   F(GetConsoleTitleA,           get_console_title_a)                           \
   F(GetStdHandle,               get_std_handle)                                \
-  F(SetConsoleTitleA,           set_console_title_a)
+  F(SetConsoleTitleA,           set_console_title_a)                           \
+  F(WriteConsoleA,              write_console_a)
 
 #define ADD_ONE(Name, name) + 1
 #define kConsoleFunctionCount (0 FOR_EACH_CONSOLE_FUNCTION(ADD_ONE))

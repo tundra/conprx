@@ -20,7 +20,7 @@ class ConDrvConsoleTest(unittest.TestCase):
     self.assertEquals(-10, console.STD_INPUT_HANDLE)
     self.assertEquals(-11, console.STD_OUTPUT_HANDLE)
     self.assertEquals(-12, console.STD_ERROR_HANDLE)
-    stdout = console.GetStdHandle(console.STD_OUTPUT_HANDLE)    
+    stderr = console.GetStdHandle(console.STD_ERROR_HANDLE)
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)

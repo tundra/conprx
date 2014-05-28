@@ -61,6 +61,9 @@ public:
   // __repr__
   static PyObject *to_representation(PyObject *object);
 
+  // Returns the handle wrapped by this object.
+  handle_t handle() { return handle_; }
+
   // Python type object.
   static PyType<Handle> type;
 
@@ -78,6 +81,9 @@ public:
 
   // __repr__
   static PyObject *to_representation(PyObject *object);
+
+  // Returns a pointer to this ref's value.
+  dword_t *ref() { return &value_; }
 
   static PyType<DwordRef> type;
   static PyMemberDef members[2];

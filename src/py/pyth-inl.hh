@@ -104,7 +104,12 @@ bool PyType<T>::is_instance(PyObject *obj) {
 
 template <typename T>
 T *PyType<T>::cast(PyObject *obj) {
-  return is_instance(obj) ? static_cast<T*>(obj) : NULL;
+  if (is_instance(obj)) {
+    return static_cast<T*>(obj);
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Cast failed");
+    return NULL;
+  }
 }
 
 } // condrv
