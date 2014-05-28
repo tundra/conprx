@@ -16,7 +16,10 @@
 #    include <Python.h>
 #  pragma warning(pop)
 #else
-#  include <Python.h>
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#    include <Python.h>
+#  pragma GCC diagnostic pop
 #endif
 
 namespace condrv {
