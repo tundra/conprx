@@ -25,6 +25,9 @@ class ConDrvDataTest(unittest.TestCase):
     ref.value = 99
     self.assertEquals(99, ref.value)
     self.assertEquals("&99", str(ref))
+    ref.value = -1
+    self.assertEquals(-1, ref.value)
+    self.assertEquals("&-1", str(ref))
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
