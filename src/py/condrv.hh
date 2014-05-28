@@ -25,9 +25,18 @@
 
 namespace condrv {
 
+// Utilities for working with python.
+class Python {
+public:
+  // Increments the ref count of the given object. Use this instead of the
+  // Py_INCREF macro to avoid a strict aliasing warning.
+  template <typename T>
+  static T &incref(T &obj);
+};
+
 // Wrapper that simplifies building of python types somewhat.
 template <typename T>
-struct PyType : public PyTypeObject {
+class PyType : public PyTypeObject {
 public:
   PyType();
 

@@ -33,6 +33,20 @@ PyType<T>::PyType() {
 #endif // IS_GCC
 
 template <typename T>
+T &Python::incref(T &obj) {
+#ifdef IS_GCC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
+  Py_INCREF(&obj);
+#ifdef IS_GCC
+#  pragma GCC diagnostic pop
+#endif
+  return obj;
+}
+
+
+template <typename T>
 PyType<T> &PyType<T>::set_name(const char *name) {
   this->tp_name = name;
   this->tp_doc = name;

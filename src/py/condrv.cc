@@ -83,6 +83,6 @@ PyMODINIT_FUNC initcondrv() {
 
   PyObject* module = Py_InitModule3("condrv", NULL, "Console driver");
 
-  Py_INCREF(&AnsiBuffer::type);
+  Python::incref(AnsiBuffer::type);
   PyModule_AddObject(module, "AnsiBuffer", reinterpret_cast<PyObject*>(&AnsiBuffer::type));
 }
