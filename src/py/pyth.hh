@@ -13,11 +13,13 @@
 #ifdef _MSC_VER
 #  pragma warning(push, 0)
 #    include <Python.h>
+#    include <structmember.h>
 #  pragma warning(pop)
 #else
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wall"
 #    include <Python.h>
+#    include <structmember.h>
 #  pragma GCC diagnostic pop
 #endif
 
@@ -52,8 +54,11 @@ public:
   // Sets the repr-function of this type to T::to_representation.
   PyType<T> &set_repr();
 
-  // Sets the methods of this type to T::py_methods.
+  // Sets the methods of this type to T::methods.
   PyType<T> &set_methods();
+
+  // Sets the methods of this type to T::members.
+  PyType<T> &set_members();
 
   // Sets the length function of this type to T::length;
   PyType<T> &set_len();

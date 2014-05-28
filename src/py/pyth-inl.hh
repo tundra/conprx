@@ -87,6 +87,12 @@ PyType<T> &PyType<T>::set_methods() {
 }
 
 template <typename T>
+PyType<T> &PyType<T>::set_members() {
+  this->tp_members = T::members;
+  return *this;
+}
+
+template <typename T>
 bool PyType<T>::complete() {
   return PyType_Ready(this) >= 0;
 }

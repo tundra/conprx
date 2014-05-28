@@ -8,6 +8,11 @@ using namespace condrv;
 
 // --- A n s i   s t r i n g ---
 
+void AnsiBuffer::init(uint8_t *data, size_t data_size) {
+  this->data_ = data;
+  this->data_size_ = data_size;
+}
+
 // Creates a new ansi buffer based either on a string or a length.
 PyObject *AnsiBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
   PyObject *arg = NULL;
@@ -16,11 +21,9 @@ PyObject *AnsiBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
   uint8_t *data = NULL;
   size_t data_size = 0;
-  bool is_const = false;
   if (PyString_Check(arg)) {
     // AnsiBuffer(str)
     data_size = PyString_GET_SIZE(arg) + 1;
-    is_const = true;
     data = new uint8_t[data_size];
     // Copy the whole input string, including the null terminator.
     memcpy(data, PyString_AsString(arg), data_size);
@@ -35,9 +38,7 @@ PyObject *AnsiBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds)
   }
 
   AnsiBuffer *self = AnsiBuffer::type.cast(type->tp_alloc(type, 0));
-  self->data_ = data;
-  self->is_const_ = is_const;
-  self->data_size_ = data_size;
+  self->init(data, data_size);
   return self;
 }
 
@@ -69,3 +70,26 @@ Py_ssize_t AnsiBuffer::length(PyObject *object) {
 }
 
 PyType<AnsiBuffer> AnsiBuffer::type;
+
+// --- H a n d l e ---
+
+void Handle::init(handle_t handle) {
+  this->handle_ = handle;
+}
+
+Handle *Handle::create(handle_t value) {
+  PyObject *object = type.tp_alloc(&type, 0);
+  Handle *result = type.cast(object);
+  result->init(value);
+  return result;
+}
+
+PyObject *Handle::to_representation(PyObject *object) {
+  Handle *self = Handle::type.cast(object);
+  PyObject *format = PyString_FromString("H[0x%x]");
+  PyObject *args = Py_BuildValue("l", reinterpret_cast<long>(self->handle_));
+  PyObject *result = PyString_Format(format, args);
+  return result;
+}
+
+PyType<Handle> Handle::type;

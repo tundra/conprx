@@ -19,6 +19,9 @@ namespace condrv {
 // buffer that happens, for convenience, to be easily convertible to a string.
 class AnsiBuffer : public PyObject {
 public:
+  // Initializes an already existing instance.
+  void init(uint8_t *data, size_t data_size);
+
   // __new__
   static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
@@ -34,18 +37,35 @@ public:
   // Returns this buffer's content viewed as an ansi c string.
   ansi_c_str_t as_c_str() { return reinterpret_cast<ansi_c_str_t>(data_); }
 
-  // Python helpers.
+  // Python type object.
   static PyType<AnsiBuffer> type;
 
 private:
-  // Can this string be mutated or is it constant?
-  bool is_const_;
-
   // The underlying character data.
   uint8_t *data_;
 
   // The number of bytes in the given data array.
   size_t data_size_;
+};
+
+// Wrapper around a windows HANDLE. Handles cannot be created from python, only
+// returned from api calls.
+class Handle : public PyObject {
+public:
+  // Initializes an already existing instance.
+  void init(handle_t handle);
+
+  // Creates and initializes a new instance.
+  static Handle *create(handle_t handle);
+
+  // __repr__
+  static PyObject *to_representation(PyObject *object);
+
+  // Python type object.
+  static PyType<Handle> type;
+
+private:
+  handle_t handle_;
 };
 
 } // namespace condrv

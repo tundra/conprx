@@ -12,11 +12,13 @@ namespace condrv {
 
 // Expands the given macro for each api function the console object understands.
 #define FOR_EACH_CONSOLE_FUNCTION(F)                                           \
-  F(GetConsoleTitleA, get_console_title_a)                                     \
-  F(SetConsoleTitleA, set_console_title_a)
+  F(GetConsoleTitleA,           get_console_title_a)                           \
+  F(GetStdHandle,               get_std_handle)                                \
+  F(SetConsoleTitleA,           set_console_title_a)
 
 #define ADD_ONE(Name, name) + 1
 #define kConsoleFunctionCount (0 FOR_EACH_CONSOLE_FUNCTION(ADD_ONE))
+#define kConsoleMemberCount 3
 
 // A wrapper around the windows console.
 class Console : public PyObject {
@@ -40,6 +42,13 @@ public:
 
   // Array of all the console methods, plus the end sentinel.
   static PyMethodDef methods[kConsoleFunctionCount + 1];
+  static PyMemberDef members[kConsoleMemberCount + 1];
+
+private:
+  // Standard handles.
+  long std_input_handle_;
+  long std_output_handle_;
+  long std_error_handle_;
 };
 
 } // namespace condrv

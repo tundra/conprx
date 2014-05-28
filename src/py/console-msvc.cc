@@ -24,6 +24,17 @@ PyObject *Console::get_console_title_a(PyObject *self, PyObject *args) {
   return PyInt_FromLong(result);
 }
 
+// HANDLE WINAPI GetStdHandle(
+//   _In_  DWORD nStdHandle
+// );
+PyObject *Console::get_std_handle(PyObject *self, PyObject *args) {
+  long std_handle = 0;
+  if (!PyArg_ParseTuple(args, "l", &std_handle))
+    return NULL;
+  handle_t handle = GetStdHandle(std_handle);
+  return Handle::create(handle);
+}
+
 // BOOL WINAPI SetConsoleTitle(
 //   _In_  LPCTSTR lpConsoleTitle
 // );
@@ -46,6 +57,7 @@ PyType<Console> *Console::type() {
     PyType<Console> *type = new PyType<Console>();
     type->set_name("condrv.Console");
     type->set_methods();
+    type->set_members();
     type->set_new();
     if (!type->complete())
       return NULL;
@@ -55,8 +67,19 @@ PyType<Console> *Console::type() {
 }
 
 PyObject *Console::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
-  return type->tp_alloc(type, 0);
+  Console *result = Console::type()->cast(type->tp_alloc(type, 0));
+  result->std_input_handle_ = STD_INPUT_HANDLE;
+  result->std_output_handle_ = STD_OUTPUT_HANDLE;
+  result->std_error_handle_ = STD_ERROR_HANDLE;
+  return result;
 }
+
+PyMemberDef Console::members[kConsoleMemberCount + 1] = {
+  {"STD_INPUT_HANDLE", T_LONG, offsetof(Console, std_input_handle_), 0, NULL},
+  {"STD_OUTPUT_HANDLE", T_LONG, offsetof(Console, std_output_handle_), 0, NULL},
+  {"STD_ERROR_HANDLE", T_LONG, offsetof(Console, std_error_handle_), 0, NULL},
+  {NULL, 0, 0, 0, NULL}
+};
 
 #define ADD_METHOD_ENTRY(Name, name)                                           \
   {#Name, Console::name, METH_VARARGS, #Name},
