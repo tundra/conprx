@@ -17,7 +17,7 @@
 #  pragma warning(pop)
 #else
 #  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#  pragma GCC diagnostic ignored "-Wall"
 #    include <Python.h>
 #  pragma GCC diagnostic pop
 #endif
@@ -34,16 +34,19 @@ public:
   PyType<T> &set_name(const char *name);
 
   // Sets the new-function of this type to T::create.
-  PyType<T> &has_new();
+  PyType<T> &set_new();
 
   // Sets the str-function of this type to T::to_string.
-  PyType<T> &has_str();
+  PyType<T> &set_str();
+
+  // Sets the repr-function of this type to T::to_representation.
+  PyType<T> &set_repr();
 
   // Sets the methods of this type to T::py_methods.
-  PyType<T> &has_methods();
+  PyType<T> &set_methods();
 
   // Sets the length function of this type to T::length;
-  PyType<T> &has_len();
+  PyType<T> &set_len();
 
   // Completes the construction of this type, returning true iff the completion
   // succeeded.
@@ -54,8 +57,14 @@ private:
   PySequenceMethods sequence_methods_;
 };
 
-// An ANSI (8-bit) string, mutable or const.
-class AnsiString : public PyObject {
+// An (8-bit) ansi buffer, mutable or const.
+//
+// An ansi buffer is sort of like a string in that it holds 8-bit characters
+// and is usually used for strings, but it is unlike a string in that it is
+// explicitly null-terminated (so when it holds a null-terminated string the
+// terminator is counted in the length) and can be mutable. Think of it as a
+// buffer that happens, for convenience, to be easily convertible to a string.
+class AnsiBuffer : public PyObject {
 public:
   // __new__
   static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
@@ -63,12 +72,14 @@ public:
   // __str__
   static PyObject *to_string(PyObject *object);
 
+  // __repr__
+  static PyObject *to_representation(PyObject *object);
+
   // __len__
   static Py_ssize_t length(PyObject *object);
 
   // Python helpers.
-  static PyType<AnsiString> type;
-  static PyMethodDef methods[2];
+  static PyType<AnsiBuffer> type;
 
 private:
   // Can this string be mutated or is it constant?

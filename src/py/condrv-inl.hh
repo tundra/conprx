@@ -40,26 +40,32 @@ PyType<T> &PyType<T>::set_name(const char *name) {
 }
 
 template <typename T>
-PyType<T> &PyType<T>::has_new() {
+PyType<T> &PyType<T>::set_new() {
   this->tp_new = T::create;
   return *this;
 }
 
 template <typename T>
-PyType<T> &PyType<T>::has_str() {
+PyType<T> &PyType<T>::set_str() {
   this->tp_str = T::to_string;
   return *this;
 }
 
 template <typename T>
-PyType<T> &PyType<T>::has_len() {
+PyType<T> &PyType<T>::set_repr() {
+  this->tp_repr = T::to_representation;
+  return *this;
+}
+
+template <typename T>
+PyType<T> &PyType<T>::set_len() {
   this->sequence_methods_.sq_length = T::length;
   this->tp_as_sequence = &this->sequence_methods_;
   return *this;
 }
 
 template <typename T>
-PyType<T> &PyType<T>::has_methods() {
+PyType<T> &PyType<T>::set_methods() {
   this->tp_methods = T::methods;
   return *this;
 }
