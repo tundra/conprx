@@ -79,6 +79,13 @@ private:
   PySequenceMethods sequence_methods_;
 };
 
+// Shorthand for declaring members.
+#define PY_MEMBER(NAME, TYPE, HOLDER, FIELD) \
+  {const_cast<char*>(NAME), TYPE, offsetof(HOLDER, FIELD), 0, NULL}
+
+// Last entry in a list of members.
+#define PY_LAST_MEMBER {NULL, 0, 0, 0, NULL}
+
 } // condrv
 
 #endif // _PYTH

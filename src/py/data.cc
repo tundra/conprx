@@ -93,3 +93,29 @@ PyObject *Handle::to_representation(PyObject *object) {
 }
 
 PyType<Handle> Handle::type;
+
+// --- D w o r d   r e f ---
+
+void DwordRef::init() {
+  this->value_ = 0;
+}
+
+PyObject *DwordRef::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  DwordRef *self = DwordRef::type.cast(type->tp_alloc(type, 0));
+  self->init();
+  return self;
+}
+
+PyObject *DwordRef::to_representation(PyObject *object) {
+  DwordRef *self = DwordRef::type.cast(object);
+  PyObject *format = PyString_FromString("&%i");
+  PyObject *args = Py_BuildValue("l", static_cast<long>(self->value_));
+  PyObject *result = PyString_Format(format, args);
+  return result;
+}
+
+PyType<DwordRef> DwordRef::type;
+PyMemberDef DwordRef::members[2] = {
+  PY_MEMBER("value", T_LONG, DwordRef, value_),
+  PY_LAST_MEMBER
+};

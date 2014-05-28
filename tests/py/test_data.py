@@ -18,6 +18,14 @@ class ConDrvDataTest(unittest.TestCase):
     self.assertEquals("", str(s8))
     self.assertRaises(TypeError, condrv.AnsiBuffer, [])
 
+  def test_dword_ref(self):
+    ref = condrv.DwordRef()
+    self.assertEquals(0, ref.value)
+    self.assertEquals("&0", str(ref))
+    ref.value = 99
+    self.assertEquals(99, ref.value)
+    self.assertEquals("&99", str(ref))
+
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
   unittest.main(testRunner=runner)

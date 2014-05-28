@@ -75,10 +75,10 @@ PyObject *Console::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
 }
 
 PyMemberDef Console::members[kConsoleMemberCount + 1] = {
-  {"STD_INPUT_HANDLE", T_LONG, offsetof(Console, std_input_handle_), 0, NULL},
-  {"STD_OUTPUT_HANDLE", T_LONG, offsetof(Console, std_output_handle_), 0, NULL},
-  {"STD_ERROR_HANDLE", T_LONG, offsetof(Console, std_error_handle_), 0, NULL},
-  {NULL, 0, 0, 0, NULL}
+  PY_MEMBER("STD_INPUT_HANDLE", T_LONG, Console, std_input_handle_),
+  PY_MEMBER("STD_OUTPUT_HANDLE", T_LONG, Console, std_output_handle_),
+  PY_MEMBER("STD_ERROR_HANDLE", T_LONG, Console, std_error_handle_),
+  PY_LAST_MEMBER
 };
 
 #define ADD_METHOD_ENTRY(Name, name)                                           \

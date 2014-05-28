@@ -68,6 +68,24 @@ private:
   handle_t handle_;
 };
 
+// A pointer to a dword. Used for output parameters.
+class DwordRef : public PyObject {
+public:
+  void init();
+
+  // __new__
+  static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+  // __repr__
+  static PyObject *to_representation(PyObject *object);
+
+  static PyType<DwordRef> type;
+  static PyMemberDef members[2];
+
+private:
+  dword_t value_;
+};
+
 } // namespace condrv
 
 #endif // _DATA

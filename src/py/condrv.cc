@@ -21,6 +21,12 @@ PyMODINIT_FUNC initcondrv() {
       .complete())
     return;
 
+  if (!DwordRef::type
+      .set_name("condrv.DwordRef")
+      .set_new().set_repr().set_members()
+      .complete())
+    return;
+
   PyType<Console> *console = Console::type();
   if (!console)
     return;
@@ -31,6 +37,8 @@ PyMODINIT_FUNC initcondrv() {
   PyModule_AddObject(module, "AnsiBuffer", reinterpret_cast<PyObject*>(&AnsiBuffer::type));
   Python::incref(Handle::type);
   PyModule_AddObject(module, "Handle", reinterpret_cast<PyObject*>(&Handle::type));
+  Python::incref(DwordRef::type);
+  PyModule_AddObject(module, "DwordRef", reinterpret_cast<PyObject*>(&DwordRef::type));
   Python::incref(*console);
   PyModule_AddObject(module, "Console", reinterpret_cast<PyObject*>(console));
 }
