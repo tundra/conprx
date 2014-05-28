@@ -6,12 +6,11 @@
 #ifndef _CONDRV
 #define _CONDRV
 
-// The python docs say to include Python.h before anything else but we need
-// stuff from here to control how to import it so this one gets to go first.
-#include "utils/types.hh"
+// We can't use the macros from types.hh because python.h insists on being
+// included first and sometimes fails to include if it isn't. What a surprise:
+// python sucks at the api level too.
 
-// Okay now we can import Python.h.
-#ifdef IS_MSVC
+#ifdef _MSC_VER
 #  pragma warning(push, 0)
 #    include <Python.h>
 #  pragma warning(pop)
@@ -21,6 +20,8 @@
 #    include <Python.h>
 #  pragma GCC diagnostic pop
 #endif
+
+#include "utils/types.hh"
 
 namespace condrv {
 
