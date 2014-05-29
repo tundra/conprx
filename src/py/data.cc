@@ -94,16 +94,18 @@ PyObject *WideBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds)
   size_t data_size = 0;
   if (PyUnicode_Check(arg)) {
     // WideBuffer(unicode)
-    // Encode the unicode string as utf16.
+    // Encode the unicode string as utf16. The result is a plain string (not a
+    // unicode!) that holds the encoded bytes.
     PyObject *utf16 = PyUnicode_AsUTF16String(arg);
-    // The first character will always be a BOM so discount that.
-    size_t char_count = (PyString_Size(utf16) / sizeof(uint16_t)) - 1;
+    // The first (16-bit) character will always be a BOM so discount that.
     uint16_t *chars = reinterpret_cast<uint16_t*>(PyString_AS_STRING(utf16)) + 1;
+    size_t char_count = (PyString_Size(utf16) / sizeof(uint16_t)) - 1;
+    // Add room for the null terminator.
     data_size = char_count + 1;
     data = new uint16_t[data_size];
     // The string is not null-terminated so first copy the characters, then
     // null-terminate.
-    memcpy(data, chars, char_count * sizeof(uint16_t));
+    memcpy(data, chars, sizeof(uint16_t) * char_count);
     data[char_count] = '\0';
   } else if (PyInt_Check(arg)) {
     // WideBuffer(int)
@@ -130,8 +132,11 @@ PyObject *WideBuffer::to_representation(PyObject *object) {
   // terminated strings.
   WideBuffer *self = WideBuffer::type.cast(object);
   wide_c_str_t w_str = self->as_c_str();
+  // Decode the utf16 data in the buffer into a python unicode object.
   PyObject *data_str = PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
       self->data_size_ * sizeof(uint16_t), NULL, NULL);
+  // Use the %r formatter directive which calls repr which converts non-ascii
+  // characters to escapes, which is what we want.
   PyObject *format = PyString_FromString("U%r");
   PyObject *args = Py_BuildValue("O", data_str);
   return PyUnicode_Format(format, args);
@@ -144,8 +149,10 @@ PyObject *WideBuffer::to_string(PyObject *object) {
   wide_c_str_t w_str = self->as_c_str();
   size_t last_char = self->data_size_ - 1;
   size_t length = (w_str[last_char] == '\0') ? wstrlen(w_str) : last_char;
+  // This actually returns a unicode, not a string, but python seems to do the
+  // right thing both when calling this through str() and unicode().
   return PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
-      length * sizeof(uint16_t), NULL, NULL);
+      sizeof(uint16_t) * length, NULL, NULL);
 }
 
 Py_ssize_t WideBuffer::length(PyObject *object) {
@@ -159,8 +166,7 @@ PyObject *WideBuffer::get_item(PyObject *object, Py_ssize_t index) {
     PyErr_SetString(PyExc_IndexError, "WideBuffer index out of bounds");
     return NULL;
   }
-  uint16_t value = self->data_[index];
-  return PyInt_FromLong(value);
+  return PyInt_FromLong(self->data_[index]);
 }
 
 size_t WideBuffer::wstrlen(wide_c_str_t str) {

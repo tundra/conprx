@@ -51,7 +51,9 @@ private:
   size_t data_size_;
 };
 
-// An (16-bit) wide character buffer, mutable or const.
+// An (16-bit) wide character buffer, mutable or const. It is wide in the
+// windows sense, UTF-16, no in the ill-defined wchar_t sense which means
+// different things in different contexts.
 class WideBuffer : public PyObject {
 public:
   // Initializes an already existing instance.
