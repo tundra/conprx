@@ -63,8 +63,11 @@ public:
   // Sets the methods of this type to T::members.
   PyType<T> &set_members();
 
-  // Sets the length function of this type to T::length;
+  // Sets the length function of this type to T::length.
   PyType<T> &set_len();
+
+  // Sets the item getter of this type to T::get_item.
+  PyType<T> &set_item();
 
   // Binds this type to a name in the given module.
   PyType<T> &bind(PyObject *module, const char *name);

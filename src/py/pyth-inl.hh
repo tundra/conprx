@@ -88,6 +88,13 @@ PyType<T> &PyType<T>::set_len() {
 }
 
 template <typename T>
+PyType<T> &PyType<T>::set_item() {
+  this->sequence_methods_.sq_item = T::get_item;
+  this->tp_as_sequence = &this->sequence_methods_;
+  return *this;
+}
+
+template <typename T>
 PyType<T> &PyType<T>::set_methods() {
   this->tp_methods = T::methods;
   return *this;

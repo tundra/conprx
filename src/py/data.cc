@@ -6,7 +6,7 @@
 
 using namespace condrv;
 
-// --- A n s i   s t r i n g ---
+// --- A n s i   b u f f e r ---
 
 void AnsiBuffer::init(uint8_t *data, size_t data_size) {
   this->data_ = data;
@@ -51,9 +51,9 @@ PyObject *AnsiBuffer::to_representation(PyObject *object) {
   // The representation explicitly includes the null terminator for null-
   // terminated strings.
   AnsiBuffer *self = AnsiBuffer::type.cast(object);
-  const char *c_str = self->as_c_str();
+  ansi_c_str_t c_str = self->as_c_str();
   PyObject *data_str = PyString_FromStringAndSize(c_str, self->data_size_);
-  PyObject *format = PyString_FromString("A\"%s\"");
+  PyObject *format = PyString_FromString("A'%s'");
   PyObject *args = Py_BuildValue("O", data_str);
   PyObject *result = PyString_Format(format, args);
   return result;
@@ -63,7 +63,7 @@ PyObject *AnsiBuffer::to_string(PyObject *object) {
   // The string conversion stops at the first null character if the string is
   // null-terminated.
   AnsiBuffer *self = AnsiBuffer::type.cast(object);
-  const char *c_str = self->as_c_str();
+  ansi_c_str_t c_str = self->as_c_str();
   size_t data_size = self->data_size_ - 1;
   size_t length = (c_str[data_size] == '\0') ? strlen(c_str) : data_size - 1;
   return PyString_FromStringAndSize(c_str, length);
@@ -75,6 +75,103 @@ Py_ssize_t AnsiBuffer::length(PyObject *object) {
 }
 
 PyType<AnsiBuffer> AnsiBuffer::type;
+
+
+// --- W i d e   b u f f e r ---
+
+void WideBuffer::init(uint16_t *data, size_t data_size) {
+  this->data_ = data;
+  this->data_size_ = data_size;
+}
+
+// Creates a new ansi buffer based either on a string or a length.
+PyObject *WideBuffer::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  PyObject *arg = NULL;
+  if (!PyArg_ParseTuple(args, "O", &arg))
+    return NULL;
+
+  uint16_t *data = NULL;
+  size_t data_size = 0;
+  if (PyUnicode_Check(arg)) {
+    // WideBuffer(unicode)
+    // Encode the unicode string as utf16.
+    PyObject *utf16 = PyUnicode_AsUTF16String(arg);
+    // The first character will always be a BOM so discount that.
+    size_t char_count = (PyString_Size(utf16) / sizeof(uint16_t)) - 1;
+    uint16_t *chars = reinterpret_cast<uint16_t*>(PyString_AS_STRING(utf16)) + 1;
+    data_size = char_count + 1;
+    data = new uint16_t[data_size];
+    // The string is not null-terminated so first copy the characters, then
+    // null-terminate.
+    memcpy(data, chars, char_count * sizeof(uint16_t));
+    data[char_count] = '\0';
+  } else if (PyInt_Check(arg)) {
+    // WideBuffer(int)
+    data_size = PyInt_AsLong(arg);
+    data = new uint16_t[data_size];
+    memset(data, 0, sizeof(uint16_t) * data_size);
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Unexpected argument to WideBuffer()");
+    return NULL;
+  }
+
+  WideBuffer *self = WideBuffer::type.cast(type->tp_alloc(type, 0));
+  self->init(data, data_size);
+  return self;
+}
+
+void WideBuffer::dispose(PyObject *object) {
+  WideBuffer *self = WideBuffer::type.cast(object);
+  delete[] self->data_;
+}
+
+PyObject *WideBuffer::to_representation(PyObject *object) {
+  // The representation explicitly includes the null terminator for null-
+  // terminated strings.
+  WideBuffer *self = WideBuffer::type.cast(object);
+  wide_c_str_t w_str = self->as_c_str();
+  PyObject *data_str = PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
+      self->data_size_ * sizeof(uint16_t), NULL, NULL);
+  PyObject *format = PyString_FromString("U%r");
+  PyObject *args = Py_BuildValue("O", data_str);
+  return PyUnicode_Format(format, args);
+}
+
+PyObject *WideBuffer::to_string(PyObject *object) {
+  // The string conversion stops at the first null character if the string is
+  // null-terminated.
+  WideBuffer *self = WideBuffer::type.cast(object);
+  wide_c_str_t w_str = self->as_c_str();
+  size_t last_char = self->data_size_ - 1;
+  size_t length = (w_str[last_char] == '\0') ? wstrlen(w_str) : last_char;
+  return PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
+      length * sizeof(uint16_t), NULL, NULL);
+}
+
+Py_ssize_t WideBuffer::length(PyObject *object) {
+  WideBuffer *self = WideBuffer::type.cast(object);
+  return self->data_size_;
+}
+
+PyObject *WideBuffer::get_item(PyObject *object, Py_ssize_t index) {
+  WideBuffer *self = WideBuffer::type.cast(object);
+  if (static_cast<Py_ssize_t>(self->data_size_) <= index) {
+    PyErr_SetString(PyExc_IndexError, "WideBuffer index out of bounds");
+    return NULL;
+  }
+  uint16_t value = self->data_[index];
+  return PyInt_FromLong(value);
+}
+
+size_t WideBuffer::wstrlen(wide_c_str_t str) {
+  wide_c_str_t p = str;
+  while (*p)
+    p++;
+  return p - str;
+}
+
+PyType<WideBuffer> WideBuffer::type;
+
 
 // --- H a n d l e ---
 

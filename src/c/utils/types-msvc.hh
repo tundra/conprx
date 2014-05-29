@@ -12,4 +12,5 @@
 #define win_size_t SIZE_T
 #define module_t HMODULE
 #define ansi_c_str_t LPSTR
+#define wide_c_str_t LPWSTR
 #define c_str_t LPCSTR

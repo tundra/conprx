@@ -51,6 +51,47 @@ private:
   size_t data_size_;
 };
 
+// An (16-bit) wide character buffer, mutable or const.
+class WideBuffer : public PyObject {
+public:
+  // Initializes an already existing instance.
+  void init(uint16_t *data, size_t data_size);
+
+  // __new__
+  static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+  // __dealloc__
+  static void dispose(PyObject *object);
+
+  // __str__
+  static PyObject *to_string(PyObject *object);
+
+  // __repr__
+  static PyObject *to_representation(PyObject *object);
+
+  // __len__
+  static Py_ssize_t length(PyObject *object);
+
+  // __item__
+  static PyObject *get_item(PyObject *object, Py_ssize_t index);
+
+  // Returns the index of the first \0 in the given string.
+  static size_t wstrlen(wide_c_str_t str);
+
+  // Returns this buffer's content viewed as an ansi c string.
+  wide_c_str_t as_c_str() { return reinterpret_cast<wide_c_str_t>(data_); }
+
+  // Python type object.
+  static PyType<WideBuffer> type;
+
+private:
+  // The underlying character data.
+  uint16_t *data_;
+
+  // The number of shorts in the given data array.
+  size_t data_size_;
+};
+
 // Wrapper around a windows HANDLE. Handles cannot be created from python, only
 // returned from api calls.
 class Handle : public PyObject {

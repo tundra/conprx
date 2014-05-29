@@ -18,6 +18,13 @@ PyMODINIT_FUNC initcondrv() {
     return;
   AnsiBuffer::type.bind(module, "AnsiBuffer");
 
+  if (!WideBuffer::type
+      .set_name("condrv.WideBuffer")
+      .set_new().set_dealloc().set_str().set_repr().set_len().set_item()
+      .complete())
+    return;
+  WideBuffer::type.bind(module, "WideBuffer");
+
   if (!Handle::type
       .set_name("condrv.Handle")
       .set_repr()
