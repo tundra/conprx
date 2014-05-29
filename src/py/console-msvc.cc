@@ -39,6 +39,18 @@ PyObject *Console::get_console_title_a(PyObject *self, PyObject *args) {
   return PyInt_FromLong(result);
 }
 
+PyObject *Console::get_console_title_w(PyObject *self, PyObject *args) {
+  PyObject *console_title_obj = NULL;
+  long size = 0;
+  if (!PyArg_ParseTuple(args, "Ol", &console_title_obj, &size))
+    return NULL;
+  WideBuffer *console_title = WideBuffer::type.cast(console_title_obj);
+  if (!console_title)
+    return NULL;
+  long result = GetConsoleTitleW(console_title->as_c_str(), size);
+  return PyInt_FromLong(result);
+}
+
 // HANDLE WINAPI GetStdHandle(
 //   _In_  DWORD nStdHandle
 // );
@@ -61,6 +73,17 @@ PyObject *Console::set_console_title_a(PyObject *self, PyObject *args) {
   if (!console_title)
     return NULL;
   bool result = SetConsoleTitleA(console_title->as_c_str());
+  return PyBool_FromLong(result);
+}
+
+PyObject *Console::set_console_title_w(PyObject *self, PyObject *args) {
+  PyObject *console_title_obj = NULL;
+  if (!PyArg_ParseTuple(args, "O", &console_title_obj))
+    return NULL;
+  WideBuffer *console_title = WideBuffer::type.cast(console_title_obj);
+  if (!console_title)
+    return NULL;
+  bool result = SetConsoleTitleW(console_title->as_c_str());
   return PyBool_FromLong(result);
 }
 
