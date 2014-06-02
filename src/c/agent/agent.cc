@@ -6,28 +6,6 @@
 #include "conapi.hh"
 #include "utils/log.hh"
 
-// Controls the injection of the console agent.
-class ConsoleAgent {
-public:
-  // Install the console agent instead of the built-in console.
-  static bool install(Console &console);
-
-private:
-  // Returns the address of the console function with the given name.
-  static function_t get_console_function_address(c_str_t name);
-
-  // The console object currently being delegated to.
-  static Console *delegate;
-
-  static bool WINAPI write_console_a_bridge(handle_t console_output,
-      const void *buffer, dword_t number_of_chars_to_write,
-      dword_t *number_of_chars_written, void *reserved) {
-    return delegate->write_console_a(console_output, buffer, number_of_chars_to_write,
-        number_of_chars_written, reserved);
-  }
-
-};
-
 Console *ConsoleAgent::delegate = NULL;
 
 bool ConsoleAgent::install(Console &installed_delegate) {

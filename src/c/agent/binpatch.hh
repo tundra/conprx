@@ -1,7 +1,7 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-/// ## Cross-platform code for binary patching.
+/// # Binary code patching
 ///
 /// A binary patch in this context is one that causes the implementation of one
 /// C function to be replaced by a different one without requiring changes to
@@ -9,27 +9,29 @@
 /// you're calling is replaced with a different one under your feet.
 ///
 /// The way this is done is by destructively overwriting the first instructions
-/// of the function to be replaced with a jump to the replacement. The process
-/// works as follows.
+/// of the function to be replaced with a jump to an alternative implementation.
+/// This approach is somewhat inspired by code patching and somewhat by inline
+/// caching techniques.
 ///
-/// The function to patch and its replacement are assumed to be no more than
-/// 2^32 bytes apart in memory. The first 5 bytes in the original function is
-/// replaced with a jump to the replacement. Note that this may not happen
-/// cleanly -- the end of the 5 bytes may be in the middle of some instruction
-/// but it doesn't matter since we're jumping away from there anyway.
+/// Code patching is tricky and error prone, and if you get it wrong it can do
+/// real damage. For this reason this library is willing to sacrifice some
+/// performance to have extra safeguards, and to refuse to work unless it is
+/// convinced that it will be successful.
 ///
-/// At the same time a trampoline function is constructed that first executes
-/// the instructions that were overwritten in the original, the _preamble_. That
-/// means not just the first 5 bytes since, as mentioned above, the 5-byte
-/// boundary may fall within an instruction and we need the full instruction to
-/// be executed by the trampoline. Then the trampoline jumps to the point in the
-/// original function immediately following the preamble at which point
-/// everything works as if the original function had been intact.
+/// The library uses a few abstractions.
+///
+///    * A {{#BinaryPatch}}(binary patch) is a request to patch a function. It
+///      also keeps track of the current state, whether it has been applied etc.
+///    * The {{#PatchEngine}}(patch engine) encapsulates the mechanics of
+///      actually making the code changes. Each platform has its own patch
+///      engine.
 
 #ifndef _BINPATCH
 #define _BINPATCH
 
 #include "utils/types.hh"
+
+class PatchEngine;
 
 // The size in bytes of a jmp instruction.
 #define kJmpSizeBytes 5
@@ -57,40 +59,11 @@ typedef size_t address_arith_t;
 // The type of a function to be patched.
 typedef void *function_t;
 
-// Casts a function to an abstract function_t.
-#define FUNCAST(EXPR) reinterpret_cast<function_t>(EXPR)
-
-// The platform-specific engine that knows how to apply binary patches.
-class PatchEngine {
-public:
-  virtual ~PatchEngine();
-
-  // If the engine needs any kind of initialization this call will ensure that
-  // it has been initialized.
-  virtual bool ensure_initialized();
-
-  // Attempts to open the page that holds the given address such that it can be
-  // written. If successful the previous permissions should be stored in the
-  // given out parameter.
-  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms) = 0;
-
-  // Attempts to close the currently open page that holds the given address
-  // by restoring the permissions to the given value, which was the on stored
-  // in the out parameter by the open method.
-  virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms) = 0;
-
-  // Allocates a piece of executable memory of the given size near enough to
-  // the given address that we can jump between them. If memory can't be
-  // successfully allocated returns NULL.
-  virtual address_t alloc_executable(address_t addr, size_t size) = 0;
-
-  // Returns the patch engine appropriate for this platform.
-  static PatchEngine &get();
-};
-
-// Encapsulates an individual binary patch. Binary patches are platform
-// independent, - any platform code is encapsulated in the patch engine which
-// the patch object will delegate to as appropriate.
+/// ## Binary patch
+///
+/// An individual binary patch request is the "unit" of the patching process.
+/// It contains an address of the function to replace and an address of its
+/// intended replacement, as well as extra
 class BinaryPatch {
 public:
   // Indicates the current state of this patch.
@@ -177,6 +150,37 @@ private:
   // When applied this array holds the code in the original function that was
   // overwritten.
   byte_t overwritten_[kPatchSizeBytes];
+};
+
+// Casts a function to an abstract function_t.
+#define FUNCAST(EXPR) reinterpret_cast<function_t>(EXPR)
+
+// The platform-specific engine that knows how to apply binary patches.
+class PatchEngine {
+public:
+  virtual ~PatchEngine();
+
+  // If the engine needs any kind of initialization this call will ensure that
+  // it has been initialized.
+  virtual bool ensure_initialized();
+
+  // Attempts to open the page that holds the given address such that it can be
+  // written. If successful the previous permissions should be stored in the
+  // given out parameter.
+  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms) = 0;
+
+  // Attempts to close the currently open page that holds the given address
+  // by restoring the permissions to the given value, which was the on stored
+  // in the out parameter by the open method.
+  virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms) = 0;
+
+  // Allocates a piece of executable memory of the given size near enough to
+  // the given address that we can jump between them. If memory can't be
+  // successfully allocated returns NULL.
+  virtual address_t alloc_executable(address_t addr, size_t size) = 0;
+
+  // Returns the patch engine appropriate for this platform.
+  static PatchEngine &get();
 };
 
 #endif // _BINPATCH
