@@ -232,7 +232,7 @@ public:
 
   // Returns true if any offset between two addresses that are at most the given
   // distance apart will fit in 32 bits.
-  static bool offsets_fits_in_32_bits(size_t dist);
+  static bool offsets_fit_in_32_bits(size_t dist);
 
 private:
   // The patch engine used to apply this patch set.
@@ -250,8 +250,26 @@ private:
   Status status_;
 };
 
-// Casts a function to an abstract function_t.
-#define FUNCAST(EXPR) reinterpret_cast<address_t>(EXPR)
+// Casts a function to an address statically such that it can be used in
+// compile time constants. If the result doesn't have to be a constant it's
+// better to use Code::upcast.
+#define CODE_UPCAST(EXPR) reinterpret_cast<address_t>(EXPR)
+
+// Utilities for working with function pointers.
+class Code {
+public:
+  // Casts the given address to the same type as the given prototype.
+  template <typename T>
+  static T *downcast(T *prototype, address_t addr) {
+    return reinterpret_cast<T*>(addr);
+  }
+
+  // Casts the given function to an address.
+  template <typename T>
+  static address_t upcast(T *value) {
+    return CODE_UPCAST(value);
+  }
+};
 
 // The platform-specific object that knows how to allocate and manipulate memory.
 class MemoryManager {

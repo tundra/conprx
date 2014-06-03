@@ -15,7 +15,7 @@ bool ConsoleAgent::install(Console &installed_delegate) {
   }
   delegate = &installed_delegate;
   address_t write_console_a = get_console_function_address(TEXT("WriteConsoleA"));
-  PatchRequest patch(write_console_a, FUNCAST(write_console_a_bridge), 0);
+  PatchRequest patch(write_console_a, Code::upcast(write_console_a_bridge), 0);
   MemoryManager &memman = MemoryManager::get();
   if (!memman.ensure_initialized())
     return false;

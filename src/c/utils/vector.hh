@@ -7,6 +7,7 @@
 #include "stdc.h"
 #include "utils/types.hh"
 
+// A thin wrapper around an array with a length and various utilities.
 template <typename T>
 class Vector {
 public:

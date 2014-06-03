@@ -17,5 +17,5 @@ bool APIENTRY DllMain(module_t module, dword_t reason, void *) {
 
 address_t ConsoleAgent::get_console_function_address(c_str_t name) {
   module_t kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
-  return FUNCAST(GetProcAddress(kernel32, name));
+  return Code::upcast(GetProcAddress(kernel32, name));
 }

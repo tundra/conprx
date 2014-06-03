@@ -140,7 +140,7 @@ bool PatchSet::prepare_apply() {
       sizeof(PatchStubs) * requests().length());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
-    LOG_ERROR("Failed to allocate memory for %i requests near %p.",
+    LOG_ERROR("Failed to allocate memory for %i stubs near %p.",
         range.start(), requests().length());
     return false;
   }
@@ -151,7 +151,7 @@ bool PatchSet::prepare_apply() {
   // worst case, the two locations farthest away from each other in the two
   // ranges, but the size of the ranges themselves should be negligible in
   // comparison and this seems like a safer check.
-  if (!offsets_fits_in_32_bits(dist)) {
+  if (!offsets_fit_in_32_bits(dist)) {
     LOG_ERROR("Memory couldn't be allocated near %p/%llu; distance to %p/%llu is %llu",
         range.start(), range.length(), memory.start(), memory.length(), dist);
     return false;
@@ -163,8 +163,8 @@ bool PatchSet::prepare_apply() {
   return true;
 }
 
-bool PatchSet::offsets_fits_in_32_bits(size_t dist) {
-  return (dist & ~static_cast<size_t>(0x7FFFFFFF)) == 0;
+bool PatchSet::offsets_fit_in_32_bits(size_t dist) {
+  return dist < 0x80000000;
 }
 
 Vector<byte_t> PatchSet::determine_address_range() {
