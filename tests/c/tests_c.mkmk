@@ -5,7 +5,8 @@ import re
 
 filenames = [
   "test_binpatch.cc",
-  "test_conapi.cc"
+  "test_conapi.cc",
+  "test_vector.cc",
 ]
 
 # Compile a single test file, ensuring that the include paths are hooked up

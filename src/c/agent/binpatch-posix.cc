@@ -9,13 +9,13 @@
 #include "utils/log.hh"
 
 
-class PosixPatchEngine : public PatchEngine {
+class PosixMemoryManager : public MemoryManager {
 public:
-  PosixPatchEngine();
+  PosixMemoryManager();
   virtual bool ensure_initialized();
   virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms);
   virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms);
-  virtual address_t alloc_executable(address_t addr, size_t size);
+  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size);
 private:
   bool is_initialized_;
   size_t page_size_;
@@ -25,11 +25,11 @@ private:
   bool try_set_page_permissions(address_t addr, int prot);
 };
 
-PosixPatchEngine::PosixPatchEngine()
+PosixMemoryManager::PosixMemoryManager()
   : is_initialized_(false)
   , page_size_(0) { }
 
-bool PosixPatchEngine::ensure_initialized() {
+bool PosixMemoryManager::ensure_initialized() {
   if (is_initialized_)
     return true;
   int page_size = sysconf(_SC_PAGE_SIZE);
@@ -43,7 +43,7 @@ bool PosixPatchEngine::ensure_initialized() {
   return true;
 }
 
-bool PosixPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_perms) {
+bool PosixMemoryManager::try_open_page_for_writing(address_t addr, dword_t *old_perms) {
   // TODO: store the old permissions rather than assume they're read+exec. As
   //   far as I've been able to determine you're meant to get this info by
   //   parsing stuff from /proc which seems ridiculous.
@@ -54,14 +54,14 @@ bool PosixPatchEngine::try_open_page_for_writing(address_t addr, dword_t *old_pe
   return result;
 }
 
-bool PosixPatchEngine::try_close_page_for_writing(address_t addr, dword_t old_perms) {
+bool PosixMemoryManager::try_close_page_for_writing(address_t addr, dword_t old_perms) {
   bool result = try_set_page_permissions(addr, PROT_READ | PROT_EXEC);
   if (!result)
     LOG_ERROR("Failed to close %p after writing", addr);
   return result;
 }
 
-bool PosixPatchEngine::try_set_page_permissions(address_t addr, int prot) {
+bool PosixMemoryManager::try_set_page_permissions(address_t addr, int prot) {
   // TODO: deal with the case where the function is spread over multiple pages.
   address_arith_t start_addr = reinterpret_cast<address_arith_t>(addr);
   address_arith_t page_addr = start_addr & ~(this->page_size_ - 1);
@@ -71,23 +71,23 @@ bool PosixPatchEngine::try_set_page_permissions(address_t addr, int prot) {
   return true;
 }
 
-address_t PosixPatchEngine::alloc_executable(address_t addr, size_t size) {
+Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size) {
   address_arith_t addr_val = reinterpret_cast<address_arith_t>(addr);
   if ((addr_val & 0xFFFFFFFF) != addr_val) {
     LOG_ERROR("Cannot allocate executable memory near %p (%ib)", addr, size);
     // All we can do to allocate near the given address is to rely on it being
     // in the bottom 2G and then ask mmap to give us memory there. If it's not
     // there there's nothing we can do.
-    return NULL;
+    return Vector<byte_t>();
   }
   void *result = mmap(NULL, page_size_, PROT_READ | PROT_WRITE | PROT_EXEC,
       MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, 0, 0);
-  return static_cast<address_t>(result);
+  return Vector<byte_t>(static_cast<byte_t*>(result), size);
 }
 
-PatchEngine &PatchEngine::get() {
-  static PosixPatchEngine *instance = NULL;
+MemoryManager &MemoryManager::get() {
+  static PosixMemoryManager *instance = NULL;
   if (instance == NULL)
-    instance = new PosixPatchEngine();
+    instance = new PosixMemoryManager();
   return *instance;
 }

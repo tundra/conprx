@@ -14,3 +14,4 @@
 #define ansi_c_str_t LPSTR
 #define wide_c_str_t LPWSTR
 #define c_str_t LPCSTR
+#define ssize_t SSIZE_T

@@ -3,6 +3,6 @@
 
 #include "utils/types.hh"
 
-function_t ConsoleAgent::get_console_function_address(c_str_t name) {
+address_t ConsoleAgent::get_console_function_address(c_str_t name) {
   return NULL;
 }

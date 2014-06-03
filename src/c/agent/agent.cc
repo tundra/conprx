@@ -14,16 +14,16 @@ bool ConsoleAgent::install(Console &installed_delegate) {
     return false;
   }
   delegate = &installed_delegate;
-  function_t write_console_a = get_console_function_address(TEXT("WriteConsoleA"));
-  BinaryPatch patch(write_console_a, FUNCAST(write_console_a_bridge), 0);
-  PatchEngine &engine = PatchEngine::get();
-  if (!engine.ensure_initialized())
+  address_t write_console_a = get_console_function_address(TEXT("WriteConsoleA"));
+  PatchRequest patch(write_console_a, FUNCAST(write_console_a_bridge), 0);
+  MemoryManager &memman = MemoryManager::get();
+  if (!memman.ensure_initialized())
     return false;
   if (!patch.is_tentatively_possible()) {
     LOG_ERROR("Patch is impossible");
     return false;
   }
-  if (!patch.apply(engine)) {
+  if (!patch.apply(memman)) {
     LOG_ERROR("Failed to patch");
     return false;
   }
