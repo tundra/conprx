@@ -4,7 +4,12 @@
 #include "utils/types.hh"
 
 static bool dll_process_attach() {
-  return ConsoleAgent::install(Console::logger());
+  LoggingConsole *logger = new LoggingConsole(NULL);
+  Console *original = NULL;
+  if (!ConsoleAgent::install(*logger, &original))
+    return false;
+  logger->set_delegate(original);
+  return true;
 }
 
 bool APIENTRY DllMain(module_t module, dword_t reason, void *) {

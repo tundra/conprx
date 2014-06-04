@@ -38,24 +38,34 @@
 #include "conapi.hh"
 #include "utils/types.hh"
 
+namespace conprx {
+
 // Controls the injection of the console agent.
 class ConsoleAgent {
 public:
-  // Install the console agent instead of the built-in console.
-  static bool install(Console &console);
+  // Install the given console instead of the built-in one. Returns true on
+  // success. If this succeeds the output parameter will hold another console
+  // which can be called to get the original console behavior.
+  static bool install(Console &console, Console **original_out);
+
+  static Console &delegate() { return *delegate_; }
 
 private:
   // Returns the address of the console function with the given name.
   static address_t get_console_function_address(c_str_t name);
 
-  // The console object currently being delegated to.
-  static Console *delegate;
+  // Returns the address of the delegator that turns static function calls into
+  // method calls on the delegate object.
+  static address_t get_delegate_bridge(int key);
 
-  static bool WINAPI write_console_a_bridge(handle_t console_output,
-      const void *buffer, dword_t number_of_chars_to_write,
-      dword_t *number_of_chars_written, void *reserved) {
-    return delegate->write_console_a(console_output, buffer, number_of_chars_to_write,
-        number_of_chars_written, reserved);
-  }
+#define __EMIT_DELEGATE_BRIDGE__(Name, name, RET, PARAMS, ARGS)                \
+  static RET name##_bridge PARAMS;
+  FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
+#undef __EMIT_DELEGATE_BRIDGE__
+
+  // The console object currently being delegated to.
+  static Console *delegate_;
 
 };
+
+} // namespace conprx

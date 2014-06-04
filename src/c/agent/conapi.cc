@@ -6,29 +6,32 @@
 #include "conapi.hh"
 #include "utils/log.hh"
 
+using namespace conprx;
+
 Console::~Console() { }
 
-// Console implementation that just logs everything.
-class LoggingConsole : public Console {
-public:
-  virtual bool write_console_a(handle_t console_output, const void *buffer,
-    dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
-    void *reserved);
+static Console::FunctionInfo function_info[Console::kFunctionCount + 1] = {
+#define __DECLARE_INFO__(Name, name, ...) {TEXT(#Name), Console::name##_key} ,
+    FOR_EACH_CONAPI_FUNCTION(__DECLARE_INFO__)
+#undef __DECLARE_INFO__
+    {NULL, 0}
 };
 
-bool LoggingConsole::write_console_a(handle_t console_output, const void *buffer,
-  dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
-  void *reserved) {
-  LOG_INFO("WriteConsoleA(\"%s\", %i)", buffer, number_of_chars_to_write);
-  *number_of_chars_written = number_of_chars_to_write;
-  return true;
+Vector<Console::FunctionInfo> Console::functions() {
+  return Vector<FunctionInfo>(function_info, Console::kFunctionCount);
 }
 
-Console &Console::logger() {
-  static LoggingConsole *instance = NULL;
-  if (instance == NULL)
-    instance = new LoggingConsole();
-  return *instance;
+// --- L o g g i n g ---
+
+bool LoggingConsole::alloc_console() {
+  return delegate().alloc_console();
+}
+
+bool LoggingConsole::write_console_a(handle_t console_output, const void *buffer,                            \
+       dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
+       void *reserved) {
+  return delegate().write_console_a(console_output, buffer, number_of_chars_to_write,
+      number_of_chars_written, reserved);
 }
 
 #ifdef IS_MSVC

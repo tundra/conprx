@@ -7,22 +7,28 @@
 
 class WindowsMemoryManager : public MemoryManager {
 public:
-  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms);
-  virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms);
+  virtual bool open_for_writing(Vector<byte_t> region, dword_t *old_perms);
+  virtual bool close_for_writing(Vector<byte_t> region, dword_t old_perms);
   virtual Vector<byte_t> alloc_executable(address_t addr, size_t size);
 };
 
-bool WindowsMemoryManager::try_open_page_for_writing(address_t addr, dword_t *old_perms) {
-  return VirtualProtect(addr, kPatchSizeBytes, PAGE_EXECUTE_READWRITE, old_perms);
+bool WindowsMemoryManager::open_for_writing(Vector<byte_t> region, dword_t *old_perms) {
+  return VirtualProtect(region.start(), region.length(), PAGE_EXECUTE_READWRITE, old_perms);
 }
 
-bool WindowsMemoryManager::try_close_page_for_writing(address_t addr, dword_t old_perms) {
+bool WindowsMemoryManager::close_for_writing(Vector<byte_t> region, dword_t old_perms) {
   dword_t dummy_perms = 0;
-  return VirtualProtect(addr, kPatchSizeBytes, old_perms, &dummy_perms);
+  return VirtualProtect(region.start(), region.length(), old_perms, &dummy_perms);
 }
 
 Vector<byte_t> WindowsMemoryManager::alloc_executable(address_t addr, size_t size) {
-  return Vector<byte_t>();
+  void *memory = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (memory == NULL) {
+    int error = GetLastError();
+    LOG_WARNING("VirtualAlloc failed: %i", error);
+    return Vector<byte_t>();
+  }
+  return Vector<byte_t>(static_cast<address_t>(memory), size);
 }
 
 MemoryManager &MemoryManager::get() {

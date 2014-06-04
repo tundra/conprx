@@ -16,7 +16,7 @@ typedef const char *ansi_c_str_t;
 typedef const wchar_t *wide_c_str_t;
 typedef ansi_c_str_t c_str_t;
 
-#define TEXT(STR) STR
+#define TEXT(STR) (STR)
 
 // Windows-specific directives that we can just ignore when building elsewhere.
 #define APIENTRY

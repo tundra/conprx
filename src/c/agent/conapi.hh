@@ -6,27 +6,76 @@
 #ifndef _CONAPI
 #define _CONAPI
 
+#include "agent/binpatch.hh"
 #include "utils/types.hh"
+#include "utils/vector.hh"
 
-// A virtual console api.
+namespace conprx {
+
+#define FOR_EACH_CONAPI_FUNCTION(F)                                            \
+  F(WriteConsoleA, write_console_a, bool,                                      \
+      (handle_t console_output, const void *buffer,                            \
+       dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
+       void *reserved),                                                        \
+      (console_output, buffer, number_of_chars_to_write,                       \
+       number_of_chars_written, reserved))                                     \
+  F(AllocConsole, alloc_console, bool, (), ())
+
+// A container that holds the various definitions used by the other console
+// types.
 class Console {
 public:
-  typedef bool (write_console_a_t)(handle_t console_output, const void *buffer,
-    dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
-    void *reserved);
-
   virtual ~Console();
 
-  virtual bool write_console_a(handle_t console_output, const void *buffer,
-    dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
-    void *reserved) = 0;
+  // The types of the naked console functions.
+#define __DECLARE_CONAPI_FUNCTION__(Name, name, RET, PARAMS, ARGS)             \
+  typedef RET (*name##_t)PARAMS;
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
+#undef __DECLARE_CONAPI_FUNCTION__
 
-  // Returns the native implementation of the windows console api. Only defined
-  // on windows.
-  static Console &wincon();
+  enum key_t {
+#define __DECLARE_CONAPI_KEY__(Name, name, RET, PARAMS, ARGS)                  \
+    name##_key,
+    FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_KEY__)
+#undef __DECLARE_CONAPI_KEY__
+    kFunctionCount
+  };
 
-  // Returns a console that logs all events.
-  static Console &logger();
+#define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
+  virtual RET name PARAMS = 0;
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
+#undef __DECLARE_CONAPI_METHOD__
+
+  // A description of a console function.
+  struct FunctionInfo {
+    c_str_t name;
+    int key;
+  };
+
+  // Returns a list containing descriptions of all the console functions.
+  static Vector<FunctionInfo> functions();
+
 };
+
+// A console implementation that logs all interaction before forwarding it to
+// a given delegate.
+class LoggingConsole : public Console {
+public:
+  LoggingConsole(Console *delegate) : delegate_(delegate) { }
+
+  void set_delegate(Console *delegate) { delegate_ = delegate; }
+
+  Console &delegate() { return *delegate_; }
+
+#define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
+  virtual RET name PARAMS;
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
+#undef __DECLARE_CONAPI_METHOD__
+
+private:
+  Console *delegate_;
+};
+
+} // conprx
 
 #endif // _CONAPI

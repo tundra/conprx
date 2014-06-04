@@ -33,21 +33,11 @@
 #include "utils/vector.hh"
 
 class MemoryManager;
+class InstructionSet;
 struct PatchStubs;
 
-// The size in bytes of a jmp instruction.
-#define kJmpSizeBytes 5
-
-// The opcode of a jmp.
-#define kJmpOp 0xE9
-
-// The size in bytes of the patch that will be written into the subject function
-// to redirect it.
-#define kPatchSizeBytes kJmpSizeBytes
-
-// The size in bytes of the instruction that resumes the original method after
-// executing the preamble in the trampoline.
-#define kResumeSizeBytes kJmpSizeBytes
+// The biggest possible redirect sequence.
+#define kMaxRedirectSizeBytes 8
 
 // Shorthand for bytes.
 typedef unsigned char byte_t;
@@ -66,16 +56,6 @@ typedef size_t address_arith_t;
 /// the patching process.
 class PatchRequest {
 public:
-  // Indicates the current state of this patch.
-  enum Status {
-    // This patch hasn't been applied yet, or it has been applied and then
-    // successfully reverted.
-    NOT_APPLIED,
-    PREPARED,
-    APPLIED,
-    FAILED
-  };
-
   // Flags that control how the patch is applied.
   enum Flag {
     MAKE_TRAMPOLINE = 0x1
@@ -85,50 +65,29 @@ public:
   // the given replacement.
   PatchRequest(address_t original, address_t replacement, uint32_t flags = MAKE_TRAMPOLINE);
 
+  PatchRequest();
+
   // Marks this request as having been prepared to be applied.
   void preparing_apply(PatchStubs *stubs);
-
-  // Checks, without making any changes, whether the given request may be
-  // possible. This is to catch cases where we can tell early on that a patch
-  // couldn't possibly succeed, without necessarily guaranteeing that it will
-  // succeed if you try. The function that does the actual patching can assume
-  // that this has been called and returned true.
-  bool is_tentatively_possible();
-
-  // Returns the current status.
-  Status status() { return status_; }
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
 
   address_t original() { return reinterpret_cast<address_t>(original_); }
 
-  // Attempts to revert the patched code to its original state.
-  bool revert(MemoryManager &memman);
+  address_t replacement() { return reinterpret_cast<address_t>(replacement_); }
 
-  // When this patch is applied, returns the trampoline that behaves the same
-  // way as the original implementation would have if it hadn't been patched.
-  // The argument is just a convenient way to ensure that the result is cast
-  // to the appropriate type if you pass in the original function.
+  PatchStubs *stubs() { return stubs_; }
+
   template <typename T>
-  T get_trampoline(T prototype) {
-    return reinterpret_cast<T>(trampoline_);
-  }
+  T get_trampoline();
+
+  template <typename T>
+  T get_trampoline(T prototype) { return get_trampoline<T>(); }
+
+  Vector<byte_t> overwritten() { return Vector<byte_t>(overwritten_, kMaxRedirectSizeBytes); }
 
 private:
-  // Returns the distance a relative jump has to travel to get from the original
-  // to the replacement.
-  int64_t get_relative_distance();
-
-  // Builds the trampoline code that will implement the original function. If
-  // for some reason a trampoline can't be built NULL is returned.
-  byte_t *build_trampoline(MemoryManager &memman);
-
-  // Returns the size of the trampoline preamble to use for the trampoline that
-  // behaves like the function starting at the given address. If it is not
-  // possible to trampoline this returns 0.
-  static size_t get_preamble_size(address_t addr);
-
   // The address of the original function. Note that when the patch has been
   // applied the function at this address will effectively be the replacement,
   // to call the original use the generated trampoline which is a different
@@ -144,21 +103,9 @@ private:
   // The custom code stubs associated with this patch.
   PatchStubs *stubs_;
 
-  // The trampoline function which provides the behavior of the original once
-  // it is no longer available through the actual original because it has been
-  // patched.
-  address_t trampoline_;
-
-  // When the code is open for writing this field holds the previous
-  // permissions set on the code.
-  dword_t old_perms_;
-
-  // The current status of this patch.
-  Status status_;
-
   // When applied this array holds the code in the original function that was
   // overwritten.
-  byte_t overwritten_[kPatchSizeBytes];
+  byte_t overwritten_[kMaxRedirectSizeBytes];
 };
 
 // Size of the entry component of a patch stub.
@@ -186,6 +133,32 @@ struct PatchStubs {
   byte_t helper_[kHelperPatchStubSizeBytes];
 };
 
+template <typename T>
+T PatchRequest::get_trampoline() {
+  return reinterpret_cast<T>(stubs());
+}
+
+// All the platform dependent objects bundled together.
+class Platform {
+public:
+  // Ensures that the platform object is fully initialized, if it hasn't been
+  // already. Returns true on success.
+  bool ensure_initialized();
+
+  MemoryManager &memory_manager() { return memman_; }
+
+  InstructionSet &instruction_set() { return inst_; }
+
+  // Returns the current platform. Remember to initialize it before using it.
+  static Platform &get();
+
+private:
+  Platform(InstructionSet &inst, MemoryManager &memman);
+
+  InstructionSet &inst_;
+  MemoryManager &memman_;
+};
+
 /// ## Patch set
 ///
 /// A patch set holds a number of patch requests. We generally want to apply a
@@ -196,11 +169,11 @@ struct PatchStubs {
 ///
 ///   1. First we allocate and validate the executable stubs. At this point
 ///      no changes have been made to the original code so if this fails we
-///      can bail out immediately.
+///      can bail out immediately. (`prepare_apply`).
 ///   2. Then we make the relevant memory regions holding the original code
 ///      writeable. If this fails part way through we have to revert the
 ///      permissions before aborting. We still haven't actually changed any
-///      code.
+///      code. (`open_for_patching`).
 ///   3. Then we patch the code. It shouldn't be possible for this to fail since
 ///      the permissions are set up appropriately and the stubs have been
 ///      validated.
@@ -214,30 +187,74 @@ public:
   enum Status {
     NOT_APPLIED,
     PREPARED,
+    OPEN,
+    APPLIED_OPEN,
+    REVERTED_OPEN,
     APPLIED,
     FAILED
   };
 
   // Creates a patch set that applies the given list of patches.
-  PatchSet(MemoryManager &memman, Vector<PatchRequest> requests);
+  PatchSet(Platform &platform, Vector<PatchRequest> requests);
 
   // Prepares to apply the patches. Preparing makes no code changes, it only
   // checks whether patching is possible and allocates the data needed to do
   // the patching. Returns true iff preparing succeeded.
   bool prepare_apply();
 
+  // Attempts to set the permissions on the code we're going to patch. Returns
+  // true iff this succeeds.
+  bool open_for_patching();
+
+  // Attempts to return the permissions on the code that has been patched to
+  // the state it was before.
+  bool close_after_patching(Status success_status);
+
+  // Patches the redirect instructions into the original functions.
+  void install_redirects();
+
+  // Restores the original functions to their initial state.
+  void revert_redirects();
+
+  // Given a fresh patch set, runs through the sequence of operations that
+  // causes the patches to be applied.
+  bool apply();
+
+  // Runs through the complete sequence of operations that restores the
+  // originals to their initial state.
+  bool revert();
+
   // Determines the lower and upper bound of the addresses to patch by scanning
-  // over the requests and min/max'ing over the addresses.
+  // over the requests and min/max'ing over the addresses. Note that this is
+  // not the range we're going to write within but slightly narrower -- it
+  // stops at the beginning of the last function to write and we'll be writing
+  // a little bit past the beginning. Use determine_patch_range to get the
+  // full range we'll be writing.
   Vector<byte_t> determine_address_range();
+
+  // Does basically the same thing as determine_address_range but takes into
+  // account that we have to write some amount past the last address. All the
+  // memory we'll be writing will be within this range.
+  Vector<byte_t> determine_patch_range();
 
   // Returns true if any offset between two addresses that are at most the given
   // distance apart will fit in 32 bits.
   static bool offsets_fit_in_32_bits(size_t dist);
 
+  Status status() { return status_; }
+
 private:
+  // Attempts to write all the locations we'll be patching. Returns false or
+  // crashes if writing fails.
+  bool validate_open_for_patching();
+
+  // Applies an individual request.
+  void install_redirect(PatchRequest &request);
+
   // The patch engine used to apply this patch set.
-  MemoryManager &memman_;
-  MemoryManager &memman() { return memman_; }
+  Platform &platform_;
+  MemoryManager &memory_manager() { return platform_.memory_manager(); }
+  InstructionSet &instruction_set() { return platform_.instruction_set(); }
 
   // The patch requests to apply.
   Vector<PatchRequest> requests_;
@@ -248,6 +265,10 @@ private:
 
   // The current status.
   Status status_;
+
+  // When the code is open for writing this field holds the previous
+  // permissions set on the code.
+  dword_t old_perms_;
 };
 
 // Casts a function to an address statically such that it can be used in
@@ -280,15 +301,15 @@ public:
   // it has been initialized.
   virtual bool ensure_initialized();
 
-  // Attempts to open the page that holds the given address such that it can be
-  // written. If successful the previous permissions should be stored in the
-  // given out parameter.
-  virtual bool try_open_page_for_writing(address_t addr, dword_t *old_perms) = 0;
+  // Attempts to open the given memory region such that it can be written. If
+  // successful the previous permissions should be stored in the given out
+  // parameter.
+  virtual bool open_for_writing(Vector<byte_t> region, dword_t *old_perms) = 0;
 
-  // Attempts to close the currently open page that holds the given address
-  // by restoring the permissions to the given value, which was the on stored
-  // in the out parameter by the open method.
-  virtual bool try_close_page_for_writing(address_t addr, dword_t old_perms) = 0;
+  // Attempts to close the given memory region such that it can no longer be
+  // written. The old_perms parameter contains the value that was stored by
+  // open_for_writing.
+  virtual bool close_for_writing(Vector<byte_t> region, dword_t old_perms) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to
   // the given address that we can jump between them. If memory can't be
@@ -297,6 +318,24 @@ public:
 
   // Returns the memory manager appropriate for this platform.
   static MemoryManager &get();
+};
+
+// An instruction set encapsulates the flavor of machine code used on the
+// current platform.
+class InstructionSet {
+public:
+  virtual ~InstructionSet();
+
+  // Returns the size in bytes of the code patch that redirects execution from
+  // the original code to the replacement.
+  virtual size_t get_redirect_size_bytes() = 0;
+
+  // Installs a redirect from the request's original function to its entry
+  // stub.
+  virtual void install_redirect(PatchRequest &request) = 0;
+
+  // Returns the instruction set to use on this platform.
+  static InstructionSet &get();
 };
 
 #endif // _BINPATCH
