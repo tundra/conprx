@@ -32,9 +32,10 @@
 #include "utils/types.hh"
 #include "utils/vector.hh"
 
-class MemoryManager;
 class InstructionSet;
-struct PatchStubs;
+class MemoryManager;
+class Platform;
+struct PatchCode;
 
 // The biggest possible redirect sequence.
 #define kMaxRedirectSizeBytes 8
@@ -56,19 +57,14 @@ typedef size_t address_arith_t;
 /// the patching process.
 class PatchRequest {
 public:
-  // Flags that control how the patch is applied.
-  enum Flag {
-    MAKE_TRAMPOLINE = 0x1
-  };
-
   // Initializes a binary patch that replaces the given original function with
   // the given replacement.
-  PatchRequest(address_t original, address_t replacement, uint32_t flags = MAKE_TRAMPOLINE);
+  PatchRequest(address_t original, address_t replacement);
 
   PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  void preparing_apply(PatchStubs *stubs);
+  void preparing_apply(Platform *platform, PatchCode *code);
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
@@ -77,17 +73,28 @@ public:
 
   address_t replacement() { return reinterpret_cast<address_t>(replacement_); }
 
-  PatchStubs *stubs() { return stubs_; }
+  PatchCode &code() { return *code_; }
 
+  Platform &platform() { return *platform_; }
+
+  // Returns the trampoline code viewed as the given type.
   template <typename T>
-  T get_trampoline();
+  T get_trampoline() { return reinterpret_cast<T>(get_or_create_trampoline()); }
 
+  // Returns the trampoline code viewed as the same type as the given argument.
+  // Since function types are so long this can be a convenient shorthand.
   template <typename T>
   T get_trampoline(T prototype) { return get_trampoline<T>(); }
 
   Vector<byte_t> overwritten() { return Vector<byte_t>(overwritten_, kMaxRedirectSizeBytes); }
 
 private:
+  // Returns the address of the trampoline, creating it on first call.
+  address_t get_or_create_trampoline();
+
+  // Writes the trampoline code.
+  void write_trampoline();
+
   // The address of the original function. Note that when the patch has been
   // applied the function at this address will effectively be the replacement,
   // to call the original use the generated trampoline which is a different
@@ -97,46 +104,34 @@ private:
   // The address of the replacement function.
   address_t replacement_;
 
-  // Flags that affect how this patch behaves.
-  int32_t flags_;
+  // True iff the appropriate code has been written into the trampoline stub.
+  bool has_written_trampoline_;
 
   // The custom code stubs associated with this patch.
-  PatchStubs *stubs_;
+  PatchCode *code_;
 
   // When applied this array holds the code in the original function that was
   // overwritten.
   byte_t overwritten_[kMaxRedirectSizeBytes];
-};
 
-// Size of the entry component of a patch stub.
-#define kEntryPatchStubSizeBytes 32
+  // The platform utilities.
+  Platform *platform_;
+};
 
 // Size of the helper component of a patch stub.
-#define kHelperPatchStubSizeBytes 32
+#define kTrampolinePatchStubSizeBytes 32
 
-/// ## Patch stubs
+/// ## Patch code
 ///
-/// The patch stubs struct is really just an alias for two blocks of code, the
-/// entry stub and the helper stub. Each patch request has one pair of patch
-/// stubs associated with it and, when applied, will jump unconditionally to
-/// the entry stub.
+/// The patch code struct is a container for the executable code used by a
+/// patch. Each patch request has a patch code struct associated with it.
 ///
 /// To make the initial application of the patch set as cheap as possible we
-/// only do a partial application and then complete it when the original
-/// function is first called. When first called the entry stub contains code
-/// that causes patching to be completed and the helper contains part of the
-/// code that accomplishes this. Once patching is complete the entry will
-/// contain a jump directly to the replacement function.
-struct PatchStubs {
-  PatchRequest *origin_;
-  byte_t entry_[kEntryPatchStubSizeBytes];
-  byte_t helper_[kHelperPatchStubSizeBytes];
+/// initially only redirect and then generate the trampoline on demand. The
+/// request keeps track of the state of the code.
+struct PatchCode {
+  byte_t trampoline_[kTrampolinePatchStubSizeBytes];
 };
-
-template <typename T>
-T PatchRequest::get_trampoline() {
-  return reinterpret_cast<T>(stubs());
-}
 
 // All the platform dependent objects bundled together.
 class Platform {
@@ -176,11 +171,12 @@ private:
 ///      code. (`open_for_patching`).
 ///   3. Then we patch the code. It shouldn't be possible for this to fail since
 ///      the permissions are set up appropriately and the stubs have been
-///      validated.
+///      validated. (`install_redirects`)
 ///   4. Finally we revert the permissions on any memory we've written.
+///      (`close_after_patching`).
 ///
 /// At this point any calls to the patched functions will be redirected to the
-/// patch stubs which will complete the patch process on first call.
+/// replacements. The trampolines will be generated on demand.
 class PatchSet {
 public:
   // Indicates the current state of this patch set.
@@ -261,7 +257,7 @@ private:
   Vector<PatchRequest> &requests() { return requests_; }
 
   // The patch stubs that hold the code implementing the requests.
-  Vector<PatchStubs> stubs_;
+  Vector<PatchCode> codes_;
 
   // The current status.
   Status status_;
@@ -333,6 +329,10 @@ public:
   // Installs a redirect from the request's original function to its entry
   // stub.
   virtual void install_redirect(PatchRequest &request) = 0;
+
+  // Writes trampoline code into the given code object that implements the same
+  // behavior as the request's original function did before it was replaced.
+  virtual void write_trampoline(PatchRequest &request, PatchCode &code) = 0;
 
   // Returns the instruction set to use on this platform.
   static InstructionSet &get();

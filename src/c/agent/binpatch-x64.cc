@@ -5,6 +5,7 @@ class X64 : public InstructionSet {
 public:
   virtual size_t get_redirect_size_bytes();
   virtual void install_redirect(PatchRequest &request);
+  virtual void write_trampoline(PatchRequest &request, PatchCode &code);
 
   // Returns the singleton ia32 instance.
   static X64 &get();
@@ -13,9 +14,6 @@ private:
   static const byte_t kJmpOp = 0xE9;
   static const size_t kJmpOpSizeBytes = 5;
   static const byte_t kInt3Op = 0xCC;
-  static const byte_t kPushaOp = 0x60;
-  static const byte_t kFarCallOp = 0xE8;
-  static const size_t kFarCallOpSizeBytes = 5;
 
   static const size_t kRedirectSizeBytes = kJmpOpSizeBytes;
 };
@@ -32,6 +30,12 @@ void X64::install_redirect(PatchRequest &request) {
   ssize_t original_to_replacement = (replacement - original) - kJmpOpSizeBytes;
   original[0] = kJmpOp;
   reinterpret_cast<int32_t*>(original + 1)[0] = static_cast<int32_t>(original_to_replacement);
+}
+
+void X64::write_trampoline(PatchRequest &request, PatchCode &code) {
+  // For now we'll just have the trampoline interrupt when called.
+  address_t trampoline = code.trampoline_;
+  trampoline[0] = kInt3Op;
 }
 
 X64 &X64::get() {

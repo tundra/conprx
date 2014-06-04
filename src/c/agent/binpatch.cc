@@ -11,21 +11,35 @@ bool MemoryManager::ensure_initialized() {
 MemoryManager::~MemoryManager() {
 }
 
-PatchRequest::PatchRequest(address_t original, address_t replacement, uint32_t flags)
+PatchRequest::PatchRequest(address_t original, address_t replacement)
   : original_(original)
   , replacement_(replacement)
-  , flags_(flags)
-  , stubs_(NULL) { }
+  , has_written_trampoline_(false)
+  , code_(NULL)
+  , platform_(NULL) { }
 
 PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
-  , flags_(0)
-  , stubs_(NULL) { }
+  , has_written_trampoline_(false)
+  , code_(NULL)
+  , platform_(NULL) { }
 
-void PatchRequest::preparing_apply(PatchStubs *stubs) {
-  stubs->origin_ = this;
-  stubs_ = stubs;
+void PatchRequest::preparing_apply(Platform *platform, PatchCode *code) {
+  platform_ = platform;
+  code_ = code;
+}
+
+address_t PatchRequest::get_or_create_trampoline() {
+  if (!has_written_trampoline_)
+    write_trampoline();
+  return code_->trampoline_;
+}
+
+void PatchRequest::write_trampoline() {
+  InstructionSet &inst = platform().instruction_set();
+  inst.write_trampoline(*this, code());
+  has_written_trampoline_ = true;
 }
 
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
@@ -44,7 +58,7 @@ bool PatchSet::prepare_apply() {
   Vector<byte_t> range = determine_patch_range();
   // Allocate a chunk of memory to hold the stubs.
   Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
-      sizeof(PatchStubs) * requests().length());
+      sizeof(PatchCode) * requests().length());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
     LOG_ERROR("Failed to allocate memory for %i stubs near %p.",
@@ -66,9 +80,9 @@ bool PatchSet::prepare_apply() {
     return false;
   }
   // Cast the memory to a vector of patch stubs.
-  stubs_ = memory.cast<PatchStubs>();
+  codes_ = memory.cast<PatchCode>();
   for (size_t i = 0; i < requests().length(); i++)
-    requests()[i].preparing_apply(&stubs_[i]);
+    requests()[i].preparing_apply(&platform_, &codes_[i]);
   status_ = PREPARED;
   return true;
 }
