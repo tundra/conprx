@@ -48,8 +48,6 @@ public:
   // which can be called to get the original console behavior.
   static bool install(Console &console, Console **original_out);
 
-  static Console &delegate() { return *delegate_; }
-
 private:
   // Returns the address of the console function with the given name.
   static address_t get_console_function_address(c_str_t name);
@@ -65,6 +63,7 @@ private:
 
   // The console object currently being delegated to.
   static Console *delegate_;
+  static Console &delegate() { return *delegate_; }
 
 };
 
