@@ -33,6 +33,33 @@
 ///
 ///    * The {{host.hh}}(console host) is a command-line utility that runs a
 ///      command with the agent injected.
+///
+/// ## Options
+///
+/// The agent understands a number of environment options, set either through
+/// the registry or as environment variables. On startup options are read in
+/// sequence from
+///
+///    1. `HKEY_LOCAL_MACHINE\Software\Tundra\Console Agent\...`
+///    2. `HKEY_CURRENT_USER\Software\Tundra\Console Agent\...`
+///    3. Environment variables.
+///
+/// Later values override earlier ones, so the local machine settings can
+/// override the defaults, the user settings can override machine settings, and
+/// environment settings can override user settings.
+///
+/// The naming convention for options are upper camel case for registry entries,
+/// all caps for environment variables. The options are,
+///
+///    * `Enabled`/`CONSOLE_AGENT_ENABLED`: whether to patch code or just bail
+///      out immediately. The default is true.
+///    * `VerboseLogging`/`CONSOLE_AGENT_VERBOSE_LOGGING`: log what the agent
+///      does, both successfully and on failures. The default is to log only
+///      on failures.
+///
+/// Setting a registry option to integer `0` disables the option, `1` enables
+/// it. Setting an environment variable to the string `"0"` disables an option,
+/// `"1"` enables it.
 
 #include "binpatch.hh"
 #include "conapi.hh"
@@ -70,7 +97,7 @@ private:
 // <field>              <upper camel>           <all caps>
 #define FOR_EACH_BOOL_OPTION(F)                                                \
   F(is_enabled,      true,      "Enabled",              "ENABLED")             \
-  F(verbose_logging, true,      "VerboseLogging",       "VERBOSE_LOGGING")
+  F(verbose_logging, false,     "VerboseLogging",       "VERBOSE_LOGGING")
 
 // The set of options that control how the agent behaves. Where these are read
 // from depends on the platform; on windows from the registry.

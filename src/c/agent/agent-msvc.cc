@@ -5,6 +5,7 @@
 
 using namespace conprx;
 
+// Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
 public:
   // Returns true iff the current process is blacklisted. Returns true if this
@@ -43,15 +44,19 @@ bool WindowsConsoleAgent::dll_process_attach() {
 
 bool WindowsConsoleAgent::is_process_blacklisted() {
   c_char_t buffer[1024];
+  // Passing NULL means the current process. Now we know.
   size_t length = GetModuleFileName(NULL, buffer, 1024);
   if (length == 0)
     // If we can't determine the executable's name we better not try patching
     // it.
     return true;
+  // Scan through the blacklist to see if this process matches anything. I
+  // imaging this will have to get smarter, possibly even support some amount
+  // of external configuration and/or wildcard matching. Laters.
   Vector<c_char_t> executable(buffer, length);
   for (size_t i = 0; i < kBlacklistSize; i++) {
     Vector<c_char_t> entry(const_cast<c_char_t*>(kBlacklist[i]), lstrlen(kBlacklist[i]));
-    if (executable.is_suffix(entry))
+    if (executable.has_suffix(entry))
       return true;
   }
   return false;
@@ -61,6 +66,10 @@ address_t ConsoleAgent::get_console_function_address(c_str_t name) {
   module_t kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
   return Code::upcast(GetProcAddress(kernel32, name));
 }
+
+// The registry key under which any options are stored. This doesn't have to
+// exist but if it does we'll read from it.
+#define OPTIONS_REGISTRY_KEY_NAME TEXT("Software\\Tundra\\Console Agent")
 
 // Windows-specific implementation of the options. The reason to make this into
 // a class is such that it has access to the protected fields in Options.
@@ -98,8 +107,7 @@ void WindowsOptions::override_from_registry(hkey_t registry) {
   // Try to open the registry key under which these values live. If it doesn't
   // exist there's no point in continuing.
   hkey_t hkey = 0;
-  long ret = RegOpenKeyEx(registry, TEXT("Software\\Tundra\\ConsoleAgent"),
-      0, KEY_READ, &hkey);
+  long ret = RegOpenKeyEx(registry, OPTIONS_REGISTRY_KEY_NAME, 0, KEY_READ, &hkey);
   if (ret != ERROR_SUCCESS)
     return;
 #define __EMIT_REG_READ__(name, defawlt, Name, NAME)                           \

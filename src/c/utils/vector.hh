@@ -49,7 +49,7 @@ public:
   // Returns true if the given vector is a suffix of this one. A vector is a
   // suffix of itself; the empty vector is trivially a suffix of any vector,
   // also including itself.
-  bool is_suffix(Vector<T> other) {
+  bool has_suffix(Vector<T> other) {
     if (other.length() > length())
       return false;
     for (size_t i = 0; i < other.length(); i++) {
