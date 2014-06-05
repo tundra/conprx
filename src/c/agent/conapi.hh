@@ -13,13 +13,13 @@
 namespace conprx {
 
 #define FOR_EACH_CONAPI_FUNCTION(F)                                            \
-  F(WriteConsoleA, write_console_a, bool,                                      \
+  F(WriteConsoleA, write_console_a, bool_t,                                    \
       (handle_t console_output, const void *buffer,                            \
        dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
        void *reserved),                                                        \
       (console_output, buffer, number_of_chars_to_write,                       \
        number_of_chars_written, reserved))                                     \
-  F(AllocConsole, alloc_console, bool, (), ())
+  F(AllocConsole, alloc_console, bool_t, (), ())
 
 // A container that holds the various definitions used by the other console
 // types.
@@ -29,7 +29,7 @@ public:
 
   // The types of the naked console functions.
 #define __DECLARE_CONAPI_FUNCTION__(Name, name, RET, PARAMS, ARGS)             \
-  typedef RET (*name##_t)PARAMS;
+  typedef RET (WINAPI *name##_t)PARAMS;
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
 #undef __DECLARE_CONAPI_FUNCTION__
 

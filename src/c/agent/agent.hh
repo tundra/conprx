@@ -57,14 +57,41 @@ private:
   static address_t get_delegate_bridge(int key);
 
 #define __EMIT_DELEGATE_BRIDGE__(Name, name, RET, PARAMS, ARGS)                \
-  static RET name##_bridge PARAMS;
+  static RET WINAPI name##_bridge PARAMS;
   FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
 #undef __EMIT_DELEGATE_BRIDGE__
 
   // The console object currently being delegated to.
   static Console *delegate_;
   static Console &delegate() { return *delegate_; }
+};
 
+// Expands the given macro for each boolean option. The arguments are:
+// <field>              <upper camel>           <all caps>
+#define FOR_EACH_BOOL_OPTION(F)                                                \
+  F(is_enabled,      true,      "Enabled",              "ENABLED")             \
+  F(verbose_logging, true,      "VerboseLogging",       "VERBOSE_LOGGING")
+
+// The set of options that control how the agent behaves. Where these are read
+// from depends on the platform; on windows from the registry.
+class Options {
+public:
+  Options();
+
+#define __EMIT_BOOL_GETTER__(name, defawlt, Name, NAME) bool name() { return name##_; }
+  FOR_EACH_BOOL_OPTION(__EMIT_BOOL_GETTER__)
+#undef __EMIT_BOOL_GETTER__
+
+  // Returns the singleton options instance.
+  static Options &get();
+
+protected:
+#define __EMIT_BOOL_FIELD__(name, defawlt, Name, NAME) bool name##_;
+  FOR_EACH_BOOL_OPTION(__EMIT_BOOL_FIELD__)
+#undef __EMIT_BOOL_FIELD__
+
+  // Dummy unused field.
+  bool dummy_;
 };
 
 } // namespace conprx

@@ -5,8 +5,23 @@
 #include "test/unittest.hh"
 #include "agent/conapi.hh"
 
+using namespace conprx;
+
 TEST(conapi, datatypes) {
   size_t word_size = IF_64_BIT(8, 4);
   ASSERT_EQ(word_size, sizeof(dword_t));
   ASSERT_EQ(sizeof(void*), sizeof(handle_t));
+}
+
+template <typename T>
+void use(T t) { }
+
+TEST(conapi, functypes) {
+#ifdef IS_MSVC
+#define __EMIT_ASSIGN__(Name, name, RET, PARAMS, ARGS)                         \
+  Console::name##_t name = Name;                                               \
+  use(name);
+  FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
+#undef __EMIT_ASSIGN__
+#endif
 }

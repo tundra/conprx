@@ -49,6 +49,7 @@ PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   , old_perms_(0) { }
 
 bool PatchSet::prepare_apply() {
+  LOG_DEBUG("Preparing to apply patch set");
   if (requests().is_empty()) {
     // Trivially succeed if there are no patches to apply.
     status_ = PREPARED;
@@ -56,9 +57,11 @@ bool PatchSet::prepare_apply() {
   }
   // Determine the range within which all the original functions occur.
   Vector<byte_t> range = determine_patch_range();
+  LOG_DEBUG("Patch range: %p .. %p", range.start(), range.end());
   // Allocate a chunk of memory to hold the stubs.
   Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
       sizeof(PatchCode) * requests().length());
+  LOG_DEBUG("Memory: %p .. %p", memory.start(), memory.end());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
     LOG_ERROR("Failed to allocate memory for %i stubs near %p.",
@@ -126,15 +129,18 @@ Vector<byte_t> PatchSet::determine_patch_range() {
 }
 
 bool PatchSet::open_for_patching() {
+  LOG_DEBUG("Opening original code for writing");
   // Try opening the region for writing.
   Vector<byte_t> region = determine_patch_range();
   if (!memory_manager().open_for_writing(region, &old_perms_)) {
-    LOG_ERROR("Failed to open code for writing.");
+    LOG_ERROR("Failed to open code for patching.");
     status_= FAILED;
     return false;
   }
   // Validate that writing works.
+  LOG_DEBUG("Validating that code is writable");
   if (validate_open_for_patching()) {
+    LOG_DEBUG("Successfully validated that code is writable");
     status_ = OPEN;
     return true;
   } else {
@@ -161,18 +167,22 @@ bool PatchSet::validate_open_for_patching() {
 }
 
 bool PatchSet::close_after_patching(Status success_status) {
+  LOG_DEBUG("Closing original code for writing");
   Vector<byte_t> region = determine_patch_range();
   if (!memory_manager().close_for_writing(region, old_perms_)) {
     status_ = FAILED;
     return false;
   }
+  LOG_DEBUG("Successfully closed original code");
   status_ = success_status;
   return true;
 }
 
 void PatchSet::install_redirects() {
+  LOG_DEBUG("Installing redirects");
   for (size_t i = 0; i < requests().length(); i++)
     install_redirect(requests()[i]);
+  LOG_DEBUG("Successfully installed redirects");
   status_ = APPLIED_OPEN;
 }
 
@@ -186,6 +196,7 @@ void PatchSet::install_redirect(PatchRequest &request) {
 }
 
 void PatchSet::revert_redirects() {
+  LOG_DEBUG("Reverting redirects");
   InstructionSet &inst = instruction_set();
   for (size_t i = 0; i < requests().length(); i++) {
     PatchRequest &request = requests()[i];
@@ -193,6 +204,7 @@ void PatchSet::revert_redirects() {
     address_t original = request.original();
     memcpy(original, overwritten.start(), inst.get_redirect_size_bytes());
   }
+  LOG_DEBUG("Successfully reverted redirects");
   status_ = REVERTED_OPEN;
 }
 
@@ -204,6 +216,15 @@ bool PatchSet::apply() {
     return false;
   install_redirects();
   if (!close_after_patching(PatchSet::APPLIED))
+    return false;
+  return true;
+}
+
+bool PatchSet::revert() {
+  if (!open_for_patching())
+    return false;
+  revert_redirects();
+  if (!close_after_patching(PatchSet::NOT_APPLIED))
     return false;
   return true;
 }

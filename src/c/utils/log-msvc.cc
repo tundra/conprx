@@ -15,7 +15,8 @@
 class WindowsEventLog : public Log {
 public:
   WindowsEventLog();
-  virtual void record(Type type, const char *file, int line, const char *fmt, ...);
+  virtual void vrecord(Type type, const char *file, int line, const char *fmt,
+      va_list args);
 private:
   handle_t event_source_;
 };
@@ -29,13 +30,11 @@ WindowsEventLog::WindowsEventLog()
       EVENT_SOURCE_NAME); // lpSourceName
 }
 
-void WindowsEventLog::record(Type type, const char *file, int line, const char *fmt, ...) {
+void WindowsEventLog::vrecord(Type type, const char *file, int line, const char *fmt,
+    va_list args) {
   // Format the varargs into a message.
   char message_string[kMaxMessageSize];
-  va_list args;
-  va_start(args, fmt);
   vsnprintf(message_string, kMaxMessageSize, fmt, args);
-  va_end(args);
 
   // Convert the line number to a string.
   char line_string[kMaxMessageSize];
@@ -49,6 +48,9 @@ void WindowsEventLog::record(Type type, const char *file, int line, const char *
     break;
   case Log::WRN:
     event_id = MSG_LOG_WARNING;
+    break;
+  case Log::DBG:
+    event_id = MSG_LOG_VERBOSE;
     break;
   default:
     event_id = MSG_LOG_INFO;

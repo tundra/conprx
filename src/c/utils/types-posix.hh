@@ -9,6 +9,7 @@
 typedef void *handle_t;
 typedef void *module_t;
 typedef long dword_t;
+typedef bool bool_t;
 
 // Because of the magic way windows handles strings we'll use this alias for
 // them even on posix.

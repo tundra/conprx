@@ -66,9 +66,9 @@ bool WindowsSubprocess::start_suspended_child() {
       &startup_info,    // lpStartupInfo
       &child_info_);    // lpProcessInformation
 
-  if (!result)
-    LOG_ERROR("Failed to create child process '%s'", command_);
-
+  if (!result) {
+    LOG_ERROR("CreateProcess(%s) failed: %i", command_, GetLastError());
+  }
   return result;
 }
 

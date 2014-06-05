@@ -13,19 +13,27 @@ public:
 };
 
 bool WindowsMemoryManager::open_for_writing(Vector<byte_t> region, dword_t *old_perms) {
-  return VirtualProtect(region.start(), region.length(), PAGE_EXECUTE_READWRITE, old_perms);
+  bool result = VirtualProtect(region.start(), region.length(), PAGE_EXECUTE_READWRITE,
+      old_perms);
+  if (!result)
+    LOG_WARNING("VirtualProtect(PAGE_EXECUTE_READWRITE) failed: %i",
+        static_cast<int>(GetLastError()));
+  return result;
 }
 
 bool WindowsMemoryManager::close_for_writing(Vector<byte_t> region, dword_t old_perms) {
   dword_t dummy_perms = 0;
-  return VirtualProtect(region.start(), region.length(), old_perms, &dummy_perms);
+  bool result = VirtualProtect(region.start(), region.length(), old_perms, &dummy_perms);
+  if (!result)
+    LOG_WARNING("VirtualProtect(%i) failed: %i", old_perms,
+        static_cast<int>(GetLastError()));
+  return result;
 }
 
 Vector<byte_t> WindowsMemoryManager::alloc_executable(address_t addr, size_t size) {
   void *memory = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
   if (memory == NULL) {
-    int error = GetLastError();
-    LOG_WARNING("VirtualAlloc failed: %i", error);
+    LOG_WARNING("VirtualAlloc failed: %i", static_cast<int>(GetLastError()));
     return Vector<byte_t>();
   }
   return Vector<byte_t>(static_cast<address_t>(memory), size);

@@ -31,13 +31,26 @@ FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 Console *ConsoleAgent::delegate_ = NULL;
 
 bool ConsoleAgent::install(Console &delegate, Console **original_out) {
+  // Set up the log level before we do anything else.
+  Options &options = Options::get();
+  if (options.verbose_logging())
+    Log::get().set_debug_log_enabled(true);
+
+  LOG_DEBUG("Installing agent");
+  if (!options.is_enabled()) {
+    LOG_DEBUG("Agent disabled; exiting");
+    return true;
+  }
+
   delegate_ = &delegate;
 
   // Get and initialize the platform.
+  LOG_DEBUG("Initializing platform");
   Platform &platform = Platform::get();
   if (!platform.ensure_initialized())
     return false;
 
+  LOG_DEBUG("Creating patch requests");
   // Identify the set of functions we're going to patch. Some of them may not
   // be available in which case we'll just not try to patch them.
   Vector<Console::FunctionInfo> functions = Console::functions();
@@ -53,27 +66,34 @@ bool ConsoleAgent::install(Console &delegate, Console **original_out) {
     Console::FunctionInfo &info = functions[i];
     address_t original = get_console_function_address(info.name);
     address_t bridge = get_delegate_bridge(info.key);
-    if (original == NULL || bridge == NULL)
+    if (original == NULL || bridge == NULL) {
+      LOG_DEBUG("Console function %s not found", info.name);
       continue;
+    }
     PatchRequest request(original, bridge);
     packed_requests[packed_offset++] = request;
     key_to_request[info.key] = request;
   }
   Vector<PatchRequest> requests = Vector<PatchRequest>(packed_requests, packed_offset);
+  LOG_DEBUG("Created %i patch requests", static_cast<int>(requests.length()));
 
   // Create a patch set and apply it.
   PatchSet patches(platform, requests);
   if (!patches.apply())
     return false;
+  if (!patches.revert())
+    return false;
 
   *original_out = new OriginalConsole(Vector<PatchRequest>(key_to_request, Console::kFunctionCount));
+
+  LOG_DEBUG("Successfully installed agent");
   return true;
 }
 
 // Expands to a bridge for each api function that calls the object stored in
 // the agent's delegate field.
 #define __EMIT_BRIDGE__(Name, name, RET, PARAMS, ARGS)                         \
-  RET ConsoleAgent::name##_bridge PARAMS {                                     \
+  RET WINAPI ConsoleAgent::name##_bridge PARAMS {                              \
     return ConsoleAgent::delegate().name ARGS;                                 \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_BRIDGE__)
@@ -92,6 +112,13 @@ address_t ConsoleAgent::get_delegate_bridge(int key) {
       return NULL;
   }
 }
+
+// The default options construction.
+Options::Options() :
+#define __EMIT_INIT__(name, defawlt, Name, NAME) name##_(defawlt) ,
+    FOR_EACH_BOOL_OPTION(__EMIT_INIT__)
+#undef __EMIT_INIT__
+    dummy_(false) { }
 
 #ifdef IS_MSVC
 #include "agent-msvc.cc"

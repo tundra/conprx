@@ -40,3 +40,19 @@ TEST(vector, cast) {
   ASSERT_EQ(5, v32[1]);
   ASSERT_EQ(4, v32[2]);
 }
+
+TEST(vector, is_suffix) {
+  int32_t ints[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(ints, 10)));
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(ints + 1, 9)));
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(ints + 5, 5)));
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(ints + 9, 1)));
+  ASSERT_FALSE(Vector<int32_t>(ints + 1, 9).is_suffix(Vector<int32_t>(ints, 10)));
+  ASSERT_TRUE(Vector<int32_t>(ints + 1, 9).is_suffix(Vector<int32_t>(ints + 2, 8)));
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>()));
+  int32_t oints[10] = {10, 11, 12, 3, 4, 5, 6, 7, 8, 9};
+  ASSERT_FALSE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(oints, 10)));
+  ASSERT_FALSE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(oints + 1, 9)));
+  ASSERT_FALSE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(oints + 2, 8)));
+  ASSERT_TRUE(Vector<int32_t>(ints, 10).is_suffix(Vector<int32_t>(oints + 3, 7)));
+}

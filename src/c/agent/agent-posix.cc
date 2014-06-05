@@ -6,3 +6,10 @@
 address_t ConsoleAgent::get_console_function_address(c_str_t name) {
   return NULL;
 }
+
+Options &Options::get() {
+  static Options *instance = NULL;
+  if (instance == NULL)
+    instance = new Options();
+  return *instance;
+}

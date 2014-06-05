@@ -23,11 +23,11 @@ Vector<Console::FunctionInfo> Console::functions() {
 
 // --- L o g g i n g ---
 
-bool LoggingConsole::alloc_console() {
+bool_t LoggingConsole::alloc_console() {
   return delegate().alloc_console();
 }
 
-bool LoggingConsole::write_console_a(handle_t console_output, const void *buffer,                            \
+bool_t LoggingConsole::write_console_a(handle_t console_output, const void *buffer,                            \
        dword_t number_of_chars_to_write, dword_t *number_of_chars_written,
        void *reserved) {
   return delegate().write_console_a(console_output, buffer, number_of_chars_to_write,

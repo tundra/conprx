@@ -10,6 +10,8 @@
 
 #include "stdc.h"
 
+#include <stdarg.h>
+
 // State associated with logging.
 class Log {
 public:
@@ -18,15 +20,30 @@ public:
   enum Type {
     ERR = 0x0001,
     WRN = 0x0002,
-    INF = 0x0004
+    INF = 0x0004,
+    DBG = 0x0008
   };
 
+  Log();
   virtual ~Log();
 
   // Record a log event.
-  virtual void record(Type type, const char *file, int line, const char *fmt, ...) = 0;
+  void record(Type type, const char *file, int line, const char *fmt, ...);
+
+  // Returns a debug log event.
+  void record_debug(const char *file, int line, const char *fmt, ...);
+
+  // Records a log event.
+  virtual void vrecord(Type type, const char *file, int line, const char *fmt,
+      va_list args) = 0;
+
+  // Sets whether debug log output is enabled or ignored.
+  void set_debug_log_enabled(bool value);
 
 public:
+  // Ignore debug log messages?
+  bool enable_debug_log_;
+
   // Returns the singleton log instance, creating it if necessary.
   static Log &get();
 };
@@ -39,5 +56,8 @@ public:
 
 // Log information.
 #define LOG_INFO(FMT, ...) Log::get().record(Log::INF, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
+
+// Conditionally log debug information.
+#define LOG_DEBUG(FMT, ...) Log::get().record_debug( __FILE__, __LINE__, FMT, ##__VA_ARGS__)
 
 #endif // _LOG

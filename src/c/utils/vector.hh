@@ -46,6 +46,21 @@ public:
   // Returns the index'th element.
   T &operator[](size_t index) { return elms_[index]; }
 
+  // Returns true if the given vector is a suffix of this one. A vector is a
+  // suffix of itself; the empty vector is trivially a suffix of any vector,
+  // also including itself.
+  bool is_suffix(Vector<T> other) {
+    if (other.length() > length())
+      return false;
+    for (size_t i = 0; i < other.length(); i++) {
+      T &t = (*this)[length() - i - 1];
+      T &o = other[other.length() - i - 1];
+      if (t != o)
+        return false;
+    }
+    return true;
+  }
+
   // Returns the distance between this vector and the given other vector. The
   // distance is measured as the largest number of elements between two
   // elements, one in this vector and one in the other. Hence the distance
