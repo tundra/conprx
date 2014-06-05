@@ -60,6 +60,14 @@
 /// Setting a registry option to integer `0` disables the option, `1` enables
 /// it. Setting an environment variable to the string `"0"` disables an option,
 /// `"1"` enables it.
+///
+/// ## Blacklist
+///
+/// The agent has a blacklist of processes it refuses to patch. In some cases
+/// they're core services which we shouldn't tamper with, in other cases they're
+/// fallbacks that we want to be sure work even if the agent misbehaves. For
+/// instance, the registry editor is blacklisted because if the agent misbehaves
+/// we may need to disable it by setting registry values.
 
 #include "binpatch.hh"
 #include "conapi.hh"
