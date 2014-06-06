@@ -8,16 +8,17 @@ using namespace conprx;
 // Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
 public:
-  // Returns true iff the current process is blacklisted. Returns true if this
-  // process should not be patched under any circumstances.
-  static bool is_process_blacklisted();
+  // Returns true iff the current process is hardcoded blacklisted. Returns true
+  // if this process should not be patched under any circumstances, no matter
+  // what options are set.
+  static bool is_process_hard_blacklisted();
 
   // Called when the dll process attach notification is received.
   static bool dll_process_attach();
 
 private:
   // A list of executable names we refuse to patch.
-  static const size_t kBlacklistSize = 3;
+  static const size_t kBlacklistSize = 4;
   static c_str_t kBlacklist[kBlacklistSize];
 };
 
@@ -26,23 +27,46 @@ c_str_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     // patch them. Also it serves no purpose.
     TEXT("conhost.exe"),
     TEXT("svchost.exe"),
+    TEXT("WerFault.exe"),
     // Leave the registry editor untouched since, in the worst case, you may
     // need it to disable the agent if it becomes broken.
     TEXT("regedit.exe")
 };
 
 bool WindowsConsoleAgent::dll_process_attach() {
-  if (is_process_blacklisted())
+  // The blacklist is one way to protect against hosing the system completely
+  // if there's a bug, and a more fundamental one than the options since we
+  // use the blacklist to ensure that you can change the options using the
+  // registry editor, for instance. Hence the blacklist check should be short
+  // and sweet with few places for bugs to hide. And nothing nontrivial should
+  // happen before it.
+  if (is_process_hard_blacklisted())
     return true;
+
+  // Then apply the options. This is the next step in ensuring that you can
+  // interact with the system even if there are problems with the agent so
+  // again as little nontrivial behavior that could harbor bugs should happen
+  // before it.
+  Options &options = Options::get();
+  if (options.verbose_logging())
+    Log::get().set_debug_log_enabled(true);
+  if (!options.is_enabled())
+    return true;
+
+  // Okay at this point we can start with the actual work since we've made it
+  // safely through the guards above.
   LoggingConsole *logger = new LoggingConsole(NULL);
   Console *original = NULL;
-  if (!install(*logger, &original))
+  if (!install(options, *logger, &original))
     return false;
   logger->set_delegate(original);
   return true;
 }
 
-bool WindowsConsoleAgent::is_process_blacklisted() {
+bool WindowsConsoleAgent::is_process_hard_blacklisted() {
+  // It is not safe to log at this point since this is run in *every* process
+  // the system has, including processes that are too fundamental to support
+  // the stuff we need for logging.
   c_char_t buffer[1024];
   // Passing NULL means the current process. Now we know.
   size_t length = GetModuleFileName(NULL, buffer, 1024);

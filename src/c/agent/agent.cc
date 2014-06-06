@@ -30,18 +30,8 @@ FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 
 Console *ConsoleAgent::delegate_ = NULL;
 
-bool ConsoleAgent::install(Console &delegate, Console **original_out) {
-  // Set up the log level before we do anything else.
-  Options &options = Options::get();
-  if (options.verbose_logging())
-    Log::get().set_debug_log_enabled(true);
-
+bool ConsoleAgent::install(Options &options, Console &delegate, Console **original_out) {
   LOG_DEBUG("Installing agent");
-  if (!options.is_enabled()) {
-    LOG_DEBUG("Agent disabled; exiting");
-    return true;
-  }
-
   delegate_ = &delegate;
 
   // Get and initialize the platform.

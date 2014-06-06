@@ -12,32 +12,30 @@
 
 // Fallback log that only uses standard C functions that should be available on
 // all platforms.
-class WindowsEventLog : public Log {
+class WindowsEventLogBackend : public LogBackend {
 public:
-  WindowsEventLog();
-  virtual void vrecord(Type type, const char *file, int line, const char *fmt,
-      va_list args);
+  WindowsEventLogBackend();
+  virtual void vrecord(Log::Type type, const char *file, int line,
+      const char *fmt, va_list args);
 private:
   handle_t event_source_;
 };
 
-#define kMaxMessageSize 256
-
-WindowsEventLog::WindowsEventLog()
+WindowsEventLogBackend::WindowsEventLogBackend()
   : event_source_(NULL) {
   event_source_ = RegisterEventSource(
       NULL,               // lpUNCServerName
       EVENT_SOURCE_NAME); // lpSourceName
 }
 
-void WindowsEventLog::vrecord(Type type, const char *file, int line, const char *fmt,
-    va_list args) {
+void WindowsEventLogBackend::vrecord(Log::Type type, const char *file, int line,
+    const char *fmt, va_list args) {
   // Format the varargs into a message.
-  char message_string[kMaxMessageSize];
-  vsnprintf(message_string, kMaxMessageSize, fmt, args);
+  char message_string[kMaxLogMessageSize];
+  vsnprintf(message_string, kMaxLogMessageSize, fmt, args);
 
   // Convert the line number to a string.
-  char line_string[kMaxMessageSize];
+  char line_string[kMaxLogMessageSize];
   sprintf(line_string, "%i", line);
 
   // Find the right event id to use.
@@ -72,9 +70,9 @@ void WindowsEventLog::vrecord(Type type, const char *file, int line, const char 
       NULL);            // lpRawData
 }
 
-Log &Log::get() {
-  static WindowsEventLog *instance = NULL;
+LogBackend *LogBackend::get_default() {
+  static WindowsEventLogBackend *instance = NULL;
   if (instance == NULL)
-    instance = new WindowsEventLog();
-  return *instance;
+    instance = new WindowsEventLogBackend();
+  return instance;
 }

@@ -3,24 +3,9 @@
 
 #include <stdio.h>
 
-// Fallback log that only uses standard C functions that should be available on
-// all platforms.
-class FallbackLog : public Log {
-public:
-  virtual void vrecord(Type type, const char *file, int line, const char *fmt, va_list args);
-};
-
-#define kMaxMessageSize 256
-
-void FallbackLog::vrecord(Type type, const char *file, int line, const char *fmt, va_list args) {
-  char message[kMaxMessageSize];
-  vsnprintf(message, kMaxMessageSize, fmt, args);
-  fprintf(stderr, "[%i] %s:%i: %s\n", type, file, line, message);
-}
-
-Log &Log::get() {
-  static FallbackLog *instance = NULL;
+LogBackend *LogBackend::get_default() {
+  static StderrLogBackend *instance = NULL;
   if (instance == NULL)
-    instance = new FallbackLog();
-  return *instance;
+    instance = new StderrLogBackend();
+  return instance;
 }
