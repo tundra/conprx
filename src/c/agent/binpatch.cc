@@ -4,6 +4,8 @@
 #include "binpatch.hh"
 #include "utils/log.hh"
 
+using namespace conprx;
+
 bool MemoryManager::ensure_initialized() {
   return true;
 }
@@ -15,6 +17,7 @@ PatchRequest::PatchRequest(address_t original, address_t replacement)
   : original_(original)
   , replacement_(replacement)
   , has_written_trampoline_(false)
+  , written_trampoline_(NULL)
   , code_(NULL)
   , platform_(NULL) { }
 
@@ -22,6 +25,7 @@ PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
   , has_written_trampoline_(false)
+  , written_trampoline_(NULL)
   , code_(NULL)
   , platform_(NULL) { }
 
@@ -33,12 +37,22 @@ void PatchRequest::preparing_apply(Platform *platform, PatchCode *code) {
 address_t PatchRequest::get_or_create_trampoline() {
   if (!has_written_trampoline_)
     write_trampoline();
-  return code_->trampoline_;
+  return written_trampoline_;
 }
 
 void PatchRequest::write_trampoline() {
   InstructionSet &inst = platform().instruction_set();
-  inst.write_trampoline(*this, code());
+  if (inst.write_trampoline(*this, code())) {
+    written_trampoline_ = code().trampoline_;
+  } else {
+    size_t redirect_size = inst.get_redirect_size_bytes();
+    byte_t block[8];
+    memcpy(block, overwritten_, redirect_size);
+    memcpy(block + redirect_size, original_ + redirect_size, 8 - redirect_size);
+    LOG_ERROR("Error writing trampoline for code [%x %x %x %x %x %x %x %x]",
+        block[0], block[1], block[2], block[3], block[4], block[5], block[6],
+        block[7]);
+  }
   has_written_trampoline_ = true;
 }
 

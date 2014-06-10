@@ -46,6 +46,9 @@ public:
   // Returns the index'th element.
   T &operator[](size_t index) { return elms_[index]; }
 
+  // Returns the index'th element of a const vector.
+  const T &operator[](size_t index) const { return elms_[index]; }
+
   // Returns true if the given vector is a suffix of this one. A vector is a
   // suffix of itself; the empty vector is trivially a suffix of any vector,
   // also including itself.

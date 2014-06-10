@@ -5,6 +5,8 @@ def build_object(filename):
   source_file = c.get_source_file(filename)
   source_file.add_include(get_root().get_child("src", "c"))
   source_file.add_include(get_dep('tclib').get_child("src", "c"))
+  source_file.add_include(get_system_file('/usr/include/llvm-3.4'))
+  source_file.add_include(get_system_file('/usr/include/llvm-c-3.4'))
   return source_file.get_object()
 
 agent_files = [
@@ -14,6 +16,7 @@ agent_files = [
 ]
 
 utils = get_external("src", "c", "utils", "objects")
+disass = get_external("src", "c", "disass", "objects")
 
 objects = get_group("objects")
 
@@ -23,6 +26,7 @@ for filename in agent_files:
 agent = c.get_shared_library("agent")
 agent.add_object(objects)
 agent.add_object(utils)
+agent.add_object(disass)
 
 host_files = [
   "host.cc",
@@ -31,6 +35,7 @@ host_files = [
 
 host = c.get_executable("host")
 host.add_object(utils)
+host.add_object(disass)
 for filename in host_files:
   host.add_object(build_object(filename))
 

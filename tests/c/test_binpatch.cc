@@ -4,7 +4,10 @@
 /// Code patching.
 
 #include "agent/binpatch.hh"
+#include "agent/binpatch-x64.hh"
 #include "test.hh"
+
+using namespace conprx;
 
 TEST(binpatch, datatypes) {
   ASSERT_EQ(1, sizeof(byte_t));
@@ -43,7 +46,7 @@ TEST(binpatch, individual_steps) {
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
   ASSERT_EQ(9, add(3, 5));
-  // ASSERT_EQ(8, patch.get_trampoline(add)(3, 5));
+//  ASSERT_EQ(8, patch.get_trampoline(add)(3, 5));
 
   ASSERT_TRUE(patches.open_for_patching());
   ASSERT_EQ(PatchSet::OPEN, patches.status());
@@ -103,4 +106,15 @@ TEST(binpatch, casts) {
   ASSERT_EQ(7, my_add_2(3, 4));
   address_t add_addr_2 = Code::upcast(add_impl);
   ASSERT_PTREQ(add_addr, add_addr_2);
+}
+
+#define CHECK_LENGTH(EXP, ...) do {                                            \
+  byte_t bytes[8] = {__VA_ARGS__};                                             \
+  ASSERT_EQ(EXP, X64::get_instruction_length(Vector<byte_t>(bytes, 8)));       \
+} while (false)
+
+TEST(binpatch, x64_disass) {
+  CHECK_LENGTH(1, 0x55); // push %rbp
+  CHECK_LENGTH(3, 0x48, 0x89, 0xe5); // mov %rsp,%rbp
+  CHECK_LENGTH(3, 0x89, 0x7d, 0xfc); // mov %edi,-0x4(%rbp)
 }

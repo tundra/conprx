@@ -32,6 +32,8 @@
 #include "utils/types.hh"
 #include "utils/vector.hh"
 
+namespace conprx {
+
 class InstructionSet;
 class MemoryManager;
 class Platform;
@@ -39,15 +41,6 @@ struct PatchCode;
 
 // The biggest possible redirect sequence.
 #define kMaxRedirectSizeBytes 8
-
-// Shorthand for bytes.
-typedef unsigned char byte_t;
-
-// Byte-size memory address (so addition increments by one byte at a time).
-typedef byte_t *address_t;
-
-// Integer datatype large enough to allow address arithmetic.
-typedef size_t address_arith_t;
 
 /// ## Patch request
 ///
@@ -106,6 +99,11 @@ private:
 
   // True iff the appropriate code has been written into the trampoline stub.
   bool has_written_trampoline_;
+
+  // The completed trampoline. Will contain the value to return for the
+  // trampoline when has_written_trampoline_ is true; it may be null if there
+  // was an error in constructing it.
+  address_t written_trampoline_;
 
   // The custom code stubs associated with this patch.
   PatchCode *code_;
@@ -332,10 +330,12 @@ public:
 
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
-  virtual void write_trampoline(PatchRequest &request, PatchCode &code) = 0;
+  virtual bool write_trampoline(PatchRequest &request, PatchCode &code) = 0;
 
   // Returns the instruction set to use on this platform.
   static InstructionSet &get();
 };
+
+} // namespace conprx
 
 #endif // _BINPATCH
