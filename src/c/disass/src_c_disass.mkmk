@@ -1,0 +1,25 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+def build_object(filename):
+  source_file = c.get_source_file(filename)
+  source_file.add_include(get_root().get_child("src", "c"))
+  source_file.add_include(get_dep('tclib').get_child("src", "c"))
+  source_file.add_include(get_system_file('/usr/include/llvm-3.4'))
+  source_file.add_include(get_system_file('/usr/include/llvm-c-3.4'))
+  return source_file.get_object()
+
+disass_files = [
+  "decoder-x86.c",
+  "disassembler-x86.cc",
+]
+
+utils = get_external("src", "c", "utils", "objects")
+
+objects = get_group("objects")
+
+for filename in disass_files:
+  objects.add_member(build_object(filename))
+
+all = get_group("all")
+all.add_dependency(objects)
