@@ -22,7 +22,6 @@
 #ifndef X86DISASSEMBLERDECODERCOMMON_H
 #define X86DISASSEMBLERDECODERCOMMON_H
 
-#include "llvm/Support/DataTypes.h"
 
 #define INSTRUCTIONS_SYM  x86DisassemblerInstrSpecifiers
 #define CONTEXTS_SYM      x86DisassemblerContexts

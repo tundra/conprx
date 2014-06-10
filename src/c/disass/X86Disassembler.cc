@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "X86Disassembler.h"
 #include "X86DisassemblerDecoder.h"
 
 #define GET_REGINFO_ENUM
@@ -37,8 +38,8 @@ const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii) {
 
 #define debug(s) DEBUG(x86DisassemblerDebug(__FILE__, __LINE__, s));
 
-namespace llvm {
-
+namespace llvm {  
+  
 // Fill-ins to make the compiler happy.  These constants are never actually
 //   assigned; they are just filler to make an automatically-generated switch
 //   statement work.
@@ -91,11 +92,11 @@ static int regionReader(const void* arg, uint8_t* byte, uint64_t address) {
 static void logger(void* arg, const char* log) {
   if (!arg)
     return;
-
+  
   raw_ostream &vStream = *(static_cast<raw_ostream*>(arg));
   vStream << log << "\n";
-}
-
+}  
+  
 //
 // Public interface for the disassembler
 //
@@ -114,7 +115,7 @@ X86GenericDisassembler::getInstruction(MCInst &instr,
   dlog_t loggerFn = logger;
   if (&vStream == &nulls())
     loggerFn = 0; // Disable logging completely if it's going to nulls().
-
+  
   int ret = decodeInstruction(&internalInstr,
                               regionReader,
                               (const void*)&region,
@@ -157,7 +158,7 @@ static void translateRegister(MCInst &mcInst, Reg reg) {
 }
 
 /// tryAddingSymbolicOperand - trys to add a symbolic operand in place of the
-/// immediate Value in the MCInst.
+/// immediate Value in the MCInst. 
 ///
 /// @param Value      - The immediate Value, has had any PC adjustment made by
 ///                     the caller.
@@ -169,7 +170,7 @@ static void translateRegister(MCInst &mcInst, Reg reg) {
 /// If the getOpInfo() function was set when setupForSymbolicDisassembly() was
 /// called then that function is called to get any symbolic information for the
 /// immediate in the instruction using the Address, Offset and Width.  If that
-/// returns non-zero then the symbolic information it returns is used to create
+/// returns non-zero then the symbolic information it returns is used to create 
 /// an MCExpr and that is added as an operand to the MCInst.  If getOpInfo()
 /// returns zero and isBranch is true then a symbol look up for immediate Value
 /// is done and if a symbol is found an MCExpr is created with that, else
@@ -177,8 +178,8 @@ static void translateRegister(MCInst &mcInst, Reg reg) {
 /// if it adds an operand to the MCInst and false otherwise.
 static bool tryAddingSymbolicOperand(int64_t Value, bool isBranch,
                                      uint64_t Address, uint64_t Offset,
-                                     uint64_t Width, MCInst &MI,
-                                     const MCDisassembler *Dis) {
+                                     uint64_t Width, MCInst &MI, 
+                                     const MCDisassembler *Dis) {  
   return Dis->tryAddingSymbolicOperand(MI, Value, Address, isBranch,
                                        Offset, Width);
 }
@@ -188,7 +189,7 @@ static bool tryAddingSymbolicOperand(int64_t Value, bool isBranch,
 /// These can often be addresses in a literal pool.  The Address of the
 /// instruction and its immediate Value are used to determine the address
 /// being referenced in the literal pool entry.  The SymbolLookUp call back will
-/// return a pointer to a literal 'C' string if the referenced address is an
+/// return a pointer to a literal 'C' string if the referenced address is an 
 /// address into a section with 'C' string literals.
 static void tryAddingPcLoadReferenceComment(uint64_t Address, uint64_t Value,
                                             const void *Decoder) {
@@ -205,7 +206,7 @@ static void tryAddingPcLoadReferenceComment(uint64_t Address, uint64_t Value,
 static void translateImmediate(MCInst &mcInst, uint64_t immediate,
                                const OperandSpecifier &operand,
                                InternalInstruction &insn,
-                               const MCDisassembler *Dis) {
+                               const MCDisassembler *Dis) {  
   // Sign-extend the immediate if necessary.
 
   OperandType type = (OperandType)operand.type;
@@ -318,7 +319,7 @@ static bool translateRMRegister(MCInst &mcInst,
     debug("A R/M register operand may not have a SIB byte");
     return true;
   }
-
+  
   switch (insn.eaBase) {
   default:
     debug("Unexpected EA base register");
@@ -338,7 +339,7 @@ static bool translateRMRegister(MCInst &mcInst,
   ALL_REGS
 #undef ENTRY
   }
-
+  
   return false;
 }
 
@@ -351,26 +352,26 @@ static bool translateRMRegister(MCInst &mcInst,
 ///                       from.
 /// @return             - 0 on success; nonzero otherwise
 static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
-                              const MCDisassembler *Dis) {
+                              const MCDisassembler *Dis) {  
   // Addresses in an MCInst are represented as five operands:
-  //   1. basereg       (register)  The R/M base, or (if there is a SIB) the
+  //   1. basereg       (register)  The R/M base, or (if there is a SIB) the 
   //                                SIB base
-  //   2. scaleamount   (immediate) 1, or (if there is a SIB) the specified
+  //   2. scaleamount   (immediate) 1, or (if there is a SIB) the specified 
   //                                scale amount
   //   3. indexreg      (register)  x86_registerNONE, or (if there is a SIB)
-  //                                the index (which is multiplied by the
+  //                                the index (which is multiplied by the 
   //                                scale amount)
   //   4. displacement  (immediate) 0, or the displacement if there is one
   //   5. segmentreg    (register)  x86_registerNONE for now, but could be set
   //                                if we have segment overrides
-
+  
   MCOperand baseReg;
   MCOperand scaleAmount;
   MCOperand indexReg;
   MCOperand displacement;
   MCOperand segmentReg;
   uint64_t pcrel = 0;
-
+  
   if (insn.eaBase == EA_BASE_sib || insn.eaBase == EA_BASE_sib64) {
     if (insn.sibBase != SIB_BASE_NONE) {
       switch (insn.sibBase) {
@@ -414,7 +415,7 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
       unsigned IndexOffset = insn.sibIndex -
                          (insn.addressSize == 8 ? SIB_INDEX_RAX:SIB_INDEX_EAX);
       SIBIndex IndexBase = IndexIs256 ? SIB_INDEX_YMM0 : SIB_INDEX_XMM0;
-      insn.sibIndex = (SIBIndex)(IndexBase +
+      insn.sibIndex = (SIBIndex)(IndexBase + 
                            (insn.sibIndex == SIB_INDEX_NONE ? 4 : IndexOffset));
     }
 
@@ -436,7 +437,7 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
     } else {
       indexReg = MCOperand::CreateReg(0);
     }
-
+    
     scaleAmount = MCOperand::CreateImm(insn.sibScale);
   } else {
     switch (insn.eaBase) {
@@ -455,7 +456,7 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
       }
       else
         baseReg = MCOperand::CreateReg(0);
-
+      
       indexReg = MCOperand::CreateReg(0);
       break;
     case EA_BASE_BX_SI:
@@ -486,7 +487,7 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
         //   placeholders to keep the compiler happy.
 #define ENTRY(x)                                        \
       case EA_BASE_##x:                                 \
-        baseReg = MCOperand::CreateReg(X86::x); break;
+        baseReg = MCOperand::CreateReg(X86::x); break; 
       ALL_EA_BASES
 #undef ENTRY
 #define ENTRY(x) case EA_REG_##x:
@@ -497,12 +498,12 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
         return true;
       }
     }
-
+    
     scaleAmount = MCOperand::CreateImm(1);
   }
-
+  
   displacement = MCOperand::CreateImm(insn.displacement);
-
+  
   static const uint8_t segmentRegnums[SEG_OVERRIDE_max] = {
     0,        // SEG_OVERRIDE_NONE
     X86::CS,
@@ -512,9 +513,9 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
     X86::FS,
     X86::GS
   };
-
+  
   segmentReg = MCOperand::CreateReg(segmentRegnums[insn.segmentOverride]);
-
+  
   mcInst.addOperand(baseReg);
   mcInst.addOperand(scaleAmount);
   mcInst.addOperand(indexReg);
@@ -535,7 +536,7 @@ static bool translateRMMemory(MCInst &mcInst, InternalInstruction &insn,
 ///                       from.
 /// @return             - 0 on success; nonzero otherwise
 static bool translateRM(MCInst &mcInst, const OperandSpecifier &operand,
-                        InternalInstruction &insn, const MCDisassembler *Dis) {
+                        InternalInstruction &insn, const MCDisassembler *Dis) {  
   switch (operand.type) {
   default:
     debug("Unexpected type for a R/M operand");
@@ -579,7 +580,7 @@ static bool translateRM(MCInst &mcInst, const OperandSpecifier &operand,
     return translateRMMemory(mcInst, insn, Dis);
   }
 }
-
+  
 /// translateFPRegister - Translates a stack position on the FPU stack to its
 ///   LLVM form, and appends it to an MCInst.
 ///
@@ -592,13 +593,13 @@ static bool translateFPRegister(MCInst &mcInst,
     debug("Invalid FP stack position");
     return true;
   }
-
+  
   mcInst.addOperand(MCOperand::CreateReg(X86::ST0 + stackPos));
 
   return false;
 }
 
-/// translateOperand - Translates an operand stored in an internal instruction
+/// translateOperand - Translates an operand stored in an internal instruction 
 ///   to LLVM's format and appends it to an MCInst.
 ///
 /// @param mcInst       - The MCInst to append to.
@@ -607,7 +608,7 @@ static bool translateFPRegister(MCInst &mcInst,
 /// @return             - false on success; true otherwise.
 static bool translateOperand(MCInst &mcInst, const OperandSpecifier &operand,
                              InternalInstruction &insn,
-                             const MCDisassembler *Dis) {
+                             const MCDisassembler *Dis) {  
   switch (operand.encoding) {
   default:
     debug("Unhandled operand encoding during translation");
@@ -656,7 +657,7 @@ static bool translateOperand(MCInst &mcInst, const OperandSpecifier &operand,
                             insn, Dis);
   }
 }
-
+  
 /// translateInstruction - Translates an internal instruction and all its
 ///   operands to an MCInst.
 ///
@@ -665,12 +666,12 @@ static bool translateOperand(MCInst &mcInst, const OperandSpecifier &operand,
 /// @return             - false on success; true otherwise.
 static bool translateInstruction(MCInst &mcInst,
                                 InternalInstruction &insn,
-                                const MCDisassembler *Dis) {
+                                const MCDisassembler *Dis) {  
   if (!insn.spec) {
     debug("Instruction has no specification");
     return true;
   }
-
+  
   mcInst.setOpcode(insn.instructionID);
   // If when reading the prefix bytes we determined the overlapping 0xf2 or 0xf3
   // prefix bytes should be disassembled as xrelease and xacquire then set the
@@ -681,11 +682,11 @@ static bool translateInstruction(MCInst &mcInst,
     else if(mcInst.getOpcode() == X86::REPNE_PREFIX)
       mcInst.setOpcode(X86::XACQUIRE_PREFIX);
   }
-
+  
   int index;
-
+  
   insn.numImmediatesTranslated = 0;
-
+  
   for (index = 0; index < X86_MAX_OPERANDS; ++index) {
     if (insn.operands[index].encoding != ENCODING_NONE) {
       if (translateOperand(mcInst, insn.operands[index], insn, Dis)) {
@@ -693,7 +694,7 @@ static bool translateInstruction(MCInst &mcInst,
       }
     }
   }
-
+  
   return false;
 }
 
@@ -709,9 +710,9 @@ static MCDisassembler *createX86_64Disassembler(const Target &T,
                                                      T.createMCInstrInfo());
 }
 
-extern "C" void LLVMInitializeX86Disassembler() {
+extern "C" void LLVMInitializeX86Disassembler() { 
   // Register the disassembler.
-  TargetRegistry::RegisterMCDisassembler(TheX86_32Target,
+  TargetRegistry::RegisterMCDisassembler(TheX86_32Target, 
                                          createX86_32Disassembler);
   TargetRegistry::RegisterMCDisassembler(TheX86_64Target,
                                          createX86_64Disassembler);

@@ -7,54 +7,64 @@
 
 #include "utils/log.hh"
 #include "disassembler-x86.hh"
+#include "utils/types.hh"
 
 #define __STDC_LIMIT_MACROS
 #define __STDC_CONSTANT_MACROS
 #define NDEBUG 1
 
+#include <assert.h>
+#include <math.h>
+
 // These have been hoisted from the LLVM file.
-#include "llvm/MC/MCInst.h"
-#include "llvm/MC/MCInstrInfo.h"
-#include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/MemoryObject.h"
-#include "llvm/Support/TargetRegistry.h"
 
-namespace llvm {
+#include "Compiler.hh"
+#include "type_traits.hh"
+#include "SwapByteOrder.hh"
+#include "MathExtras.hh"
+#include "AlignOf.hh"
+#include "SmallVector.hh"
+#include "StringRef.hh"
+#include "DataTypes.hh"
+#include "SMLoc.hh"
 
-// Stub disassembler supertype.
-class MCDisassembler {
-public:
-  virtual ~MCDisassembler() { }
-  MCDisassembler(const llvm::MCSubtargetInfo &) : CommentStream(NULL) { }
-  enum DecodeStatus {
-    Fail = 0,
-    SoftFail = 1,
-    Success = 3
-  };
+#include "MCInst.hh"
+#include "OwningPtr.hh"
+#include "Disassembler.hh"
+#include "MCRelocationInfo.hh"
+#include "MCSymbolizer.hh"
+#include "MCDisassembler.hh"
 
-  bool tryAddingSymbolicOperand(MCInst &Inst,
-                                int64_t Value,
-                                uint64_t Address, bool IsBranch,
-                                uint64_t Offset, uint64_t InstSize) const {
-    return true;
-  }
+#include "ErrorHandling.hh"
+#include "Twine.hh"
+#include "Triple.hh"
 
-  void tryAddingPcLoadReferenceComment(int64_t Value, uint64_t Address) const {
+#define LLVM_ON_UNIX 1
 
-  }
-
-  virtual DecodeStatus  getInstruction(MCInst& instr,
-                                       uint64_t& size,
-                                       const MemoryObject &region,
-                                       uint64_t address,
-                                       raw_ostream &vStream,
-                                       raw_ostream &cStream) const = 0;
-
-  mutable raw_ostream *CommentStream;
-};
-
-}
+#include "PointerLikeTypeTraits.hh"
+#include "DenseMapInfo.hh"
+#include "DenseMap.hh"
+#include "MCRegisterInfo.hh"
+#include "MCSchedule.hh"
+#include "MCInstrItineraries.hh"
+#include "SubtargetFeature.hh"
+#include "MCSubtargetInfo.hh"
+#include "MCInstrDesc.hh"
+#include "MCInstrInfo.hh"
+#include "system_error.hh"
+#include "TimeValue.hh"
+#include "SmallString.hh"
+#include "Casting.hh"
+#include "IntrusiveRefCntPtr.hh"
+#include "FileSystem.hh"
+#include "raw_ostream.hh"
+#include "Debug.hh"
+#include "MemoryObject.hh"
+#include "Core.hh"
+#include "Target.hh"
+#include "TargetMachine.hh"
+#include "CodeGen.hh"
+#include "TargetRegistry.hh"
 
 #include "X86Disassembler.h"
 #include "X86Disassembler.cc"

@@ -85,6 +85,7 @@
 #undef INSTRUCTION_SPECIFIER_FIELDS
 #undef INSTRUCTION_IDS
 
+
 namespace llvm {
 
 class MCInst;

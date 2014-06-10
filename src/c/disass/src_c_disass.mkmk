@@ -10,7 +10,7 @@ def build_object(filename):
   return source_file.get_object()
 
 disass_files = [
-  "decoder-x86.c",
+  "disassembler-decoder-x86.c",
   "disassembler-x86.cc",
 ]
 
