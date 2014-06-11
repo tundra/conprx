@@ -40,9 +40,6 @@ public:
   virtual void install_redirect(PatchRequest &request);
   virtual bool write_trampoline(PatchRequest &request, PatchCode &code);
 
-  // Returns the length of the next instruction in the given code block.
-  static size_t get_instruction_length(Vector<byte_t> code);
-
   // Returns the singleton ia32 instance.
   static X64 &get();
 

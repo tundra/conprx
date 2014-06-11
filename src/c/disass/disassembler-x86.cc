@@ -8,86 +8,52 @@
 #include "utils/log.hh"
 #include "disassembler-x86.hh"
 #include "utils/types.hh"
+#include "fake-llvm-inl.hh"
 
-#define __STDC_LIMIT_MACROS
-#define __STDC_CONSTANT_MACROS
-#define NDEBUG 1
+// MSVC has a few issues with the code below but luckily only warnings so we can
+// silence those.
+#ifdef IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4530 4986)
+#endif
 
 #include <assert.h>
 #include <math.h>
-
-// These have been hoisted from the LLVM file.
-
-#include "Compiler.hh"
-#include "type_traits.hh"
-#include "SwapByteOrder.hh"
-#include "MathExtras.hh"
-#include "AlignOf.hh"
-#include "SmallVector.hh"
-#include "StringRef.hh"
-#include "DataTypes.hh"
-#include "SMLoc.hh"
-
-#include "MCInst.hh"
-#include "OwningPtr.hh"
-#include "Disassembler.hh"
-#include "MCRelocationInfo.hh"
-#include "MCSymbolizer.hh"
-#include "MCDisassembler.hh"
-
-#include "ErrorHandling.hh"
-#include "Twine.hh"
-#include "Triple.hh"
-
-#define LLVM_ON_UNIX 1
-
-#include "PointerLikeTypeTraits.hh"
-#include "DenseMapInfo.hh"
-#include "DenseMap.hh"
-#include "MCRegisterInfo.hh"
-#include "MCSchedule.hh"
-#include "MCInstrItineraries.hh"
-#include "SubtargetFeature.hh"
-#include "MCSubtargetInfo.hh"
-#include "MCInstrDesc.hh"
-#include "MCInstrInfo.hh"
-#include "system_error.hh"
-#include "TimeValue.hh"
-#include "SmallString.hh"
-#include "Casting.hh"
-#include "IntrusiveRefCntPtr.hh"
-#include "FileSystem.hh"
-#include "raw_ostream.hh"
-#include "Debug.hh"
-#include "MemoryObject.hh"
-#include "Core.hh"
-#include "Target.hh"
-#include "TargetMachine.hh"
-#include "CodeGen.hh"
-#include "TargetRegistry.hh"
-
-#include "X86Disassembler.h"
-#include "X86Disassembler.cc"
+#include <string>
 
 using namespace conprx;
 
-// An llvm memory object that reads directly from a byte vector.
-class VectorMemory : public llvm::MemoryObject {
-public:
-  VectorMemory(Vector<byte_t> memory) : memory_(memory) { }
-  virtual uint64_t getBase() const { return reinterpret_cast<uint64_t>(memory_.start()); }
-  virtual uint64_t getExtent() const { return memory_.length(); }
-  virtual int readByte(uint64_t address, uint8_t *ptr) const {
-    if (memory_.length() <= address) {
-      return -1;
-    } else {
-      *ptr = memory_[address];
-      return 0;
-    }
-  }
-private:
-  Vector<byte_t> memory_;
-};
+// We need this bit of setup for the headers to compile. Found by trial and
+// error.
+#define INSTRUCTION_SPECIFIER_FIELDS uint16_t operands;
+#define INSTRUCTION_IDS uint16_t instructionIDs;
+#define NDEBUG 1
+
+#ifdef IS_MSVC
+#define BOOL DONT_CLASH_WITH_WINDEF_BOOL
+#endif
+
+// Include the headers required by the disassembler. The import script strips
+// includes from within the files it imports so all the required imports have
+// to be given explicitly here, in dependency order.
+#include "llvm/MCInst.hh"
+#include "llvm/MCRegisterInfo.hh"
+#include "llvm/MCInstrDesc.hh"
+#include "llvm/MCInstrInfo.hh"
+#include "llvm/X86DisassemblerDecoderCommon.h"
+#include "llvm/X86DisassemblerDecoder.h"
+#include "llvm/X86Disassembler.h"
+
+// Include the generated files.
+#define GET_REGINFO_ENUM
+#include "llvm/X86GenRegisterInfo.inc"
+#define GET_INSTRINFO_ENUM
+#include "llvm/X86GenInstrInfo.inc"
+
+// Finally, include the disassembler implementation itself. We include it here
+// both becuase it needs all the setup above but also because we need to pick
+// out some of the internals of it below.
+#include "llvm/X86Disassembler.cc"
 
 Disassembler::~Disassembler() { }
 
@@ -95,8 +61,17 @@ Disassembler::~Disassembler() { }
 // disassembler.
 class Dis_X86_64 : public Disassembler {
 public:
-  virtual size_t get_instruction_length(Vector<byte_t> code);
+  Dis_X86_64();
+  virtual Status resolve(Vector<byte_t> code, size_t offset, resolve_result *result_out);
+
+private:
+  llvm::MCSubtargetInfo subtarget_;
+  llvm::MCDisassembler *disass_;
 };
+
+Dis_X86_64::Dis_X86_64() {
+  disass_ = createX86_64Disassembler(llvm::TheX86_64Target, subtarget_);
+}
 
 Disassembler &Disassembler::x86_64() {
   static Dis_X86_64 *instance = NULL;
@@ -105,13 +80,20 @@ Disassembler &Disassembler::x86_64() {
   return *instance;
 }
 
-size_t Dis_X86_64::get_instruction_length(Vector<byte_t> code) {
-  LLVMInitializeX86Disassembler();
-  llvm::MCSubtargetInfo *subtarget = llvm::TheX86_64Target.createMCSubtargetInfo("", "", "");
-  llvm::MCDisassembler *disass = llvm::TheX86_64Target.createMCDisassembler(*subtarget);
+Disassembler::Status Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
+    resolve_result *result_out) {
   llvm::MCInst instr;
   uint64_t size = 0;
-  VectorMemory memory(code);
-  disass->getInstruction(instr, size, memory, 0, llvm::nulls(), llvm::nulls());
-  return size;
+  llvm::MemoryObject memory(code);
+  MCDisassembler::DecodeStatus decode_status = disass_->getInstruction(instr,
+      size, memory, offset, llvm::nulls(), llvm::nulls());
+  if (decode_status != MCDisassembler::Success)
+    return Disassembler::INVALID_INSTRUCTION;
+  result_out->length = size;
+  result_out->opcode = instr.getOpcode();
+  return Disassembler::RESOLVED;
 }
+
+#ifdef IS_MSVC
+#pragma warning(pop)
+#endif

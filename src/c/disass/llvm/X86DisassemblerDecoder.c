@@ -13,14 +13,14 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#include <stdarg.h>   /* for va_*()       */
-#include <stdio.h>    /* for vsnprintf()  */
-#include <stdlib.h>   /* for exit()       */
-#include <string.h>   /* for memset()     */
+// #include <stdarg.h>   /* for va_*()       */
+// #include <stdio.h>    /* for vsnprintf()  */
+// #include <stdlib.h>   /* for exit()       */
+// #include <string.h>   /* for memset()     */
 
-#include "X86DisassemblerDecoder.h"
+// #include "X86DisassemblerDecoder.h"
 
-#include "X86GenDisassemblerTables.inc"
+// #include "X86GenDisassemblerTables.inc"
 
 #define TRUE  1
 #define FALSE 0

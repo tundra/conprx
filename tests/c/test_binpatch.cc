@@ -5,6 +5,7 @@
 
 #include "agent/binpatch.hh"
 #include "agent/binpatch-x64.hh"
+#include "disass/disassembler-x86.hh"
 #include "test.hh"
 
 using namespace conprx;
@@ -109,12 +110,22 @@ TEST(binpatch, casts) {
 }
 
 #define CHECK_LENGTH(EXP, ...) do {                                            \
-  byte_t bytes[8] = {__VA_ARGS__};                                             \
-  ASSERT_EQ(EXP, X64::get_instruction_length(Vector<byte_t>(bytes, 8)));       \
+  Disassembler &disass = Disassembler::x86_64();                               \
+  byte_t bytes[16] = {__VA_ARGS__, 0x00};                                      \
+  Disassembler::resolve_result result;                                         \
+  ASSERT_EQ(Disassembler::RESOLVED, disass.resolve(Vector<byte_t>(bytes, 16), 0, &result)); \
+  ASSERT_EQ(EXP, result.length);                                               \
 } while (false)
 
 TEST(binpatch, x64_disass) {
   CHECK_LENGTH(1, 0x55); // push %rbp
   CHECK_LENGTH(3, 0x48, 0x89, 0xe5); // mov %rsp,%rbp
   CHECK_LENGTH(3, 0x89, 0x7d, 0xfc); // mov %edi,-0x4(%rbp)
+  CHECK_LENGTH(3, 0x8B, 0x45, 0xfc); // mov %-0x8(%rbp),%eax
+  CHECK_LENGTH(2, 0x01, 0xd0); // add %edx,%eax
+  CHECK_LENGTH(1, 0x5d); // pop %rbp
+  CHECK_LENGTH(1, 0xc3); // retq
+  CHECK_LENGTH(7, 0x48, 0x89, 0x85, 0x48, 0xfe, 0xff, 0xff); // mov %rax,-0x1b8(%rbp)
+  CHECK_LENGTH(3, 0x48, 0x89, 0xc7); // mov %rax,%rdi
+  CHECK_LENGTH(4, 0x48, 0x89, 0x04, 0x24); // mov %rax,(%rsp)
 }

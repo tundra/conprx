@@ -14,13 +14,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "X86Disassembler.h"
-#include "X86DisassemblerDecoder.h"
+// #include "X86Disassembler.h"
+// #include "X86DisassemblerDecoder.h"
+// #include "llvm/MC/MCContext.h"
+// #include "llvm/MC/MCDisassembler.h"
+// #include "llvm/MC/MCExpr.h"
+// #include "llvm/MC/MCInst.h"
+// #include "llvm/MC/MCInstrInfo.h"
+// #include "llvm/MC/MCSubtargetInfo.h"
+// #include "llvm/Support/Debug.h"
+// #include "llvm/Support/MemoryObject.h"
+// #include "llvm/Support/TargetRegistry.h"
+// #include "llvm/Support/raw_ostream.h"
 
 #define GET_REGINFO_ENUM
-#include "X86GenRegisterInfo.inc"
+// #include "X86GenRegisterInfo.inc"
 #define GET_INSTRINFO_ENUM
-#include "X86GenInstrInfo.inc"
+// #include "X86GenInstrInfo.inc"
 
 using namespace llvm;
 using namespace llvm::X86Disassembler;

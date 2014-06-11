@@ -80,11 +80,12 @@
 #define INSTRUCTION_IDS               \
   uint16_t instructionIDs;
 
-#include "X86DisassemblerDecoderCommon.h"
+// #include "X86DisassemblerDecoderCommon.h"
 
 #undef INSTRUCTION_SPECIFIER_FIELDS
 #undef INSTRUCTION_IDS
 
+// #include "llvm/MC/MCDisassembler.h"
 
 namespace llvm {
 

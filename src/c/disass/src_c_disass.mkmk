@@ -3,15 +3,15 @@
 
 def build_object(filename):
   source_file = c.get_source_file(filename)
+  source_file.set_force_c(filename.endswith(".c"))
   source_file.add_include(get_root().get_child("src", "c"))
   source_file.add_include(get_dep('tclib').get_child("src", "c"))
-  source_file.add_include(get_system_file('/usr/include/llvm-3.4'))
-  source_file.add_include(get_system_file('/usr/include/llvm-c-3.4'))
   return source_file.get_object()
 
 disass_files = [
   "disassembler-decoder-x86.c",
   "disassembler-x86.cc",
+  "fake-llvm.cc",
 ]
 
 utils = get_external("src", "c", "utils", "objects")

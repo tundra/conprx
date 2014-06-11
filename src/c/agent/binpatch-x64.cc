@@ -23,21 +23,19 @@ void X64::install_redirect(PatchRequest &request) {
 bool X64::write_trampoline(PatchRequest &request, PatchCode &code) {
   address_t trampoline = code.trampoline_;
   trampoline[0] = kInt3Op;
-  byte_t block[8];
-  memcpy(block, request.overwritten().start(), kRedirectSizeBytes);
-  memcpy(block + kRedirectSizeBytes, request.original() + kRedirectSizeBytes, 8 - kRedirectSizeBytes);
+  byte_t bytes[8];
+  memcpy(bytes, request.overwritten().start(), kRedirectSizeBytes);
+  memcpy(bytes + kRedirectSizeBytes, request.original() + kRedirectSizeBytes, 8 - kRedirectSizeBytes);
+  Vector<byte_t> block(bytes, 8);
   size_t offset = 0;
+  Disassembler::resolve_result result;
+  Disassembler &disass = Disassembler::x86_64();
   while (offset < kRedirectSizeBytes) {
-    size_t next_size = get_instruction_length(Vector<byte_t>(block + offset, 8 - offset));
-    if (next_size == 0)
+    if (disass.resolve(block, offset, &result) != Disassembler::RESOLVED)
       return false;
-    offset += next_size;
+    offset += result.length;
   }
   return true;
-}
-
-size_t X64::get_instruction_length(Vector<byte_t> code) {
-  return Disassembler::x86_64().get_instruction_length(code);
 }
 
 X64 &X64::get() {
