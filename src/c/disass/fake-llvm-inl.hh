@@ -3,16 +3,12 @@
 
 #include "fake-llvm.hh"
 
-namespace conprx {
+namespace llvm {
 
 template <typename K, typename V>
-V &FakeDenseMap<K, V>::operator[](const K &) {
+V &DenseMap<K, V>::operator[](const K &) {
   return value_;
 }
-
-} // namespace conprx
-
-namespace llvm {
 
 template <typename T>
 raw_ostream &raw_ostream::operator<<(const T& arg) {

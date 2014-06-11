@@ -8,19 +8,6 @@
 #include "utils/types.hh"
 #include "utils/vector.hh"
 
-namespace conprx {
-
-// No-behavior stand-in for DenseMap.
-template <typename K, typename V>
-class FakeDenseMap {
-public:
-  V &operator[](const K &);
-private:
-  V value_;
-};
-
-} // namespace conprx
-
 // Define the llvm types in terms of the fakes.
 namespace llvm {
 
@@ -28,14 +15,24 @@ class MCInst;
 class MemoryObject;
 class MCInstrInfo;
 
+// No-behavior stand-in for DenseMap.
 template <typename K, typename V>
-class DenseMap : public conprx::FakeDenseMap<K, V> { };
+class DenseMap {
+public:
+  V &operator[](const K &);
+private:
+  V value_;
+};
 
+// Leaving this empty means that we should get an error if anyone tries to use
+// this for something nontrivial.
 template <typename T>
 class isPodLike { };
 
+// These just get passed around so it doesn't matter what they contain.
 struct SMLoc { };
 
+// These also just get passed around so they could have any type basically.
 typedef const char *StringRef;
 
 // No-behavior subtarget info.
@@ -54,6 +51,7 @@ public:
   static raw_ostream &get() { return kInstance; }
 
 private:
+  // Since this has no behavior we need just one.
   static raw_ostream kInstance;
 };
 
@@ -65,7 +63,7 @@ static raw_ostream &nulls() {
   return raw_ostream::get();
 }
 
-// An llvm memory object that reads directly from a byte vector.
+// A memory object that reads directly from a byte vector.
 class MemoryObject {
 public:
   MemoryObject(Vector<byte_t> memory);
@@ -76,6 +74,7 @@ private:
   Vector<byte_t> memory_;
 };
 
+// The code expects this to be the structure, SmallVector extending SmallVectorImpl.
 template <typename T>
 class SmallVectorImpl {
 public:
@@ -113,9 +112,10 @@ public:
   virtual DecodeStatus  getInstruction(MCInst&, uint64_t&, const MemoryObject&,
       uint64_t, raw_ostream&, raw_ostream&) const = 0;
 
+  // Both of these seem to have little effect on what we need the disassembler
+  // for.
   virtual bool tryAddingSymbolicOperand(MCInst &, int64_t, uint64_t, bool,
       uint64_t, uint64_t) const;
-
   virtual void tryAddingPcLoadReferenceComment(int64_t, uint64_t) const;
 
   mutable raw_ostream *CommentStream;
@@ -127,6 +127,7 @@ public:
   MCInstrInfo *createMCInstrInfo() const;
 };
 
+// These just get passed to RegisterMCDisassembler, they're not used as such.
 extern Target TheX86_32Target;
 extern Target TheX86_64Target;
 

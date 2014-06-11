@@ -3,9 +3,11 @@
 
 #define NDEBUG 1
 
+#include "utils/types.hh"
+
+// For off_t.
 #include <sys/types.h>
 #include <stdarg.h>
-#include "utils/types.hh"
 
 // We need this bit of setup for the headers to compile. Found by trial and
 // error.

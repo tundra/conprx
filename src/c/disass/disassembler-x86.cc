@@ -18,10 +18,7 @@
 #endif
 
 #include <assert.h>
-#include <math.h>
 #include <string>
-
-using namespace conprx;
 
 // We need this bit of setup for the headers to compile. Found by trial and
 // error.
@@ -29,6 +26,8 @@ using namespace conprx;
 #define INSTRUCTION_IDS uint16_t instructionIDs;
 #define NDEBUG 1
 
+// The BOOL defined below will clash with the one from windows.h if we're not
+// careful.
 #ifdef IS_MSVC
 #define BOOL DONT_CLASH_WITH_WINDEF_BOOL
 #endif
@@ -54,6 +53,8 @@ using namespace conprx;
 // both becuase it needs all the setup above but also because we need to pick
 // out some of the internals of it below.
 #include "llvm/X86Disassembler.cc"
+
+using namespace conprx;
 
 Disassembler::~Disassembler() { }
 
