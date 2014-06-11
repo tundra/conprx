@@ -47,7 +47,7 @@ TEST(binpatch, individual_steps) {
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
   ASSERT_EQ(9, add(3, 5));
-//  ASSERT_EQ(8, patch.get_trampoline(add)(3, 5));
+  ASSERT_EQ(8, patch.get_trampoline(add)(3, 5));
 
   ASSERT_TRUE(patches.open_for_patching());
   ASSERT_EQ(PatchSet::OPEN, patches.status());

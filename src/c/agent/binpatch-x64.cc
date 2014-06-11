@@ -20,21 +20,56 @@ void X64::install_redirect(PatchRequest &request) {
   reinterpret_cast<int32_t*>(original + 1)[0] = static_cast<int32_t>(original_to_replacement);
 }
 
-bool X64::write_trampoline(PatchRequest &request, PatchCode &code) {
-  address_t trampoline = code.trampoline_;
-  trampoline[0] = kInt3Op;
-  byte_t bytes[8];
+bool X64::get_preamble_length(PatchRequest &request, size_t *length_out) {
+#define kSnippetSize 16
+  // Build an array of bytes containing the original code which is now split
+  // in two.
+  byte_t bytes[kSnippetSize];
   memcpy(bytes, request.overwritten().start(), kRedirectSizeBytes);
-  memcpy(bytes + kRedirectSizeBytes, request.original() + kRedirectSizeBytes, 8 - kRedirectSizeBytes);
-  Vector<byte_t> block(bytes, 8);
+  memcpy(bytes + kRedirectSizeBytes, request.original() + kRedirectSizeBytes,
+      kSnippetSize - kRedirectSizeBytes);
+  Vector<byte_t> block(bytes, kSnippetSize);
+  // Skip over one instruction at a time until we're past the redirect.
   size_t offset = 0;
-  Disassembler::resolve_result result;
   Disassembler &disass = Disassembler::x86_64();
   while (offset < kRedirectSizeBytes) {
+    Disassembler::resolve_result result;
     if (disass.resolve(block, offset, &result) != Disassembler::RESOLVED)
+      // If the disassembler failed to resolve the instruction for whatever
+      // reason, we bail out.
       return false;
     offset += result.length;
   }
+  *length_out = offset;
+  return true;
+}
+
+bool X64::write_trampoline(PatchRequest &request, PatchCode &code) {
+  // Initially let the trampoline interrupt (int3) when called. Just in case
+  // anyone should decide to call it in the case that we failed below.
+  address_t trampoline = code.trampoline_;
+  trampoline[0] = kInt3Op;
+  // Determine the amount of code to restore.
+  size_t preamble_length = 0;
+  if (!get_preamble_length(request, &preamble_length))
+    return false;
+  // Copy the overwritten bytes into the trampoline. We'll definitely have to
+  // execute those.
+  memcpy(trampoline, request.overwritten().start(), kRedirectSizeBytes);
+  // Then, if there are more bytes to copy, do that as well.
+  size_t remaining_length = preamble_length - kRedirectSizeBytes;
+  if (remaining_length > 0) {
+    memcpy(trampoline + kRedirectSizeBytes, request.original() + kRedirectSizeBytes,
+        remaining_length);
+  }
+  // Now we can jump back to the original. Note that we don't have to account
+  // for the preamble length because even thought we're jumping from that far
+  // into the trampoline the destination is the same length within the original
+  // so they cancel out.
+  ssize_t trampoline_to_original = (request.original() - trampoline) - kJmpOpSizeBytes;
+  address_t jmp_addr = trampoline + preamble_length;
+  jmp_addr[0] = kJmpOp;
+  reinterpret_cast<int32_t*>(jmp_addr + 1)[0] = static_cast<int32_t>(trampoline_to_original);
   return true;
 }
 

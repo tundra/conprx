@@ -40,6 +40,10 @@ public:
   virtual void install_redirect(PatchRequest &request);
   virtual bool write_trampoline(PatchRequest &request, PatchCode &code);
 
+  // Attempt to determine the length of the given request's preamble. If
+  // successful returns true and stores the length in length_out.
+  bool get_preamble_length(PatchRequest &request, size_t *length_out);
+
   // Returns the singleton ia32 instance.
   static X64 &get();
 
