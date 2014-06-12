@@ -40,7 +40,7 @@ class Platform;
 struct PatchCode;
 
 // The biggest possible redirect sequence.
-#define kMaxRedirectSizeBytes 8
+#define kMaxPreambleSizeBytes 16
 
 /// ## Patch request
 ///
@@ -57,7 +57,7 @@ public:
   PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  void preparing_apply(Platform *platform, PatchCode *code);
+  bool prepare_apply(Platform *platform, PatchCode *code);
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
@@ -65,6 +65,8 @@ public:
   address_t original() { return reinterpret_cast<address_t>(original_); }
 
   address_t replacement() { return reinterpret_cast<address_t>(replacement_); }
+
+  size_t preamble_size() { return preamble_size_; }
 
   PatchCode &code() { return *code_; }
 
@@ -79,7 +81,7 @@ public:
   template <typename T>
   T get_trampoline(T prototype) { return get_trampoline<T>(); }
 
-  Vector<byte_t> overwritten() { return Vector<byte_t>(overwritten_, kMaxRedirectSizeBytes); }
+  Vector<byte_t> preamble() { return Vector<byte_t>(preamble_, preamble_size_); }
 
 private:
   // Returns the address of the trampoline, creating it on first call.
@@ -97,23 +99,21 @@ private:
   // The address of the replacement function.
   address_t replacement_;
 
-  // True iff the appropriate code has been written into the trampoline stub.
-  bool has_written_trampoline_;
-
-  // The completed trampoline. Will contain the value to return for the
-  // trampoline when has_written_trampoline_ is true; it may be null if there
-  // was an error in constructing it.
-  address_t written_trampoline_;
+  // The completed trampoline. Will be null until the trampoline has been
+  // written.
+  address_t trampoline_;
 
   // The custom code stubs associated with this patch.
   PatchCode *code_;
 
-  // When applied this array holds the code in the original function that was
-  // overwritten.
-  byte_t overwritten_[kMaxRedirectSizeBytes];
+  // A copy of the original method's preamble which we'll overwrite later on.
+  byte_t preamble_[kMaxPreambleSizeBytes];
 
   // The platform utilities.
   Platform *platform_;
+
+  // The length of the original's preamble.
+  size_t preamble_size_;
 };
 
 // Size of the helper component of a patch stub.
@@ -242,9 +242,6 @@ private:
   // crashes if writing fails.
   bool validate_open_for_patching();
 
-  // Applies an individual request.
-  void install_redirect(PatchRequest &request);
-
   // The patch engine used to apply this patch set.
   Platform &platform_;
   MemoryManager &memory_manager() { return platform_.memory_manager(); }
@@ -324,13 +321,17 @@ public:
   // the original code to the replacement.
   virtual size_t get_redirect_size_bytes() = 0;
 
+  // Determines the length of the preamble that will be overwritten by the
+  // redirect. Returns true on success.
+  virtual bool get_preamble_size_bytes(address_t original, size_t *size_out) = 0;
+
   // Installs a redirect from the request's original function to its entry
   // stub.
   virtual void install_redirect(PatchRequest &request) = 0;
 
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
-  virtual bool write_trampoline(PatchRequest &request, PatchCode &code) = 0;
+  virtual void write_trampoline(PatchRequest &request, PatchCode &code) = 0;
 
   // Returns the instruction set to use on this platform.
   static InstructionSet &get();

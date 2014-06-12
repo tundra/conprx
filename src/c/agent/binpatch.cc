@@ -16,44 +16,41 @@ MemoryManager::~MemoryManager() {
 PatchRequest::PatchRequest(address_t original, address_t replacement)
   : original_(original)
   , replacement_(replacement)
-  , has_written_trampoline_(false)
-  , written_trampoline_(NULL)
+  , trampoline_(NULL)
   , code_(NULL)
-  , platform_(NULL) { }
+  , platform_(NULL)
+  , preamble_size_(0) { }
 
 PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
-  , has_written_trampoline_(false)
-  , written_trampoline_(NULL)
+  , trampoline_(NULL)
   , code_(NULL)
-  , platform_(NULL) { }
+  , platform_(NULL)
+  , preamble_size_(0) { }
 
-void PatchRequest::preparing_apply(Platform *platform, PatchCode *code) {
+bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code) {
   platform_ = platform;
   code_ = code;
+  // Determine the length of the preamble. This also determines whether the
+  // preamble can safely be overwritten, otherwise we'll bail out.
+  if (!platform->instruction_set().get_preamble_size_bytes(original_,
+      &preamble_size_))
+    return false;
+  memcpy(preamble_, original_, preamble_size_);
+  return true;
 }
 
 address_t PatchRequest::get_or_create_trampoline() {
-  if (!has_written_trampoline_)
+  if (trampoline_ == NULL)
     write_trampoline();
-  return written_trampoline_;
+  return trampoline_;
 }
 
 void PatchRequest::write_trampoline() {
   InstructionSet &inst = platform().instruction_set();
-  if (inst.write_trampoline(*this, code())) {
-    written_trampoline_ = code().trampoline_;
-  } else {
-    size_t redirect_size = inst.get_redirect_size_bytes();
-    byte_t block[8];
-    memcpy(block, overwritten_, redirect_size);
-    memcpy(block + redirect_size, original_ + redirect_size, 8 - redirect_size);
-    LOG_ERROR("Error writing trampoline for code [%x %x %x %x %x %x %x %x]",
-        block[0], block[1], block[2], block[3], block[4], block[5], block[6],
-        block[7]);
-  }
-  has_written_trampoline_ = true;
+  inst.write_trampoline(*this, code());
+  trampoline_ = code().trampoline_;
 }
 
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
@@ -98,8 +95,12 @@ bool PatchSet::prepare_apply() {
   }
   // Cast the memory to a vector of patch stubs.
   codes_ = memory.cast<PatchCode>();
-  for (size_t i = 0; i < requests().length(); i++)
-    requests()[i].preparing_apply(&platform_, &codes_[i]);
+  for (size_t i = 0; i < requests().length(); i++) {
+    if (!requests()[i].prepare_apply(&platform_, &codes_[i])) {
+      status_ = FAILED;
+      return false;
+    }
+  }
   status_ = PREPARED;
   return true;
 }
@@ -194,29 +195,20 @@ bool PatchSet::close_after_patching(Status success_status) {
 
 void PatchSet::install_redirects() {
   LOG_DEBUG("Installing redirects");
+  InstructionSet &inst = instruction_set();
   for (size_t i = 0; i < requests().length(); i++)
-    install_redirect(requests()[i]);
+    inst.install_redirect(requests()[i]);
   LOG_DEBUG("Successfully installed redirects");
   status_ = APPLIED_OPEN;
 }
 
-void PatchSet::install_redirect(PatchRequest &request) {
-  InstructionSet &inst = instruction_set();
-  // Record the code being overwritten in the patch request.
-  Vector<byte_t> overwritten = request.overwritten();
-  memcpy(overwritten.start(), request.original(), inst.get_redirect_size_bytes());
-  // Then install the redirect.
-  inst.install_redirect(request);
-}
-
 void PatchSet::revert_redirects() {
   LOG_DEBUG("Reverting redirects");
-  InstructionSet &inst = instruction_set();
   for (size_t i = 0; i < requests().length(); i++) {
     PatchRequest &request = requests()[i];
-    Vector<byte_t> overwritten = request.overwritten();
+    Vector<byte_t> preamble = request.preamble();
     address_t original = request.original();
-    memcpy(original, overwritten.start(), inst.get_redirect_size_bytes());
+    memcpy(original, preamble.start(), preamble.length());
   }
   LOG_DEBUG("Successfully reverted redirects");
   status_ = REVERTED_OPEN;
