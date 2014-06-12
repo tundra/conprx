@@ -19,6 +19,12 @@ namespace conprx {
        void *reserved),                                                        \
       (console_output, buffer, number_of_chars_to_write,                       \
        number_of_chars_written, reserved))                                     \
+  F(WriteConsoleW, write_console_w, bool_t,                                    \
+      (handle_t console_output, const void *buffer,                            \
+       dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
+       void *reserved),                                                        \
+      (console_output, buffer, number_of_chars_to_write,                       \
+       number_of_chars_written, reserved))                                     \
   F(AllocConsole, alloc_console, bool_t, (), ())
 
 // A container that holds the various definitions used by the other console
