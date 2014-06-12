@@ -14,7 +14,7 @@ typedef bool bool_t;
 // Because of the magic way windows handles strings we'll use this alias for
 // them even on posix.
 typedef const char *ansi_c_str_t;
-typedef const wchar_t *wide_c_str_t;
+typedef const uint16_t *wide_c_str_t;
 typedef ansi_c_str_t c_str_t;
 
 #define TEXT(STR) (STR)

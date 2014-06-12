@@ -74,12 +74,14 @@ bool PosixMemoryManager::set_permissions(Vector<byte_t> region, int prot) {
 }
 
 Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size) {
-  address_arith_t addr_val = reinterpret_cast<address_arith_t>(addr);
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+#ifdef IS_64_BIT
+  address_arith_t addr_val = reinterpret_cast<address_arith_t>(addr);
   if ((addr_val >> 32) == 0)
     // If the address is in the first 32 bits we ask for memory there. If it's
     // not we're basically screwed but will try anyway, just in case.
     flags |= MAP_32BIT;
+#endif
   void *result = mmap(NULL, page_size_, PROT_READ | PROT_WRITE | PROT_EXEC,
       flags, 0, 0);
   if (result == NULL) {

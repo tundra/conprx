@@ -20,7 +20,11 @@ void X64::install_redirect(PatchRequest &request) {
   reinterpret_cast<int32_t*>(original + 1)[0] = static_cast<int32_t>(original_to_replacement);
 }
 
+
+
 bool X64::get_preamble_length(PatchRequest &request, size_t *length_out) {
+  // TODO: figure out if this is safe or if it might lead to reading past the
+  //   end of the page that holds the original function.
 #define kSnippetSize 16
   // Build an array of bytes containing the original code which is now split
   // in two.
@@ -33,12 +37,20 @@ bool X64::get_preamble_length(PatchRequest &request, size_t *length_out) {
   size_t offset = 0;
   Disassembler &disass = Disassembler::x86_64();
   while (offset < kRedirectSizeBytes) {
-    Disassembler::resolve_result result;
-    if (disass.resolve(block, offset, &result) != Disassembler::RESOLVED)
+    InstructionInfo info;
+    if (!disass.resolve(block, offset, &info)) {
+      if (info.status() == InstructionInfo::BLACKLISTED) {
+        LOG_WARNING("Instruction 0x%x at offset %i is blacklisted",
+            info.instruction(), offset);
+      } else if (info.status() == InstructionInfo::INVALID_INSTRUCTION) {
+        LOG_WARNING("Invalid instruction 0x%x at offset %i was blacklisted",
+            info.instruction(), offset);
+      }
       // If the disassembler failed to resolve the instruction for whatever
       // reason, we bail out.
       return false;
-    offset += result.length;
+    }
+    offset += info.length();
   }
   *length_out = offset;
   return true;

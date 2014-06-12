@@ -56,6 +56,20 @@
 
 using namespace conprx;
 
+bool InstructionInfo::fail(Status status, byte_t instr) {
+  length_ = 0;
+  status_ = status;
+  instr_ = instr;
+  return false;
+}
+
+bool InstructionInfo::succeed(size_t length) {
+  length_ = length;
+  status_ = RESOLVED;
+  instr_ = 0;
+  return true;
+}
+
 Disassembler::~Disassembler() { }
 
 // An x86-64 disassembler implemented by calling through to the llvm
@@ -63,15 +77,46 @@ Disassembler::~Disassembler() { }
 class Dis_X86_64 : public Disassembler {
 public:
   Dis_X86_64();
-  virtual Status resolve(Vector<byte_t> code, size_t offset, resolve_result *result_out);
+  virtual bool resolve(Vector<byte_t> code, size_t offset,
+      InstructionInfo *info_out);
+
+  // Returns true iff the given instruction is in the instruction whitelist.
+  bool in_whitelist(byte_t instr);
 
 private:
-  llvm::MCSubtargetInfo subtarget_;
-  llvm::MCDisassembler *disass_;
+  // Adaptor that allows the decoder, which is implemented in C, to read from
+  // vectors.
+  static int vector_byte_reader(const void* arg, uint8_t* byte,
+      uint64_t address);
+
+  // Bools that signify whether a value is in the whitelist or not.
+  bool in_whitelist_[256];
+
+  // A list of opcodes we're willing to patch.
+  static const byte_t kOpcodeWhitelist[];
+  static const size_t kOpcodeWhitelistSize = 21;
+
+};
+
+const byte_t Dis_X86_64::kOpcodeWhitelist[kOpcodeWhitelistSize] = {
+  0x00, // nop
+  0x01, // add
+  0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, // push reg
+  0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f, // pop reg
+  0x89, // mov
+  0x8b, // mov
+  0x8d  // lea
 };
 
 Dis_X86_64::Dis_X86_64() {
-  disass_ = createX86_64Disassembler(llvm::TheX86_64Target, subtarget_);
+  for (size_t i = 0; i < 256; i++)
+    in_whitelist_[i] = false;
+  for (size_t i = 0; i < kOpcodeWhitelistSize; i++)
+    in_whitelist_[kOpcodeWhitelist[i]] = true;
+}
+
+bool Dis_X86_64::in_whitelist(byte_t opcode) {
+  return in_whitelist_[opcode];
 }
 
 Disassembler &Disassembler::x86_64() {
@@ -81,18 +126,24 @@ Disassembler &Disassembler::x86_64() {
   return *instance;
 }
 
-Disassembler::Status Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
-    resolve_result *result_out) {
-  llvm::MCInst instr;
-  uint64_t size = 0;
-  llvm::MemoryObject memory(code);
-  MCDisassembler::DecodeStatus decode_status = disass_->getInstruction(instr,
-      size, memory, offset, llvm::nulls(), llvm::nulls());
-  if (decode_status != MCDisassembler::Success)
-    return Disassembler::INVALID_INSTRUCTION;
-  result_out->length = size;
-  result_out->opcode = instr.getOpcode();
-  return Disassembler::RESOLVED;
+int Dis_X86_64::vector_byte_reader(const void* arg, uint8_t* byte,
+    uint64_t address) {
+  const Vector<byte_t> &vect = *static_cast<const Vector<byte_t>*>(arg);
+  *byte = vect[address];
+  return 0;
+}
+
+bool Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
+    InstructionInfo *info_out) {
+  struct InternalInstruction instr;
+  int ret = decodeInstruction(&instr, vector_byte_reader, &code, NULL, NULL,
+      NULL, offset, MODE_64BIT);
+  if (ret)
+    // The return value is 0 on success.
+    return info_out->fail(InstructionInfo::INVALID_INSTRUCTION, 0);
+  if (!in_whitelist(instr.opcode))
+    return info_out->fail(InstructionInfo::BLACKLISTED, instr.opcode);
+  return info_out->succeed(instr.readerCursor - offset);
 }
 
 #ifdef IS_MSVC

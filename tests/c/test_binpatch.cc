@@ -47,7 +47,13 @@ TEST(binpatch, individual_steps) {
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
   ASSERT_EQ(9, add(3, 5));
-  ASSERT_EQ(8, patch.get_trampoline(add)(3, 5));
+
+  int (*add_tramp)(int, int) = patch.get_trampoline(add);
+  if (add_tramp) {
+    // Depending on which platform we're on we may not be able to produce a
+    // trampoline, in which case we should skip this test.
+    ASSERT_EQ(8, add_tramp(3, 5));
+  }
 
   ASSERT_TRUE(patches.open_for_patching());
   ASSERT_EQ(PatchSet::OPEN, patches.status());
@@ -112,9 +118,19 @@ TEST(binpatch, casts) {
 #define CHECK_LENGTH(EXP, ...) do {                                            \
   Disassembler &disass = Disassembler::x86_64();                               \
   byte_t bytes[16] = {__VA_ARGS__, 0x00};                                      \
-  Disassembler::resolve_result result;                                         \
-  ASSERT_EQ(Disassembler::RESOLVED, disass.resolve(Vector<byte_t>(bytes, 16), 0, &result)); \
-  ASSERT_EQ(EXP, result.length);                                               \
+  InstructionInfo info;                                                        \
+  ASSERT_EQ(true, disass.resolve(Vector<byte_t>(bytes, 16), 0, &info));        \
+  ASSERT_EQ(InstructionInfo::RESOLVED, info.status());                         \
+  ASSERT_EQ(EXP, info.length());                                               \
+} while (false)
+
+#define CHECK_STATUS(EXP, ...) do {                                            \
+  Disassembler &disass = Disassembler::x86_64();                               \
+  byte_t bytes[16] = {__VA_ARGS__, 0x00};                                      \
+  InstructionInfo info;                                                        \
+  ASSERT_EQ(false, disass.resolve(Vector<byte_t>(bytes, 16), 0, &info));       \
+  ASSERT_EQ(InstructionInfo::EXP, info.status());                              \
+  ASSERT_EQ(0, info.length());                                                 \
 } while (false)
 
 TEST(binpatch, x64_disass) {
@@ -124,8 +140,10 @@ TEST(binpatch, x64_disass) {
   CHECK_LENGTH(3, 0x8B, 0x45, 0xfc); // mov %-0x8(%rbp),%eax
   CHECK_LENGTH(2, 0x01, 0xd0); // add %edx,%eax
   CHECK_LENGTH(1, 0x5d); // pop %rbp
-  CHECK_LENGTH(1, 0xc3); // retq
+  CHECK_STATUS(BLACKLISTED, 0xc3); // retq
   CHECK_LENGTH(7, 0x48, 0x89, 0x85, 0x48, 0xfe, 0xff, 0xff); // mov %rax,-0x1b8(%rbp)
   CHECK_LENGTH(3, 0x48, 0x89, 0xc7); // mov %rax,%rdi
   CHECK_LENGTH(4, 0x48, 0x89, 0x04, 0x24); // mov %rax,(%rsp)
+  CHECK_STATUS(INVALID_INSTRUCTION, 0x48, 0x48); // (two rex.w prefixes)
+  CHECK_STATUS(INVALID_INSTRUCTION, 0x60); // (pusha only exists in 32 bit mode)
 }
