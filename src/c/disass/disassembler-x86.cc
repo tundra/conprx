@@ -81,6 +81,10 @@ public:
       InstructionInfo *info_out);
 
   // Returns true iff the given instruction is in the instruction whitelist.
+  // The whitelist exists because we can't safely copy any instruction -- for
+  // instance, relative jumps have to be adjusted and returns can signify the
+  // end of the code. So to be on the safe side we'll refuse to copy
+  // instructions not explicitly whitelisted.
   bool in_whitelist(byte_t instr);
 
 private:
@@ -129,8 +133,12 @@ Disassembler &Disassembler::x86_64() {
 int Dis_X86_64::vector_byte_reader(const void* arg, uint8_t* byte,
     uint64_t address) {
   const Vector<byte_t> &vect = *static_cast<const Vector<byte_t>*>(arg);
-  *byte = vect[address];
-  return 0;
+  if (address >= vect.length()) {
+    return -1;
+  } else {
+    *byte = vect[address];
+    return 0;
+  }
 }
 
 bool Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
