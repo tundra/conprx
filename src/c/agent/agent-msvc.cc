@@ -19,10 +19,10 @@ public:
 private:
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
-  static c_str_t kBlacklist[kBlacklistSize];
+  static cstr_t kBlacklist[kBlacklistSize];
 };
 
-c_str_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
+cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     // These are internal windows services that become unhappy if we try to
     // patch them. Also it serves no purpose.
     TEXT("conhost.exe"),
@@ -67,7 +67,7 @@ bool WindowsConsoleAgent::is_process_hard_blacklisted() {
   // It is not safe to log at this point since this is run in *every* process
   // the system has, including processes that are too fundamental to support
   // the stuff we need for logging.
-  c_char_t buffer[1024];
+  char_t buffer[1024];
   // Passing NULL means the current process. Now we know.
   size_t length = GetModuleFileName(NULL, buffer, 1024);
   if (length == 0)
@@ -77,16 +77,16 @@ bool WindowsConsoleAgent::is_process_hard_blacklisted() {
   // Scan through the blacklist to see if this process matches anything. I
   // imaging this will have to get smarter, possibly even support some amount
   // of external configuration and/or wildcard matching. Laters.
-  Vector<c_char_t> executable(buffer, length);
+  Vector<char_t> executable(buffer, length);
   for (size_t i = 0; i < kBlacklistSize; i++) {
-    Vector<c_char_t> entry(const_cast<c_char_t*>(kBlacklist[i]), lstrlen(kBlacklist[i]));
+    Vector<char_t> entry(const_cast<char_t*>(kBlacklist[i]), lstrlen(kBlacklist[i]));
     if (executable.has_suffix(entry))
       return true;
   }
   return false;
 }
 
-address_t ConsoleAgent::get_console_function_address(c_str_t name) {
+address_t ConsoleAgent::get_console_function_address(cstr_t name) {
   module_t kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
   return Code::upcast(GetProcAddress(kernel32, name));
 }
@@ -106,14 +106,14 @@ public:
 
   // Attempts to read a value from the registry and if present sets the field
   // to its value.
-  void override_bool_from_registry(bool *field, hkey_t registry, c_str_t name);
+  void override_bool_from_registry(bool *field, hkey_t registry, cstr_t name);
 
   // Reads any options from environment variables.
   void override_from_environment();
 
   // Attempts to read the given environment variable and if present sets the
   // field to its value, otherwise doesn't change it.
-  void override_bool_from_environment(bool *field, c_str_t name);
+  void override_bool_from_environment(bool *field, cstr_t name);
 };
 
 WindowsOptions::WindowsOptions() {
@@ -141,7 +141,7 @@ void WindowsOptions::override_from_registry(hkey_t registry) {
 }
 
 void WindowsOptions::override_bool_from_registry(bool *field, hkey_t hkey,
-    c_str_t name) {
+    cstr_t name) {
   // Read the relevant registry entry.
   dword_t type = 0;
   dword_t value = 0;
@@ -160,8 +160,8 @@ void WindowsOptions::override_from_environment() {
 #undef __EMIT_ENV_READ__
 }
 
-void WindowsOptions::override_bool_from_environment(bool *field, c_str_t name) {
-  c_char_t buffer[256];
+void WindowsOptions::override_bool_from_environment(bool *field, cstr_t name) {
+  char_t buffer[256];
   if (GetEnvironmentVariable(name, buffer, 256) == 0)
     // There was no environment variable with that name.
     return;

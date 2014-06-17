@@ -87,7 +87,7 @@ public:
 
 private:
   // Returns the address of the console function with the given name.
-  static address_t get_console_function_address(c_str_t name);
+  static address_t get_console_function_address(cstr_t name);
 
   // Returns the address of the delegator that turns static function calls into
   // method calls on the delegate object.

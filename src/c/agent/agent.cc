@@ -10,19 +10,19 @@ using namespace conprx;
 
 class OriginalConsole : public Console {
 public:
-  OriginalConsole(Vector<PatchRequest> patches) : patches_(patches) { }
+  OriginalConsole(Vector<PatchRequest*> patches) : patches_(patches) { }
 #define __EMIT_TRAMPOLINE_DECL__(Name, name, RET, PARAMS, ARGS)                \
   virtual RET name PARAMS;
   FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_DECL__)
 #undef __EMIT_TRAMPOLINE_DECL__
 private:
-  Vector<PatchRequest> patches_;
+  Vector<PatchRequest*> patches_;
 };
 
 #define __EMIT_TRAMPOLINE_IMPL__(Name, name, RET, PARAMS, ARGS)                \
   RET OriginalConsole::name PARAMS {                                           \
-    PatchRequest &patch = patches_[Console::name##_key];                       \
-    Console::name##_t trampoline = patch.get_trampoline<Console::name##_t>();  \
+    PatchRequest *patch = patches_[Console::name##_key];                       \
+    Console::name##_t trampoline = patch->get_trampoline<Console::name##_t>(); \
     return trampoline ARGS;                                                    \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
@@ -47,9 +47,12 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
   // An array of all the requests that could be constructed, in a contiguous
   // range.
   PatchRequest *packed_requests = new PatchRequest[functions.length()];
-  // An array where the key'th entry holds the request to patch the function
-  // with the given key. Some of these may be empty.
-  PatchRequest *key_to_request = new PatchRequest[Console::kFunctionCount];
+  // An array where the key'th entry holds a pointer to patch the function
+  // with the given key. Some of these may be NULL, the rest will point into
+  // the packed request array.
+  PatchRequest **key_to_request = new PatchRequest*[Console::kFunctionCount];
+  for (size_t i = 0; i < Console::kFunctionCount; i++)
+    key_to_request[i] = NULL;
   // The current offset within the packed requests.
   size_t packed_offset = 0;
   for (size_t i = 0; i < functions.length(); i++) {
@@ -58,11 +61,11 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
     address_t bridge = get_delegate_bridge(info.key);
     if (original == NULL || bridge == NULL) {
       LOG_DEBUG("Console function %s not found", info.name);
-      continue;
+    } else {
+      PatchRequest *entry = &packed_requests[packed_offset++];
+      *entry = PatchRequest(original, bridge);
+      key_to_request[info.key] = entry;
     }
-    PatchRequest request(original, bridge);
-    packed_requests[packed_offset++] = request;
-    key_to_request[info.key] = request;
   }
   Vector<PatchRequest> requests = Vector<PatchRequest>(packed_requests, packed_offset);
   LOG_DEBUG("Created %i patch requests", static_cast<int>(requests.length()));
@@ -71,10 +74,9 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
   PatchSet patches(platform, requests);
   if (!patches.apply())
     return false;
-  if (!patches.revert())
-    return false;
 
-  *original_out = new OriginalConsole(Vector<PatchRequest>(key_to_request, Console::kFunctionCount));
+  *original_out = new OriginalConsole(Vector<PatchRequest*>(key_to_request,
+      Console::kFunctionCount));
 
   LOG_DEBUG("Successfully installed agent");
   return true;

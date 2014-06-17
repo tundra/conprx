@@ -15,8 +15,8 @@
 class WindowsEventLogBackend : public LogBackend {
 public:
   WindowsEventLogBackend();
-  virtual void vrecord(Log::Type type, const char *file, int line,
-      const char *fmt, va_list args);
+  virtual void vrecord(Log::Type type, ansi_cstr_t file, int line,
+      ansi_cstr_t fmt, va_list args);
 private:
   handle_t event_source_;
 };
@@ -28,14 +28,14 @@ WindowsEventLogBackend::WindowsEventLogBackend()
       EVENT_SOURCE_NAME); // lpSourceName
 }
 
-void WindowsEventLogBackend::vrecord(Log::Type type, const char *file, int line,
-    const char *fmt, va_list args) {
+void WindowsEventLogBackend::vrecord(Log::Type type, ansi_cstr_t file, int line,
+    ansi_cstr_t fmt, va_list args) {
   // Format the varargs into a message.
-  char message_string[kMaxLogMessageSize];
+  ansi_char_t message_string[kMaxLogMessageSize];
   vsnprintf(message_string, kMaxLogMessageSize, fmt, args);
 
   // Convert the line number to a string.
-  char line_string[kMaxLogMessageSize];
+  ansi_char_t line_string[kMaxLogMessageSize];
   sprintf(line_string, "%i", line);
 
   // Find the right event id to use.
@@ -57,8 +57,8 @@ void WindowsEventLogBackend::vrecord(Log::Type type, const char *file, int line,
 
 #define kStringCount 3
   // Send the message off to the event log.
-  c_str_t strings[kStringCount] = {message_string, file, line_string};
-  ReportEvent(
+  ansi_cstr_t strings[kStringCount] = {message_string, file, line_string};
+  ReportEventA(
       event_source_,    // hEventLog
       type,             // wType
       GENERIC_CATEGORY, // wCategory

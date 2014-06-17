@@ -13,14 +13,17 @@
 #define module_t HMODULE
 #define bool_t BOOL
 
-#define ansi_c_char_t CHAR
-#define ansi_c_str_t LPSTR
+#define ansi_char_t CHAR
+#define ansi_str_t LPSTR
+#define ansi_cstr_t LPCSTR
 
-#define wide_c_char_t WCHAR
-#define wide_c_str_t LPWSTR
+#define wide_char_t WCHAR
+#define wide_str_t LPWSTR
+#define wide_cstr_t LPCWSTR
 
-#define c_str_t LPCTSTR
-#define c_char_t TCHAR
+#define str_t LPTSTR
+#define cstr_t LPCTSTR
+#define char_t TCHAR
 
 #define ssize_t SSIZE_T
 #define hkey_t HKEY

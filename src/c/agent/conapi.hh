@@ -13,6 +13,24 @@
 namespace conprx {
 
 #define FOR_EACH_CONAPI_FUNCTION(F)                                            \
+  F(AllocConsole, alloc_console, bool_t,                                       \
+      (),                                                                      \
+      ())                                                                      \
+  F(GetConsoleTitleA, get_console_title_a, dword_t,                            \
+      (ansi_str_t console_title, dword_t size),                                \
+      (console_title, size))                                                   \
+  F(GetConsoleTitleW, get_console_title_w, dword_t,                            \
+      (wide_str_t console_title, dword_t size),                                \
+      (console_title, size))                                                   \
+  F(GetStdHandle, get_std_handle, handle_t,                                    \
+      (dword_t std_handle),                                                    \
+      (std_handle))                                                            \
+  F(SetConsoleTitleA, set_console_title_a, bool_t,                             \
+      (ansi_cstr_t console_title),                                             \
+      (console_title))                                                         \
+  F(SetConsoleTitleW, set_console_title_w, bool_t,                             \
+      (wide_cstr_t console_title),                                             \
+      (console_title))                                                         \
   F(WriteConsoleA, write_console_a, bool_t,                                    \
       (handle_t console_output, const void *buffer,                            \
        dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
@@ -24,8 +42,7 @@ namespace conprx {
        dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
        void *reserved),                                                        \
       (console_output, buffer, number_of_chars_to_write,                       \
-       number_of_chars_written, reserved))                                     \
-  F(AllocConsole, alloc_console, bool_t, (), ())
+       number_of_chars_written, reserved))
 
 // A container that holds the various definitions used by the other console
 // types.
@@ -54,7 +71,7 @@ public:
 
   // A description of a console function.
   struct FunctionInfo {
-    c_str_t name;
+    cstr_t name;
     int key;
   };
 
