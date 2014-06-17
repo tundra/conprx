@@ -30,6 +30,15 @@ bool_t LoggingConsole::alloc_console() {
   return delegate().alloc_console();
 }
 
+bool_t LoggingConsole::get_console_cursor_info(handle_t console_output,
+    console_cursor_info_t *console_cursor_info) {
+  bool_t result = delegate().get_console_cursor_info(console_output,
+      console_cursor_info);
+  LOG("GetConsoleCursorInfo(%p) = {%i, %i}", console_output,
+      console_cursor_info->dwSize, console_cursor_info->bVisible);
+  return result;
+}
+
 dword_t LoggingConsole::get_console_title_a(ansi_str_t console_title,
     dword_t size) {
   dword_t result = delegate().get_console_title_a(console_title, size);
@@ -42,6 +51,22 @@ dword_t LoggingConsole::get_console_title_w(wide_str_t console_title,
   dword_t result = delegate().get_console_title_w(console_title, size);
   LOG("GetConsoleTitleW(%S) = %i", console_title, result);
   return result;
+}
+
+bool_t LoggingConsole::read_console_a(handle_t console_input, void *buffer,
+    dword_t number_of_chars_to_read, dword_t *number_of_chars_read,
+    console_readconsole_control_t *input_control) {
+  LOG("ReadConsoleA(%i)", number_of_chars_to_read);
+  return delegate().read_console_a(console_input, buffer,
+      number_of_chars_to_read, number_of_chars_read, input_control);
+}
+
+bool_t LoggingConsole::read_console_w(handle_t console_input, void *buffer,
+    dword_t number_of_chars_to_read, dword_t *number_of_chars_read,
+    console_readconsole_control_t *input_control) {
+  LOG("ReadConsoleW(%i)", number_of_chars_to_read);
+  return delegate().read_console_w(console_input, buffer,
+      number_of_chars_to_read, number_of_chars_read, input_control);
 }
 
 handle_t LoggingConsole::get_std_handle(dword_t std_handle) {

@@ -39,6 +39,13 @@ PyMODINIT_FUNC initcondrv() {
     return;
   DwordRef::type.bind(module, "DwordRef");
 
+  if (!ConsoleCursorInfo::type
+      .set_name("condrv.ConsoleCursorInfo")
+      .set_new().set_members()
+      .complete())
+    return;
+  ConsoleCursorInfo::type.bind(module, "ConsoleCursorInfo");
+
   PyType<Console> *console = Console::type();
   if (!console)
     return;

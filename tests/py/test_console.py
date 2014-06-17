@@ -114,6 +114,14 @@ class ConDrvConsoleTest(unittest.TestCase):
     self.assertEquals(0, console.GetConsoleTitleA(abuf, 4))
     self.assertEquals("", str(abuf))
 
+  def test_console_cursor_info(self):
+    console = Console()
+    if console is None:
+      return
+    info = ConsoleCursorInfo(0, False)
+    conout = console.GetStdHandle(console.STD_ERROR_HANDLE)
+    self.assertTrue(console.GetConsoleCursorInfo(conout, info))
+
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
   unittest.main(testRunner=runner)

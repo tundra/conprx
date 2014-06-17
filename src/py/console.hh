@@ -13,6 +13,7 @@ namespace condrv {
 // Expands the given macro for each api function the console object understands.
 #define FOR_EACH_CONSOLE_FUNCTION(F)                                           \
   F(GetConsoleMode,             get_console_mode)                              \
+  F(GetConsoleCursorInfo,       get_console_cursor_info)                       \
   F(GetConsoleTitleA,           get_console_title_a)                           \
   F(GetConsoleTitleW,           get_console_title_w)                           \
   F(GetStdHandle,               get_std_handle)                                \

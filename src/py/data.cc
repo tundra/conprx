@@ -227,3 +227,29 @@ PyMemberDef DwordRef::members[2] = {
   PY_MEMBER("value", T_LONG, DwordRef, value_),
   PY_LAST_MEMBER
 };
+
+// --- C o n s o l e   c u r s o r   i n f o ---
+
+PyObject *ConsoleCursorInfo::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  long size = 0;
+  long visible = false;
+  if (!PyArg_ParseTuple(args, "ll", &size, &visible))
+    return NULL;
+
+  ConsoleCursorInfo *self = ConsoleCursorInfo::type.cast(type->tp_alloc(type, 0));
+  self->init(size, !!visible);
+  return self;
+}
+
+void ConsoleCursorInfo::init(long size, char visible) {
+  size_ = size;
+  visible_ = visible;
+}
+
+PyType<ConsoleCursorInfo> ConsoleCursorInfo::type;
+
+PyMemberDef ConsoleCursorInfo::members[3] = {
+  PY_MEMBER("size", T_LONG, ConsoleCursorInfo, size_),
+  PY_MEMBER("visible", T_BOOL, ConsoleCursorInfo, visible_),
+  PY_LAST_MEMBER
+};

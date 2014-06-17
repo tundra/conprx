@@ -64,6 +64,17 @@ class ConDrvDataTest(unittest.TestCase):
     self.assertEquals(-1, ref.value)
     self.assertEquals("&-1", str(ref))
 
+  def test_console_cursor_info(self):
+    info = condrv.ConsoleCursorInfo(10, False)
+    self.assertEquals(10, info.size)
+    self.assertEquals(False, info.visible)
+    info.size = 60
+    self.assertEquals(60, info.size)
+    self.assertEquals(False, info.visible)
+    info.visible = True
+    self.assertEquals(60, info.size)
+    self.assertEquals(True, info.visible)
+
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
   unittest.main(testRunner=runner)

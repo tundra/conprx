@@ -138,6 +138,24 @@ private:
   dword_t value_;
 };
 
+// CONSOLE_CURSOR_INFO
+class ConsoleCursorInfo : public PyObject {
+public:
+  void init(long size, char visible);
+
+  // __new__
+  static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+  static PyType<ConsoleCursorInfo> type;
+  static PyMemberDef members[3];
+
+private:
+  // Python makes assumptions about these types, that's why they're not dword_t
+  // and bool_t.
+  long size_;
+  char visible_;
+};
+
 } // namespace condrv
 
 #endif // _DATA

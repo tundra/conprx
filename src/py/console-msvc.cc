@@ -23,6 +23,26 @@ PyObject *Console::get_console_mode(PyObject *self, PyObject *args) {
   return PyBool_FromLong(result);
 }
 
+// BOOL WINAPI GetConsoleCursorInfo(
+//   _In_   HANDLE hConsoleOutput,
+//   _Out_  PCONSOLE_CURSOR_INFO lpConsoleCursorInfo
+// );
+PyObject *Console::get_console_cursor_info(PyObject *self, PyObject *args) {
+  PyObject *console_output_obj = NULL;
+  PyObject *console_cursor_info_obj = NULL;
+  if (!PyArg_ParseTuple(args, "OO", &console_output_obj, &console_cursor_info_obj))
+    return NULL;
+  Handle *console_output = Handle::type.cast(console_output_obj);
+  ConsoleCursorInfo *console_cursor_info = ConsoleCursorInfo::type.cast(console_cursor_info_obj);
+  if (!console_output || !console_cursor_info)
+    return NULL;
+  CONSOLE_CURSOR_INFO info;
+  ZeroMemory(&info, sizeof(info));
+  bool result = GetConsoleCursorInfo(console_output->handle(), &info);
+  console_cursor_info->init(info.dwSize, info.bVisible);
+  return PyBool_FromLong(result);
+}
+
 // DWORD WINAPI GetConsoleTitle(
 //   _Out_  LPTSTR lpConsoleTitle,
 //   _In_   DWORD nSize

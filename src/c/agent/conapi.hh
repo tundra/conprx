@@ -7,6 +7,7 @@
 #define _CONAPI
 
 #include "agent/binpatch.hh"
+#include "conapi-types.hh"
 #include "utils/types.hh"
 #include "utils/vector.hh"
 
@@ -19,12 +20,27 @@ namespace conprx {
   F(GetConsoleTitleA, get_console_title_a, dword_t,                            \
       (ansi_str_t console_title, dword_t size),                                \
       (console_title, size))                                                   \
+  F(GetConsoleCursorInfo, get_console_cursor_info, bool_t,                     \
+      (handle_t console_output, console_cursor_info_t *console_cursor_info),   \
+      (console_output, console_cursor_info))                                   \
   F(GetConsoleTitleW, get_console_title_w, dword_t,                            \
       (wide_str_t console_title, dword_t size),                                \
       (console_title, size))                                                   \
   F(GetStdHandle, get_std_handle, handle_t,                                    \
       (dword_t std_handle),                                                    \
       (std_handle))                                                            \
+  F(ReadConsoleA, read_console_a, bool_t,                                      \
+      (handle_t console_input, void *buffer,                                   \
+       dword_t number_of_chars_to_read, dword_t *number_of_chars_read,         \
+       console_readconsole_control_t *input_control),                          \
+      (console_input, buffer, number_of_chars_to_read,                         \
+       number_of_chars_read, input_control))                                   \
+  F(ReadConsoleW, read_console_w, bool_t,                                      \
+      (handle_t console_input, void *buffer,                                   \
+       dword_t number_of_chars_to_read, dword_t *number_of_chars_read,         \
+       console_readconsole_control_t *input_control),                          \
+      (console_input, buffer, number_of_chars_to_read,                         \
+       number_of_chars_read, input_control))                                   \
   F(SetConsoleTitleA, set_console_title_a, bool_t,                             \
       (ansi_cstr_t console_title),                                             \
       (console_title))                                                         \
