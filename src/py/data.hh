@@ -38,7 +38,7 @@ public:
   static Py_ssize_t length(PyObject *object);
 
   // Returns this buffer's content viewed as an ansi c string.
-  ansi_c_str_t as_c_str() { return reinterpret_cast<ansi_c_str_t>(data_); }
+  ansi_str_t as_c_str() { return reinterpret_cast<ansi_str_t>(data_); }
 
   // Python type object.
   static PyType<AnsiBuffer> type;
@@ -78,10 +78,10 @@ public:
   static PyObject *get_item(PyObject *object, Py_ssize_t index);
 
   // Returns the index of the first \0 in the given string.
-  static size_t wstrlen(wide_c_str_t str);
+  static size_t wstrlen(wide_cstr_t str);
 
   // Returns this buffer's content viewed as an ansi c string.
-  wide_c_str_t as_c_str() { return reinterpret_cast<wide_c_str_t>(data_); }
+  wide_str_t as_c_str() { return reinterpret_cast<wide_str_t>(data_); }
 
   // Python type object.
   static PyType<WideBuffer> type;

@@ -51,7 +51,7 @@ PyObject *AnsiBuffer::to_representation(PyObject *object) {
   // The representation explicitly includes the null terminator for null-
   // terminated strings.
   AnsiBuffer *self = AnsiBuffer::type.cast(object);
-  ansi_c_str_t c_str = self->as_c_str();
+  ansi_str_t c_str = self->as_c_str();
   PyObject *data_str = PyString_FromStringAndSize(c_str, self->data_size_);
   PyObject *format = PyString_FromString("A'%s'");
   PyObject *args = Py_BuildValue("O", data_str);
@@ -63,7 +63,7 @@ PyObject *AnsiBuffer::to_string(PyObject *object) {
   // The string conversion stops at the first null character if the string is
   // null-terminated.
   AnsiBuffer *self = AnsiBuffer::type.cast(object);
-  ansi_c_str_t c_str = self->as_c_str();
+  ansi_str_t c_str = self->as_c_str();
   size_t data_size = self->data_size_ - 1;
   size_t length = (c_str[data_size] == '\0') ? strlen(c_str) : data_size - 1;
   return PyString_FromStringAndSize(c_str, length);
@@ -131,7 +131,7 @@ PyObject *WideBuffer::to_representation(PyObject *object) {
   // The representation explicitly includes the null terminator for null-
   // terminated strings.
   WideBuffer *self = WideBuffer::type.cast(object);
-  wide_c_str_t w_str = self->as_c_str();
+  wide_str_t w_str = self->as_c_str();
   // Decode the utf16 data in the buffer into a python unicode object.
   PyObject *data_str = PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
       self->data_size_ * sizeof(uint16_t), NULL, NULL);
@@ -146,7 +146,7 @@ PyObject *WideBuffer::to_string(PyObject *object) {
   // The string conversion stops at the first null character if the string is
   // null-terminated.
   WideBuffer *self = WideBuffer::type.cast(object);
-  wide_c_str_t w_str = self->as_c_str();
+  wide_str_t w_str = self->as_c_str();
   size_t last_char = self->data_size_ - 1;
   size_t length = (w_str[last_char] == '\0') ? wstrlen(w_str) : last_char;
   // This actually returns a unicode, not a string, but python seems to do the
@@ -169,8 +169,8 @@ PyObject *WideBuffer::get_item(PyObject *object, Py_ssize_t index) {
   return PyInt_FromLong(self->data_[index]);
 }
 
-size_t WideBuffer::wstrlen(wide_c_str_t str) {
-  wide_c_str_t p = str;
+size_t WideBuffer::wstrlen(wide_cstr_t str) {
+  wide_cstr_t p = str;
   while (*p)
     p++;
   return p - str;
