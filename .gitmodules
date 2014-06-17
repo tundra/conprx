@@ -1,3 +1,6 @@
 [submodule "deps/tclib"]
 	path = deps/tclib
 	url = https://github.com/goto-10/tclib.git
+[submodule "deps/plankton"]
+	path = deps/plankton
+	url = https://github.com/goto-10/plankton.git
