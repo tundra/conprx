@@ -81,7 +81,6 @@ public:
       const char *fmt, va_list args);
 };
 
-
 // Log an error.
 #define LOG_ERROR(FMT, ...) Log::get().record(Log::ERR, __FILE__, __LINE__, FMT, ##__VA_ARGS__)
 

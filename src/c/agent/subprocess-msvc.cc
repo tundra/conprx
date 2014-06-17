@@ -6,6 +6,7 @@
 
 class WindowsSubprocess : public Subprocess {
 public:
+  virtual ~WindowsSubprocess();
   WindowsSubprocess(const char *library, const char *command,
       char *const *arguments);
 
@@ -29,12 +30,35 @@ public:
 
 private:
   PROCESS_INFORMATION child_info_;
+  char *cmdline_;
 };
 
 WindowsSubprocess::WindowsSubprocess(const char *library, const char *command,
     char *const *arguments)
-  : Subprocess(library, command, arguments) {
+  : Subprocess(library, command, arguments)
+  , cmdline_(NULL) {
   ZeroMemory(&child_info_, sizeof(child_info_));
+
+  // Scan through the arguments to determine the length of the command line
+  // string.
+  size_t cmdline_size = 0;
+  for (char *const *ptr = arguments_; *ptr != NULL; ptr++)
+    cmdline_size += strlen(*ptr) + 1;
+
+  // Build the command line string using sprintf. Unless sprintf calculates the
+  // length differently from strlen this should be sure to stay within the
+  // bounds even though we're using sprintf, not snprintf (which doesn't exist
+  // on windows).
+  cmdline_ = new char[cmdline_size];
+  size_t offset = 0;
+  for (char *const *ptr = arguments_; *ptr != NULL; ptr++) {
+    offset += sprintf(cmdline_ + offset, "%s ", *ptr);
+  }
+  cmdline_[offset] = '\0';
+}
+
+WindowsSubprocess::~WindowsSubprocess() {
+  delete[] cmdline_;
 }
 
 bool WindowsSubprocess::start() {
@@ -55,8 +79,8 @@ bool WindowsSubprocess::start_suspended_child() {
   // Try creating the process in a suspended state.
   dword_t creation_flags = CREATE_SUSPENDED;
   bool result = CreateProcess(
-      command_,         // lpApplicationName
-      NULL,             // lpCommandLine
+      NULL,             // lpApplicationName
+      cmdline_,         // lpCommandLine
       NULL,             // lpProcessAttributes
       NULL,             // lpThreadAttributes
       true,             // bInheritHandles
@@ -66,9 +90,9 @@ bool WindowsSubprocess::start_suspended_child() {
       &startup_info,    // lpStartupInfo
       &child_info_);    // lpProcessInformation
 
-  if (!result) {
+  if (!result)
     LOG_ERROR("CreateProcess(%s) failed: %i", command_, GetLastError());
-  }
+
   return result;
 }
 
