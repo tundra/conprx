@@ -5,6 +5,7 @@ def build_object(filename):
   source_file = c.get_source_file(filename)
   source_file.add_include(get_root().get_child("src", "c"))
   source_file.add_include(get_dep('tclib').get_child("src", "c"))
+  source_file.add_include(get_dep('plankton').get_child("src", "c"))
   source_file.add_include(get_system_file('/usr/include/llvm-3.4'))
   source_file.add_include(get_system_file('/usr/include/llvm-c-3.4'))
   return source_file.get_object()
@@ -17,8 +18,10 @@ agent_files = [
 
 utils = get_external("src", "c", "utils", "objects")
 disass = get_external("src", "c", "disass", "objects")
+plankton = get_dep_external("plankton", "src", "c", "objects")
 
 objects = get_group("objects")
+objects.add_member(plankton)
 
 for filename in agent_files:
   objects.add_member(build_object(filename))
