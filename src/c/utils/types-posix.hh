@@ -7,6 +7,7 @@
 /// compatible otherwise.
 
 typedef void *handle_t;
+typedef handle_t hwnd_t;
 typedef void *module_t;
 typedef long dword_t;
 typedef bool bool_t;
@@ -21,8 +22,10 @@ typedef uint32_t uint_t;
 // them even on posix.
 typedef char *ansi_str_t;
 typedef const char *ansi_cstr_t;
+typedef uint16_t wide_char_t;
 typedef uint16_t *wide_str_t;
 typedef const uint16_t *wide_cstr_t;
+typedef char ansi_char_t;
 typedef ansi_str_t str_t;
 typedef ansi_cstr_t cstr_t;
 

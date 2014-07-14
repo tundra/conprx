@@ -13,6 +13,7 @@
 #define ushort_t USHORT
 #define win_size_t SIZE_T
 #define module_t HMODULE
+#define hwnd_t HWND
 #define bool_t BOOL
 #define ntstatus_t NTSTATUS
 #define ulong_t ULONG

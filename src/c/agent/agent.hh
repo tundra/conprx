@@ -75,7 +75,7 @@
 
 // Enable this to install the unpatched monitor which logs when functions are
 // called that haven't been patched.
-#define USE_UNPATCHED_MONITOR 0
+#define USE_UNPATCHED_MONITOR 1
 
 namespace conprx {
 

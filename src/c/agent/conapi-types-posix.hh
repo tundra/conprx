@@ -36,3 +36,12 @@ struct console_screen_buffer_info_t {
   small_rect_t srWindow;
   coord_t dwMaximumWindowSize;
 };
+
+// CHAR_INFO
+struct char_info_t {
+  union {
+    wide_char_t UnicodeChar;
+    ansi_char_t AsciiChar;
+  } Char;
+  word_t Attributes;
+};

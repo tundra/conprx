@@ -43,6 +43,9 @@ namespace conprx {
   F(GetConsoleTitleW, get_console_title_w, dword_t,                            \
       (wide_str_t console_title, dword_t size),                                \
       (console_title, size))                                                   \
+  F(GetConsoleWindow, get_console_window, hwnd_t,                              \
+      (),                                                                      \
+      ())                                                                      \
   F(GetStdHandle, get_std_handle, handle_t,                                    \
       (dword_t std_handle),                                                    \
       (std_handle))                                                            \
@@ -58,6 +61,18 @@ namespace conprx {
        console_readconsole_control_t *input_control),                          \
       (console_input, buffer, number_of_chars_to_read,                         \
        number_of_chars_read, input_control))                                   \
+  F(ReadConsoleOutputA, read_console_output_a, bool_t,                         \
+      (handle_t console_output, char_info_t *buffer, coord_t buffer_size,      \
+       coord_t buffer_coord, small_rect_t *read_region),                       \
+      (console_output, buffer, buffer_size, buffer_coord, read_region))        \
+  F(ReadConsoleOutputW, read_console_output_w, bool_t,                         \
+      (handle_t console_output, char_info_t *buffer, coord_t buffer_size,      \
+       coord_t buffer_coord, small_rect_t *read_region),                       \
+      (console_output, buffer, buffer_size, buffer_coord, read_region))        \
+  F(SetConsoleCursorInfo, set_console_cursor_info, bool_t,                     \
+      (handle_t console_output,                                                \
+       const console_cursor_info_t *console_cursor_info),                      \
+      (console_output, console_cursor_info))                                   \
   F(SetConsoleCursorPosition, set_console_cursor_position, bool_t,             \
       (handle_t console_output, coord_t cursor_position),                      \
       (console_output, cursor_position))                                       \
@@ -81,7 +96,16 @@ namespace conprx {
        dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
        void *reserved),                                                        \
       (console_output, buffer, number_of_chars_to_write,                       \
-       number_of_chars_written, reserved))
+       number_of_chars_written, reserved))                                     \
+  F(WriteConsoleOutputA, write_console_output_a, bool_t,                       \
+      (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,\
+       coord_t buffer_coord, small_rect_t *write_region),                      \
+      (console_output, buffer, buffer_size, buffer_coord, write_region))       \
+  F(WriteConsoleOutputW, write_console_output_w, bool_t,                       \
+      (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,\
+       coord_t buffer_coord, small_rect_t *write_region),                      \
+      (console_output, buffer, buffer_size, buffer_coord, write_region))
+
 
 // A container that holds the various definitions used by the other console
 // types.
