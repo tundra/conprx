@@ -86,6 +86,7 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
 // the agent's delegate field.
 #define __EMIT_BRIDGE__(Name, name, RET, PARAMS, ARGS)                         \
   RET WINAPI ConsoleAgent::name##_bridge PARAMS {                              \
+    IF_USE_UNPATCHED_MONITOR(UnpatchedMonitor::Disable disable,);              \
     return ConsoleAgent::delegate().name ARGS;                                 \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_BRIDGE__)
@@ -103,6 +104,76 @@ address_t ConsoleAgent::get_delegate_bridge(int key) {
     default:
       return NULL;
   }
+}
+
+UnpatchedMonitor::Disable::Disable(UnpatchedMonitor *monitor)
+  : monitor_(monitor)
+  , prev_is_active_(monitor->is_active_) {
+  monitor_->is_active_ = false;
+}
+
+UnpatchedMonitor::Disable::Disable()
+  : monitor_(installed_)
+  , prev_is_active_(monitor_->is_active_) {
+  monitor_->is_active_ = false;
+}
+
+UnpatchedMonitor::Disable::~Disable() {
+  monitor_->is_active_ = prev_is_active_;
+}
+
+UnpatchedMonitor *UnpatchedMonitor::installed_ = NULL;
+
+// This list is experimentally determined, it would be great with a well-defined
+// whitelist instead but I don't know how you'd create one. The values and the
+// functions they correspond to is determined using stack traces.
+ushort_t UnpatchedMonitor::kApiIndexBlacklist[kApiIndexBlacklistSize] = {
+  35, // TerminateThread
+  76  // GetModuleHandleW
+};
+
+bool UnpatchedMonitor::is_blacklisted(short_t dll_index, short_t api_index) {
+  if (dll_index != 0)
+    // The blacklist only contains stuff for dll 0.
+    return false;
+  for (size_t i = 0; i < kApiIndexBlacklistSize; i++) {
+    if (kApiIndexBlacklist[i] == api_index)
+      return true;
+  }
+  return false;
+}
+
+UnpatchedMonitor::UnpatchedMonitor()
+  : is_active_(true) { }
+
+// Generate the static bridge functions.
+#define LPC_BRIDGE_IMPL(Name, name, RET, PARAMS, ARGS)                         \
+  RET NTAPI UnpatchedMonitor::name##_bridge PARAMS {                           \
+    return installed_->name ARGS;                                              \
+  }
+  FOR_EACH_LPC_FUNCTION(LPC_BRIDGE_IMPL)
+#undef LPC_BRIDGE_IMPL
+
+// Expands to the trampoline function for the given lpc api function.
+#define LPC_TRAMPOLINE(name) (patches_[name##_k].get_trampoline(name##_bridge))
+
+ntstatus_t NTAPI UnpatchedMonitor::nt_request_wait_reply_port(
+    handle_t port_handle, lpc_message_t *request, lpc_message_t *incoming_reply) {
+  if (is_active_) {
+    ulong_t api_number = request->api_number;
+    ushort_t dll_index = (api_number >> 16) & 0xFFFF;
+    ushort_t api_index = (api_number & 0xFFFF);
+    if (!is_blacklisted(dll_index, api_index)) {
+      // Just to be on the safe side don't intercept any nested lpc calls caused
+      // by logging.
+      Disable disable(this);
+      fprintf(stderr, "--- unhandled lpc %i/%i ---\n", dll_index, api_index);
+      print_stack_trace(stderr);
+      fflush(stderr);
+    }
+  }
+  return LPC_TRAMPOLINE(nt_request_wait_reply_port)(port_handle, request,
+      incoming_reply);
 }
 
 // The default options construction.

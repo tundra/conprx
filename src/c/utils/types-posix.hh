@@ -10,6 +10,12 @@ typedef void *handle_t;
 typedef void *module_t;
 typedef long dword_t;
 typedef bool bool_t;
+typedef int16_t short_t;
+typedef uint16_t ushort_t;
+typedef uint16_t word_t;
+typedef int ntstatus_t;
+typedef uint32_t ulong_t;
+typedef uint32_t uint_t;
 
 // Because of the magic way windows handles strings we'll use this alias for
 // them even on posix.
@@ -25,3 +31,4 @@ typedef ansi_cstr_t cstr_t;
 // Windows-specific directives that we can just ignore when building elsewhere.
 #define APIENTRY
 #define WINAPI
+#define NTAPI

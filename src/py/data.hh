@@ -77,9 +77,6 @@ public:
   // __item__
   static PyObject *get_item(PyObject *object, Py_ssize_t index);
 
-  // Returns the index of the first \0 in the given string.
-  static size_t wstrlen(wide_cstr_t str);
-
   // Returns this buffer's content viewed as an ansi c string.
   wide_str_t as_c_str() { return reinterpret_cast<wide_str_t>(data_); }
 
@@ -154,6 +151,40 @@ private:
   // and bool_t.
   long size_;
   char visible_;
+};
+
+// COORD
+class Coord : public PyObject {
+public:
+  void init(long x, long y);
+
+  // __new__
+  static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+  static PyType<Coord> type;
+  static PyMemberDef members[3];
+
+private:
+  long x_;
+  long y_;
+};
+
+// SMALL_RECT
+class SmallRect : public PyObject {
+public:
+  void init(long left, long top, long right, long bottom);
+
+  // __new__
+  static PyObject *create(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+  static PyType<SmallRect> type;
+  static PyMemberDef members[5];
+
+private:
+  long left_;
+  long top_;
+  long right_;
+  long bottom_;
 };
 
 } // namespace condrv

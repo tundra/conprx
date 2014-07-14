@@ -46,6 +46,20 @@ PyMODINIT_FUNC initcondrv() {
     return;
   ConsoleCursorInfo::type.bind(module, "ConsoleCursorInfo");
 
+  if (!Coord::type
+      .set_name("condrv.Coord")
+      .set_new().set_members()
+      .complete())
+    return;
+  Coord::type.bind(module, "Coord");
+
+  if (!SmallRect::type
+      .set_name("condrv.SmallRect")
+      .set_new().set_members()
+      .complete())
+    return;
+  SmallRect::type.bind(module, "SmallRect");
+
   PyType<Console> *console = Console::type();
   if (!console)
     return;

@@ -9,9 +9,14 @@
 
 #define dword_t DWORD
 #define word_t WORD
+#define short_t SHORT
+#define ushort_t USHORT
 #define win_size_t SIZE_T
 #define module_t HMODULE
 #define bool_t BOOL
+#define ntstatus_t NTSTATUS
+#define ulong_t ULONG
+#define uint_t UINT
 
 #define ansi_char_t CHAR
 #define ansi_str_t LPSTR

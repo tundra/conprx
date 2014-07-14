@@ -3,6 +3,7 @@
 
 filenames = [
   "log.cc",
+  "string.cc"
 ]
 
 objects = get_group("objects")

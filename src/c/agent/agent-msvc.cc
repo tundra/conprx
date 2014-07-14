@@ -3,7 +3,91 @@
 
 #include "utils/types.hh"
 
+// It's a bad idea for the monitor to use other libraries so we only include
+// this when the unpatched monitor is enabled. This also means that any code
+// that requires this must be disabled.
+#if USE_UNPATCHED_MONITOR
+#include <Dbghelp.h>
+#pragma comment(lib, "dbghelp.lib")
+#endif
+
 using namespace conprx;
+
+template <typename T>
+bool UnpatchedMonitor::init_patch(lpc_function_key_t key, module_t ntdll,
+    const char *name, T *repl) {
+  address_t orig_addr = Code::upcast(GetProcAddress(ntdll, name));
+  if (orig_addr == NULL)
+    return false;
+  patches_[key] = PatchRequest(orig_addr, Code::upcast(repl));
+  return true;
+}
+
+bool UnpatchedMonitor::install() {
+  // If a monitor is already installed we bail.
+  if (installed_ != NULL)
+    return false;
+
+  // Initialize the patches.
+  module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+#define MAKE_PATCH(Name, name, RET, PARAMS, ARGS)                              \
+  if (!init_patch(name##_k, ntdll, #Name, name##_bridge))                      \
+    return false;
+  FOR_EACH_LPC_FUNCTION(MAKE_PATCH)
+#undef MAKE_PATCH
+
+  // Set this as the installed monitor.
+  installed_ = this;
+
+  // Sym-initialize the current process so that it's ready for printing stack
+  // traces.
+  IF_USE_UNPATCHED_MONITOR(SymInitialize(GetCurrentProcess(), NULL, true),);
+
+  // Apply the patches.
+  PatchSet patches(Platform::get(), Vector<PatchRequest>(patches_, kLpcFunctionCount));
+  return patches.apply();
+}
+
+void UnpatchedMonitor::print_stack_trace(FILE *out) {
+#if USE_UNPATCHED_MONITOR
+  // Refresh the process's module list. How this works exactly is unclear but
+  // it seems to be required for SymFromAddr to work.
+  handle_t process = GetCurrentProcess();
+  if (!SymRefreshModuleList(process)) {
+    fprintf(out, "Error refreshing module list: %i", GetLastError());
+    return;
+  }
+
+  // Capture the stack trace.
+  static const size_t kMaxStackSize = 32;
+  void *backtrace[kMaxStackSize];
+  size_t frame_count = CaptureStackBackTrace(0, kMaxStackSize, backtrace, NULL);
+
+  // Scan through the trace one frame at a time, resolving symbols as we go.
+  static const size_t kMaxNameLength = 128;
+  static const size_t kSymbolInfoSize = sizeof(SYMBOL_INFO) + (kMaxNameLength * sizeof(char_t));
+  // A SYMBOL_INFO is variable size so we stack allocate a blob of memory and
+  // cast it rather than stack allocate the info directly.
+  byte_t symbol_info_bytes[kSymbolInfoSize];
+  ZeroMemory(symbol_info_bytes, kSymbolInfoSize);
+  SYMBOL_INFO *info = reinterpret_cast<SYMBOL_INFO*>(symbol_info_bytes);
+  // This isn't strictly true, it's symbol_info_bytes, but SymFromAddr requires
+  // it to have this value.
+  info->SizeOfStruct = sizeof(SYMBOL_INFO);
+  info->MaxNameLen = kMaxNameLength;
+  for (size_t i = 0; i < frame_count; i++) {
+    void *addr = backtrace[i];
+    DWORD64 addr64 = reinterpret_cast<DWORD64>(addr);
+    if (SymFromAddr(process, addr64, 0, info)) {
+      fprintf(out, " - 0x%p: %s\n", addr, info->Name);
+    } else {
+      fprintf(out, " - 0x%p\n", addr);
+    }
+  }
+#else
+  fprintf(out, "(stack trace printing disabled)\n");
+#endif // USE_UNPATCHED_MONITOR
+}
 
 // Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
@@ -60,7 +144,8 @@ bool WindowsConsoleAgent::dll_process_attach() {
   if (!install(options, *logger, &original))
     return false;
   logger->set_delegate(original);
-  return true;
+
+  return IF_USE_UNPATCHED_MONITOR((new UnpatchedMonitor())->install(), true);
 }
 
 bool WindowsConsoleAgent::is_process_hard_blacklisted() {

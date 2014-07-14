@@ -73,6 +73,10 @@
 #include "conapi.hh"
 #include "utils/types.hh"
 
+// Enable this to install the unpatched monitor which logs when functions are
+// called that haven't been patched.
+#define USE_UNPATCHED_MONITOR 0
+
 namespace conprx {
 
 class Options;
@@ -101,6 +105,103 @@ private:
   // The console object currently being delegated to.
   static Console *delegate_;
   static Console &delegate() { return *delegate_; }
+};
+
+// Enumerate each lpc function.
+#define FOR_EACH_LPC_FUNCTION(F)                                               \
+  F(NtRequestWaitReplyPort, nt_request_wait_reply_port, ntstatus_t,            \
+      (handle_t port_handle, lpc_message_t *request,                           \
+       lpc_message_t *incoming_reply),                                         \
+      (port_handle, request, incoming_reply))
+
+// Convenience that allows the define above to be used within an expression.
+#if USE_UNPATCHED_MONITOR
+#define IF_USE_UNPATCHED_MONITOR(T, F) T
+#else
+#define IF_USE_UNPATCHED_MONITOR(T, F) F
+#endif
+
+// A monitor that attempts to log calls to console api functions that haven't
+// been patched by the agent. This is a relatively epic hack so don't, under any
+// circumstances, keep it enabled in a release.
+//
+// The built-in console works by sending messages from the client to a console
+// server process, which it does using the built-in lpc system. The monitor
+// works by intercepting these calls and printing the stack. If a call to the
+// console api has been patched we explicitly disable the monitor before and
+// after so we still intercept the call but suppress the output. Consequently
+// only unpatched calls should make their way through.
+class UnpatchedMonitor {
+public:
+  UnpatchedMonitor();
+
+  // Stack-allocate one of these to disable the given unpatched monitor
+  // temporarily, reverting to the previous state on scope exit.
+  class Disable {
+  public:
+    // Disable the given unpatched monitor.
+    Disable(UnpatchedMonitor *monitor);
+
+    // Disable the default unpatched monitor.
+    Disable();
+
+    // Revert enablement to the previous state.
+    ~Disable();
+  private:
+    UnpatchedMonitor *monitor_;
+    bool prev_is_active_;
+  };
+
+  // Dumps the current stack trace to stderr.
+  void print_stack_trace(FILE *out);
+
+  // Keys that identify which functions are stored in which entry in the
+  // patches_ array.
+  enum lpc_function_key_t {
+#define DECLARE_ENUM(Name, name, RET, PARAMS, ARGS)                            \
+    name##_k ,
+    FOR_EACH_LPC_FUNCTION(DECLARE_ENUM)
+#undef DECLARE_ENUM
+    kLpcFunctionCount
+  };
+
+  // Static bridges.
+#define DECLARE_BRIDGE(Name, name, RET, PARAMS, ARGS)                          \
+  static RET NTAPI name##_bridge PARAMS;
+  FOR_EACH_LPC_FUNCTION(DECLARE_BRIDGE)
+#undef DECLARE_BRIDGE
+
+  // Statful implementations.
+#define DECLARE_HANDLER(Name, name, RET, PARAMS, ARGS)                         \
+  RET NTAPI name PARAMS;
+  FOR_EACH_LPC_FUNCTION(DECLARE_HANDLER)
+#undef DECLARE_HANDLER
+
+  // Install the unpatched monitor, returning true iff successful.
+  bool install();
+
+private:
+  // Initializes the patch with the given key such that it is ready to be
+  // applied. Returns true iff successful.
+  template <typename T>
+  bool init_patch(lpc_function_key_t key, module_t ntdll, const char *name, T *repl);
+
+  // Currently installed unpatched monitor.
+  static UnpatchedMonitor *installed_;
+
+  // Array of api indices we're definitely not interested in.
+  static const size_t kApiIndexBlacklistSize = 2;
+  static ushort_t kApiIndexBlacklist[kApiIndexBlacklistSize];
+
+  // Is the api call with the given index blacklisted? The api index corresponds
+  // to a function on the server side.
+  static bool is_blacklisted(short_t dll_index, short_t api_index);
+
+  // Patch requests used to inject the monitor.
+  PatchRequest patches_[kLpcFunctionCount];
+
+  // Are we currently intercepting calls or just passing them on?
+  bool is_active_;
 };
 
 // Expands the given macro for each boolean option. The arguments are:

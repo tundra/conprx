@@ -3,8 +3,10 @@
 
 #include "data.hh"
 #include "pyth-inl.hh"
+#include "utils/string.hh"
 
 using namespace condrv;
+using namespace conprx;
 
 // --- A n s i   b u f f e r ---
 
@@ -148,7 +150,7 @@ PyObject *WideBuffer::to_string(PyObject *object) {
   WideBuffer *self = WideBuffer::type.cast(object);
   wide_str_t w_str = self->as_c_str();
   size_t last_char = self->data_size_ - 1;
-  size_t length = (w_str[last_char] == '\0') ? wstrlen(w_str) : last_char;
+  size_t length = (w_str[last_char] == '\0') ? String::wstrlen(w_str) : last_char;
   // This actually returns a unicode, not a string, but python seems to do the
   // right thing both when calling this through str() and unicode().
   return PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),
@@ -167,13 +169,6 @@ PyObject *WideBuffer::get_item(PyObject *object, Py_ssize_t index) {
     return NULL;
   }
   return PyInt_FromLong(self->data_[index]);
-}
-
-size_t WideBuffer::wstrlen(wide_cstr_t str) {
-  wide_cstr_t p = str;
-  while (*p)
-    p++;
-  return p - str;
 }
 
 PyType<WideBuffer> WideBuffer::type;
@@ -251,5 +246,63 @@ PyType<ConsoleCursorInfo> ConsoleCursorInfo::type;
 PyMemberDef ConsoleCursorInfo::members[3] = {
   PY_MEMBER("size", T_LONG, ConsoleCursorInfo, size_),
   PY_MEMBER("visible", T_BOOL, ConsoleCursorInfo, visible_),
+  PY_LAST_MEMBER
+};
+
+// --- C o o r d ---
+
+PyObject *Coord::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  long x = 0;
+  long y = 0;
+  if (!PyArg_ParseTuple(args, "ll", &x, &y))
+    return NULL;
+
+  Coord *self = Coord::type.cast(type->tp_alloc(type, 0));
+  self->init(x, y);
+  return self;
+}
+
+void Coord::init(long x, long y) {
+  x_ = x;
+  y_ = y;
+}
+
+PyType<Coord> Coord::type;
+
+PyMemberDef Coord::members[3] = {
+  PY_MEMBER("x", T_LONG, Coord, x_),
+  PY_MEMBER("y", T_LONG, Coord, y_),
+  PY_LAST_MEMBER
+};
+
+// --- S m a l l   r e c t ---
+
+PyObject *SmallRect::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  long left = 0;
+  long top = 0;
+  long right = 0;
+  long bottom = 0;
+  if (!PyArg_ParseTuple(args, "llll", &left, &top, &right, &bottom))
+    return NULL;
+
+  SmallRect *self = SmallRect::type.cast(type->tp_alloc(type, 0));
+  self->init(left, top, right, bottom);
+  return self;
+}
+
+void SmallRect::init(long left, long top, long right, long bottom) {
+  left_ = left;
+  top_ = top;
+  right_ = right;
+  bottom_ = bottom;
+}
+
+PyType<SmallRect> SmallRect::type;
+
+PyMemberDef SmallRect::members[5] = {
+  PY_MEMBER("left", T_LONG, SmallRect, left_),
+  PY_MEMBER("top", T_LONG, SmallRect, top_),
+  PY_MEMBER("right", T_LONG, SmallRect, right_),
+  PY_MEMBER("bottom", T_LONG, SmallRect, bottom_),
   PY_LAST_MEMBER
 };

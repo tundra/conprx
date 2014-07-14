@@ -75,6 +75,30 @@ class ConDrvDataTest(unittest.TestCase):
     self.assertEquals(60, info.size)
     self.assertEquals(True, info.visible)
 
+  def test_coord(self):
+    coord = condrv.Coord(6, 5)
+    self.assertEquals(6, coord.x)
+    self.assertEquals(5, coord.y)
+    coord.x = 10
+    coord.y = -18
+    self.assertEquals(10, coord.x)
+    self.assertEquals(-18, coord.y)
+
+  def test_small_rect(self):
+    rect = condrv.SmallRect(6, 7, 8, 9)
+    self.assertEquals(6, rect.left)
+    self.assertEquals(7, rect.top)
+    self.assertEquals(8, rect.right)
+    self.assertEquals(9, rect.bottom)
+    rect.left = 19
+    rect.top = 18
+    rect.right = 17
+    rect.bottom = 16
+    self.assertEquals(19, rect.left)
+    self.assertEquals(18, rect.top)
+    self.assertEquals(17, rect.right)
+    self.assertEquals(16, rect.bottom)
+
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
   unittest.main(testRunner=runner)

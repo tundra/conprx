@@ -98,7 +98,7 @@ private:
 
   // A list of opcodes we're willing to patch.
   static const byte_t kOpcodeWhitelist[];
-  static const size_t kOpcodeWhitelistSize = 23;
+  static const size_t kOpcodeWhitelistSize = 31;
 
 };
 
@@ -111,7 +111,8 @@ const byte_t Dis_X86_64::kOpcodeWhitelist[kOpcodeWhitelistSize] = {
   0x6a, // push imm8
   0x89, // mov
   0x8b, // mov
-  0x8d  // lea
+  0x8d, // lea
+  0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf // mov reg
 };
 
 Dis_X86_64::Dis_X86_64() {

@@ -10,6 +10,7 @@
 #include "conapi-types.hh"
 #include "utils/types.hh"
 #include "utils/vector.hh"
+#include "plankton.hh"
 
 namespace conprx {
 
@@ -17,12 +18,28 @@ namespace conprx {
   F(AllocConsole, alloc_console, bool_t,                                       \
       (),                                                                      \
       ())                                                                      \
-  F(GetConsoleTitleA, get_console_title_a, dword_t,                            \
-      (ansi_str_t console_title, dword_t size),                                \
-      (console_title, size))                                                   \
+  F(FreeConsole, free_console, bool_t,                                         \
+      (),                                                                      \
+      ())                                                                      \
+  F(GetConsoleCP, get_console_cp, uint_t,                                      \
+      (),                                                                      \
+      ())                                                                      \
   F(GetConsoleCursorInfo, get_console_cursor_info, bool_t,                     \
       (handle_t console_output, console_cursor_info_t *console_cursor_info),   \
       (console_output, console_cursor_info))                                   \
+  F(GetConsoleMode, get_console_mode, bool_t,                                  \
+      (handle_t console_handle, dword_t *mode),                                \
+      (console_handle, mode))                                                  \
+  F(GetConsoleOutputCP, get_console_output_cp, uint_t,                         \
+      (),                                                                      \
+      ())                                                                      \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, bool_t,        \
+      (handle_t console_output,                                                \
+       console_screen_buffer_info_t *console_screen_buffer_info),              \
+      (console_output, console_screen_buffer_info))                            \
+  F(GetConsoleTitleA, get_console_title_a, dword_t,                            \
+      (ansi_str_t console_title, dword_t size),                                \
+      (console_title, size))                                                   \
   F(GetConsoleTitleW, get_console_title_w, dword_t,                            \
       (wide_str_t console_title, dword_t size),                                \
       (console_title, size))                                                   \
@@ -41,6 +58,12 @@ namespace conprx {
        console_readconsole_control_t *input_control),                          \
       (console_input, buffer, number_of_chars_to_read,                         \
        number_of_chars_read, input_control))                                   \
+  F(SetConsoleCursorPosition, set_console_cursor_position, bool_t,             \
+      (handle_t console_output, coord_t cursor_position),                      \
+      (console_output, cursor_position))                                       \
+  F(SetConsoleMode, set_console_mode, bool_t,                                  \
+      (handle_t console_handle, dword_t mode),                                 \
+      (console_handle, mode))                                                  \
   F(SetConsoleTitleA, set_console_title_a, bool_t,                             \
       (ansi_cstr_t console_title),                                             \
       (console_title))                                                         \
@@ -105,6 +128,9 @@ public:
   void set_delegate(Console *delegate) { delegate_ = delegate; }
 
   Console &delegate() { return *delegate_; }
+
+  // Sends the given complete log message.
+  void emit_message(plankton::variant_t message);
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
   virtual RET name PARAMS;

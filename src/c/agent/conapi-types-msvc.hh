@@ -7,3 +7,6 @@
 
 typedef CONSOLE_CURSOR_INFO console_cursor_info_t;
 typedef CONSOLE_READCONSOLE_CONTROL console_readconsole_control_t;
+typedef COORD coord_t;
+typedef SMALL_RECT small_rect_t;
+typedef CONSOLE_SCREEN_BUFFER_INFO console_screen_buffer_info_t;
