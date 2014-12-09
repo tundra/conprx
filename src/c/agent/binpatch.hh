@@ -29,7 +29,6 @@
 #ifndef _BINPATCH
 #define _BINPATCH
 
-#include "utils/types.hh"
 #include "utils/vector.hh"
 
 namespace conprx {
@@ -41,6 +40,10 @@ struct PatchCode;
 
 // The biggest possible redirect sequence.
 #define kMaxPreambleSizeBytes 16
+
+// This is just another name for a dword_t but can be used without including the
+// full nightmare that is windows.h.
+typedef uint32_t standalone_dword_t;
 
 /// ## Patch request
 ///
@@ -259,7 +262,7 @@ private:
 
   // When the code is open for writing this field holds the previous
   // permissions set on the code.
-  dword_t old_perms_;
+  standalone_dword_t old_perms_;
 };
 
 // Casts a function to an address statically such that it can be used in
@@ -295,12 +298,12 @@ public:
   // Attempts to open the given memory region such that it can be written. If
   // successful the previous permissions should be stored in the given out
   // parameter.
-  virtual bool open_for_writing(Vector<byte_t> region, dword_t *old_perms) = 0;
+  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms) = 0;
 
   // Attempts to close the given memory region such that it can no longer be
   // written. The old_perms parameter contains the value that was stored by
   // open_for_writing.
-  virtual bool close_for_writing(Vector<byte_t> region, dword_t old_perms) = 0;
+  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to
   // the given address that we can jump between them. If memory can't be

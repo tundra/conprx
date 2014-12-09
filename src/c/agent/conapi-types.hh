@@ -7,6 +7,7 @@
 #define _CONAPI_TYPES
 
 #include "stdc.h"
+#include "utils/types.hh"
 
 // Include custom headers for each toolchain.
 #ifdef IS_MSVC

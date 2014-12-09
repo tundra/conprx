@@ -10,7 +10,7 @@
 #include "conapi-types.hh"
 #include "utils/types.hh"
 #include "utils/vector.hh"
-#include "plankton.hh"
+#include "plankton-inl.hh"
 
 namespace conprx {
 
@@ -154,7 +154,7 @@ public:
   Console &delegate() { return *delegate_; }
 
   // Sends the given complete log message.
-  void emit_message(plankton::variant_t message);
+  void emit_message(plankton::Variant message);
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
   virtual RET name PARAMS;

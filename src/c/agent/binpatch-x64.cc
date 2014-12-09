@@ -3,6 +3,7 @@
 
 #include "binpatch-x64.hh"
 #include "disass/disassembler-x86.hh"
+#include "utils/types.hh"
 
 using namespace conprx;
 

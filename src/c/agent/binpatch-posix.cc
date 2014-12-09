@@ -14,8 +14,8 @@ class PosixMemoryManager : public MemoryManager {
 public:
   PosixMemoryManager();
   virtual bool ensure_initialized();
-  virtual bool open_for_writing(Vector<byte_t> region, dword_t *old_perms);
-  virtual bool close_for_writing(Vector<byte_t> region, dword_t old_perms);
+  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms);
+  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms);
   virtual Vector<byte_t> alloc_executable(address_t addr, size_t size);
 private:
   bool is_initialized_;
@@ -45,7 +45,7 @@ bool PosixMemoryManager::ensure_initialized() {
   return true;
 }
 
-bool PosixMemoryManager::open_for_writing(Vector<byte_t> region, dword_t *old_perms) {
+bool PosixMemoryManager::open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms) {
   // TODO: store the old permissions rather than assume they're read+exec. As
   //   far as I've been able to determine you're meant to get this info by
   //   parsing stuff from /proc which seems ridiculous.
@@ -53,7 +53,7 @@ bool PosixMemoryManager::open_for_writing(Vector<byte_t> region, dword_t *old_pe
   return set_permissions(region, PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
-bool PosixMemoryManager::close_for_writing(Vector<byte_t> region, dword_t old_perms) {
+bool PosixMemoryManager::close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms) {
   return set_permissions(region, old_perms);
 }
 

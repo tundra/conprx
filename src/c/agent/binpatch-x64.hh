@@ -29,7 +29,6 @@
 #ifndef _BINPATCH_X64
 #define _BINPATCH_X64
 
-#include "utils/types.hh"
 #include "utils/vector.hh"
 
 namespace conprx {

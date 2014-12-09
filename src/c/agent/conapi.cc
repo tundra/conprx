@@ -27,37 +27,37 @@ Vector<Console::FunctionInfo> Console::functions() {
 // --- L o g g i n g ---
 
 // A plankton arena with some extra utilities for console api logging.
-class log_arena_t : public arena_t {
+class log_arena_t : public Arena {
 public:
   // Allocate a new arena string with the same contents as the given utf16
   // string.
-  variant_t new_utf16(const void *raw_utf16, size_t length);
+  Variant new_utf16(const void *raw_utf16, size_t length);
 
   // Returns a coordinate variant corresponding to the given value.
-  variant_t new_coord(const coord_t &coord);
+  Variant new_coord(const coord_t &coord);
 
   // Returns a small rect variant corresponding to the given value.
-  variant_t new_small_rect(const small_rect_t &small_rect);
+  Variant new_small_rect(const small_rect_t &small_rect);
 };
 
-variant_t log_arena_t::new_utf16(const void *raw_utf16, size_t utf16_length) {
+Variant log_arena_t::new_utf16(const void *raw_utf16, size_t utf16_length) {
   wide_cstr_t utf16 = static_cast<wide_cstr_t>(raw_utf16);
   char *utf8 = NULL;
-  size_t utf8_length = String::utf16_to_utf8(utf16, utf16_length, &utf8);
-  variant_t result = new_string(utf8, utf8_length);
+  size_t utf8_length = conprx::String::utf16_to_utf8(utf16, utf16_length, &utf8);
+  Variant result = new_string(utf8, utf8_length);
   delete[] utf8;
   return result;
 }
 
-variant_t log_arena_t::new_coord(const coord_t &coord) {
-  map_t map = new_map();
+Variant log_arena_t::new_coord(const coord_t &coord) {
+  Map map = new_map();
   map.set("x", coord.X);
   map.set("y", coord.Y);
   return map;
 }
 
-variant_t log_arena_t::new_small_rect(const small_rect_t &small_rect) {
-  map_t map = new_map();
+Variant log_arena_t::new_small_rect(const small_rect_t &small_rect) {
+  Map map = new_map();
   map.set("left", small_rect.Left);
   map.set("top", small_rect.Top);
   map.set("right", small_rect.Right);
@@ -65,14 +65,14 @@ variant_t log_arena_t::new_small_rect(const small_rect_t &small_rect) {
   return map;
 }
 
-void LoggingConsole::emit_message(variant_t message) {
+void LoggingConsole::emit_message(Variant message) {
   TextWriter writer;
   writer.write(message);
   LOG_INFO("\n%s\n", *writer);
 }
 
-static variant_t handle_variant(handle_t handle) {
-  return variant_t::integer(reinterpret_cast<int64_t>(handle));
+static Variant handle_variant(handle_t handle) {
+  return Variant::integer(reinterpret_cast<int64_t>(handle));
 }
 
 // Macro that sets up the variables used to produce a log message. After this
@@ -85,7 +85,7 @@ static variant_t handle_variant(handle_t handle) {
 //     to have set. If the call fails these should be left out.
 #define BEGIN_LOG_MESSAGE(Op) {                                                \
   log_arena_t arena;                                                           \
-  map_t message = arena.new_map();                                             \
+  Map message = arena.new_map();                                               \
   message.set("op", Op);                                                       \
   do { } while (false)
 
@@ -98,7 +98,7 @@ do { } while (false)
 bool_t LoggingConsole::alloc_console() {
   bool_t result = delegate().alloc_console();
   BEGIN_LOG_MESSAGE("AllocConsole");
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -106,7 +106,7 @@ bool_t LoggingConsole::alloc_console() {
 bool_t LoggingConsole::free_console() {
   bool_t result = delegate().free_console();
   BEGIN_LOG_MESSAGE("FreeConsole");
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -125,10 +125,10 @@ bool_t LoggingConsole::get_console_cursor_info(handle_t console_output,
       console_cursor_info);
   BEGIN_LOG_MESSAGE("GetConsoleCursorInfo");
     message.set("console_output", handle_variant(console_output));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
       message.set("size", console_cursor_info->dwSize);
-      message.set("visible", variant_t::boolean(console_cursor_info->bVisible));
+      message.set("visible", Variant::boolean(console_cursor_info->bVisible));
     }
   END_LOG_MESSAGE();
   return result;
@@ -138,7 +138,7 @@ bool_t LoggingConsole::get_console_mode(handle_t console_handle, dword_t *mode) 
   bool_t result = delegate().get_console_mode(console_handle, mode);
   BEGIN_LOG_MESSAGE("GetConsoleMode");
     message.set("console_handle", handle_variant(console_handle));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result)
       message.set("mode", *mode);
   END_LOG_MESSAGE();
@@ -159,7 +159,7 @@ bool_t LoggingConsole::get_console_screen_buffer_info(handle_t console_output,
       console_screen_buffer_info);
   BEGIN_LOG_MESSAGE("GetConsoleScreenBufferInfo");
     message.set("console_output", handle_variant(console_output));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
       message.set("size", arena.new_coord(console_screen_buffer_info->dwSize));
       message.set("cursor_position", arena.new_coord(console_screen_buffer_info->dwCursorPosition));
@@ -219,7 +219,7 @@ bool_t LoggingConsole::read_console_a(handle_t console_input, void *buffer,
       number_of_chars_to_read, number_of_chars_read, input_control);
   BEGIN_LOG_MESSAGE("ReadConsoleA");
     message.set("number_of_chars_to_read", number_of_chars_to_read);
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
       message.set("buffer", arena.new_utf16(buffer, *number_of_chars_read));
       message.set("number_of_chars_read", *number_of_chars_read);
@@ -235,7 +235,7 @@ bool_t LoggingConsole::read_console_w(handle_t console_input, void *buffer,
       number_of_chars_to_read, number_of_chars_read, input_control);
   BEGIN_LOG_MESSAGE("ReadConsoleW");
     message.set("number_of_chars_to_read", number_of_chars_to_read);
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
       message.set("buffer", arena.new_utf16(buffer, *number_of_chars_read));
       message.set("number_of_chars_read", *number_of_chars_read);
@@ -255,13 +255,13 @@ bool_t LoggingConsole::read_console_output_a(handle_t console_output,
     message.set("buffer_size", arena.new_coord(buffer_size));
     message.set("buffer_coord", arena.new_coord(buffer_coord));
     message.set("read_region_in", arena.new_small_rect(read_region_in));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
-      array_t chars = arena.new_array();
+      Array chars = arena.new_array();
       for (int y = 0; y < buffer_size.Y; y++) {
         for (int x = 0; x < buffer_size.X; x++) {
           char_info_t info = buffer[x + y * buffer_size.X];
-          chars.add(variant_t::string(&info.Char.AsciiChar, 1));
+          chars.add(Variant::string(&info.Char.AsciiChar, 1));
           chars.add(info.Attributes);
         }
       }
@@ -283,9 +283,9 @@ bool_t LoggingConsole::read_console_output_w(handle_t console_output,
     message.set("buffer_size", arena.new_coord(buffer_size));
     message.set("buffer_coord", arena.new_coord(buffer_coord));
     message.set("read_region_in", arena.new_small_rect(read_region_in));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result) {
-      array_t chars = arena.new_array();
+      Array chars = arena.new_array();
       for (int y = 0; y < buffer_size.Y; y++) {
         for (int x = 0; x < buffer_size.X; x++) {
           char_info_t info = buffer[x + y * buffer_size.X];
@@ -307,8 +307,8 @@ bool_t LoggingConsole::set_console_cursor_info(handle_t console_output,
   BEGIN_LOG_MESSAGE("SetConsoleCursorInfo");
     message.set("console_output", handle_variant(console_output));
     message.set("size", console_cursor_info->dwSize);
-    message.set("visible", variant_t::boolean(console_cursor_info->bVisible));
-    message.set("result", variant_t::boolean(result));
+    message.set("visible", Variant::boolean(console_cursor_info->bVisible));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -320,7 +320,7 @@ bool_t LoggingConsole::set_console_cursor_position(handle_t console_output,
   BEGIN_LOG_MESSAGE("SetConsoleCursorPosition");
     message.set("console_output", handle_variant(console_output));
     message.set("cursor_position", arena.new_coord(cursor_position));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -330,7 +330,7 @@ bool_t LoggingConsole::set_console_mode(handle_t console_handle, dword_t mode) {
   BEGIN_LOG_MESSAGE("GetConsoleMode");
     message.set("console_handle", handle_variant(console_handle));
     message.set("mode", mode);
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -339,7 +339,7 @@ bool_t LoggingConsole::set_console_title_a(ansi_cstr_t console_title) {
   bool_t result = delegate().set_console_title_a(console_title);
   BEGIN_LOG_MESSAGE("SetConsoleTitleA");
     message.set("console_title", console_title);
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -349,7 +349,7 @@ bool_t LoggingConsole::set_console_title_w(wide_cstr_t console_title) {
   BEGIN_LOG_MESSAGE("SetConsoleTitleW");
     message.set("console_title", arena.new_utf16(console_title,
         String::wstrlen(console_title)));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
   END_LOG_MESSAGE();
   return result;
 }
@@ -361,8 +361,8 @@ bool_t LoggingConsole::write_console_a(handle_t console_output, const void *buff
       number_of_chars_to_write, number_of_chars_written, reserved);
   BEGIN_LOG_MESSAGE("WriteConsoleA");
     message.set("number_of_chars_to_write", number_of_chars_to_write);
-    message.set("buffer", variant_t::string(static_cast<const char*>(buffer), number_of_chars_to_write));
-    message.set("result", variant_t::boolean(result));
+    message.set("buffer", Variant::string(static_cast<const char*>(buffer), number_of_chars_to_write));
+    message.set("result", Variant::boolean(result));
     if (result)
       message.set("number_of_chars_written", *number_of_chars_written);
   END_LOG_MESSAGE();
@@ -377,7 +377,7 @@ bool_t LoggingConsole::write_console_w(handle_t console_output, const void *buff
   BEGIN_LOG_MESSAGE("WriteConsoleW");
     message.set("number_of_chars_to_write", number_of_chars_to_write);
     message.set("buffer", arena.new_utf16(buffer, number_of_chars_to_write));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result)
       message.set("number_of_chars_written", *number_of_chars_written);
   END_LOG_MESSAGE();
@@ -393,18 +393,18 @@ bool_t LoggingConsole::write_console_output_a(handle_t console_output,
   BEGIN_LOG_MESSAGE("WriteConsoleOutputA");
     message.set("console_output", handle_variant(console_output));
     message.set("buffer_size", arena.new_coord(buffer_size));
-    array_t chars = arena.new_array();
+    Array chars = arena.new_array();
     for (int y = 0; y < buffer_size.Y; y++) {
       for (int x = 0; x < buffer_size.X; x++) {
         char_info_t info = buffer[x + y * buffer_size.X];
-        chars.add(variant_t::string(&info.Char.AsciiChar, 1));
+        chars.add(Variant::string(&info.Char.AsciiChar, 1));
         chars.add(info.Attributes);
       }
     }
     message.set("buffer", chars);
     message.set("buffer_coord", arena.new_coord(buffer_coord));
     message.set("write_region_in", arena.new_small_rect(write_region_in));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result)
       message.set("write_region_out", arena.new_small_rect(*write_region));
   END_LOG_MESSAGE();
@@ -420,7 +420,7 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
   BEGIN_LOG_MESSAGE("WriteConsoleOutputW");
     message.set("console_output", handle_variant(console_output));
     message.set("buffer_size", arena.new_coord(buffer_size));
-    array_t chars = arena.new_array();
+    Array chars = arena.new_array();
     for (int y = 0; y < buffer_size.Y; y++) {
       for (int x = 0; x < buffer_size.X; x++) {
         char_info_t info = buffer[x + y * buffer_size.X];
@@ -431,7 +431,7 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
     message.set("buffer", chars);
     message.set("buffer_coord", arena.new_coord(buffer_coord));
     message.set("write_region_in", arena.new_small_rect(write_region_in));
-    message.set("result", variant_t::boolean(result));
+    message.set("result", Variant::boolean(result));
     if (result)
       message.set("write_region_out", arena.new_small_rect(*write_region));
   END_LOG_MESSAGE();

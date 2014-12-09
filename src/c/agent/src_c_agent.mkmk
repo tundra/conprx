@@ -18,7 +18,7 @@ agent_files = [
 
 utils = get_external("src", "c", "utils", "objects")
 disass = get_external("src", "c", "disass", "objects")
-plankton = get_dep_external("plankton", "src", "c", "objects")
+plankton = get_dep_external("plankton", "src", "c", "library")
 
 objects = get_group("objects")
 objects.add_member(plankton)
