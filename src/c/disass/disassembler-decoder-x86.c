@@ -24,6 +24,7 @@
 // Disable all these warnings for included files, there's nothing we can do to
 // fix them anyway.
 #ifdef IS_GCC
+#  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wconversion"
 #  pragma GCC diagnostic ignored "-Wc++-compat"
 #endif
