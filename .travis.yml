@@ -6,6 +6,12 @@ install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk
 
 matrix:
   include:
+    # Test a clang build in debug mode under valgrind.
+    - language: c
+      compiler: clang
+      script: python ci.py run --debug --valgrind --noisy -- all run-tests
+      install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk && sudo apt-get update && sudo apt-get install valgrind
+    # Test everything using an optimized clang build.
     - language: c
       compiler: clang
       script: python ci.py run --noisy -- all run-tests
