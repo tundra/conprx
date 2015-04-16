@@ -34,7 +34,7 @@ PosixMemoryManager::PosixMemoryManager()
 bool PosixMemoryManager::ensure_initialized() {
   if (is_initialized_)
     return true;
-  int page_size = sysconf(_SC_PAGE_SIZE);
+  int page_size = static_cast<int>(sysconf(_SC_PAGE_SIZE));
   if (page_size == -1) {
     LOG_ERROR("Failed to determine page size");
     // Failed to get the page size; this is definitely not going to work.

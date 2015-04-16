@@ -47,6 +47,7 @@ for filename in condrv_files:
 condrv_lib = c.get_shared_library("condrv")
 condrv_lib.add_object(objects)
 condrv_lib.add_object(get_external("src", "c", "utils", "objects"))
+condrv_lib.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 for python_lib in get_python_libs():
   condrv_lib.add_library(get_system_file(python_lib))
 

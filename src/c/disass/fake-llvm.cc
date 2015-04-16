@@ -50,7 +50,7 @@ int MemoryObject::readByte(uint64_t address, uint8_t *ptr) const {
   if (memory_.length() <= address) {
     return -1;
   } else {
-    *ptr = memory_[address];
+    *ptr = memory_[static_cast<size_t>(address)];
     return 0;
   }
 }

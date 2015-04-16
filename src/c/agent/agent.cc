@@ -161,7 +161,7 @@ ntstatus_t NTAPI UnpatchedMonitor::nt_request_wait_reply_port(
     handle_t port_handle, lpc_message_t *request, lpc_message_t *incoming_reply) {
   if (is_active_) {
     ulong_t api_number = request->api_number;
-    ushort_t dll_index = (api_number >> 16) & 0xFFFF;
+    ushort_t dll_index = static_cast<ushort_t>((api_number >> 16) & 0xFFFF);
     ushort_t api_index = (api_number & 0xFFFF);
     if (!is_blacklisted(dll_index, api_index)) {
       // Just to be on the safe side don't intercept any nested lpc calls caused

@@ -44,7 +44,7 @@ Variant log_arena_t::new_utf16(const void *raw_utf16, size_t utf16_length) {
   wide_cstr_t utf16 = static_cast<wide_cstr_t>(raw_utf16);
   char *utf8 = NULL;
   size_t utf8_length = conprx::String::utf16_to_utf8(utf16, utf16_length, &utf8);
-  Variant result = new_string(utf8, utf8_length);
+  Variant result = new_string(utf8, (uint32_t) utf8_length);
   delete[] utf8;
   return result;
 }
@@ -361,7 +361,8 @@ bool_t LoggingConsole::write_console_a(handle_t console_output, const void *buff
       number_of_chars_to_write, number_of_chars_written, reserved);
   BEGIN_LOG_MESSAGE("WriteConsoleA");
     message.set("number_of_chars_to_write", number_of_chars_to_write);
-    message.set("buffer", Variant::string(static_cast<const char*>(buffer), number_of_chars_to_write));
+    message.set("buffer", Variant::string(static_cast<const char*>(buffer),
+        (uint32_t) number_of_chars_to_write));
     message.set("result", Variant::boolean(result));
     if (result)
       message.set("number_of_chars_written", *number_of_chars_written);

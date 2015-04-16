@@ -4,7 +4,7 @@
 #ifndef _TYPES
 #define _TYPES
 
-#include "stdc.h"
+#include "c/stdc.h"
 
 // Include the platform-specific type declarations.
 #ifdef IS_MSVC

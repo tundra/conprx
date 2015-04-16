@@ -32,6 +32,14 @@
 #define BOOL DONT_CLASH_WITH_WINDEF_BOOL
 #endif
 
+// Disable all these warnings for included files, there's nothing we can do to
+// fix them anyway.
+#ifdef IS_GCC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wconversion"
+#  pragma GCC diagnostic ignored "-Wc++-compat"
+#endif
+
 // Include the headers required by the disassembler. The import script strips
 // includes from within the files it imports so all the required imports have
 // to be given explicitly here, in dependency order.
@@ -53,6 +61,10 @@
 // both becuase it needs all the setup above but also because we need to pick
 // out some of the internals of it below.
 #include "llvm/X86Disassembler.cc"
+
+#ifdef IS_GCC
+#  pragma GCC diagnostic pop
+#endif
 
 using namespace conprx;
 
@@ -139,7 +151,7 @@ int Dis_X86_64::vector_byte_reader(const void* arg, uint8_t* byte,
   if (address >= vect.length()) {
     return -1;
   } else {
-    *byte = vect[address];
+    *byte = vect[static_cast<size_t>(address)];
     return 0;
   }
 }
@@ -154,7 +166,7 @@ bool Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
     return info_out->fail(InstructionInfo::INVALID_INSTRUCTION, 0);
   if (!in_whitelist(instr.opcode))
     return info_out->fail(InstructionInfo::BLACKLISTED, instr.opcode);
-  return info_out->succeed(instr.readerCursor - offset);
+  return info_out->succeed(static_cast<size_t>(instr.readerCursor - offset));
 }
 
 #ifdef IS_MSVC

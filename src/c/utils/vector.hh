@@ -4,7 +4,7 @@
 #ifndef _VECTOR
 #define _VECTOR
 
-#include "stdc.h"
+#include "c/stdc.h"
 
 // A thin wrapper around an array with a length and various utilities.
 template <typename T>

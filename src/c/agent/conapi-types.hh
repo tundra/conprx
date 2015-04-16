@@ -6,7 +6,7 @@
 #ifndef _CONAPI_TYPES
 #define _CONAPI_TYPES
 
-#include "stdc.h"
+#include "c/stdc.h"
 #include "utils/types.hh"
 
 // Include custom headers for each toolchain.

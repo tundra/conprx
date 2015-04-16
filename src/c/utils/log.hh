@@ -8,7 +8,7 @@
 #ifndef _LOG
 #define _LOG
 
-#include "stdc.h"
+#include "c/stdc.h"
 
 #include <stdarg.h>
 

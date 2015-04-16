@@ -21,7 +21,18 @@
 #define BOOL DONT_CLASH_WITH_WINDEF_BOOL
 #endif
 
+// Disable all these warnings for included files, there's nothing we can do to
+// fix them anyway.
+#ifdef IS_GCC
+#  pragma GCC diagnostic ignored "-Wconversion"
+#  pragma GCC diagnostic ignored "-Wc++-compat"
+#endif
+
 #include "llvm/X86DisassemblerDecoderCommon.h"
 #include "llvm/X86DisassemblerDecoder.h"
 #include "llvm/X86GenDisassemblerTables.inc"
 #include "llvm/X86DisassemblerDecoder.c"
+
+#ifdef IS_GCC
+#  pragma GCC diagnostic pop
+#endif

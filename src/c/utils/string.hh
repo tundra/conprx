@@ -4,7 +4,7 @@
 #ifndef _STRING
 #define _STRING
 
-#include "stdc.h"
+#include "c/stdc.h"
 #include "types.hh"
 
 namespace conprx {

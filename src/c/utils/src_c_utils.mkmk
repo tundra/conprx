@@ -7,8 +7,7 @@ filenames = [
 ]
 
 objects = get_group("objects")
-objects.add_member(get_dep_external("tclib", "src", "c", "utils", "library"))
-objects.add_member(get_dep_external("tclib", "src", "c", "io", "library"))
+objects.add_member(get_dep_external("tclib", "src", "c", "sync", "library"))
 
 for filename in filenames:
   source_file = c.get_source_file(filename)

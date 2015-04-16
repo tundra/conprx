@@ -11,7 +11,7 @@ objects.add_dependency(get_external("src", "c", "agent", "objects"))
 objects.add_dependency(get_external("src", "c", "disass", "objects"))
 objects.add_dependency(get_external("src", "c", "utils", "objects"))
 
-all = add_alias("all")
+all = get_group("all")
 all.add_member(get_external("src", "c", "agent", "all"))
 all.add_member(get_external("src", "c", "disass", "all"))
 all.add_member(get_external("src", "c", "utils", "all"))
