@@ -2,24 +2,21 @@ language: c
 compiler: gcc
 script: python ci.py run --debug --noisy -- all run-tests
 before_install: git submodule update --init --recursive
-install: ./tools/ci.py begin --config conprx.mkmk
+install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk
 
 matrix:
   include:
     - language: c
       compiler: clang
       script: python ci.py run --noisy -- all run-tests
-      install: ./tools/ci.py begin --config conprx.mkmk
+      install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk
     # Test with checks disabled.
     - languate: c
       compiler: clang
       script: python ci.py run --nochecks --noisy -- all run-tests
-      install: ./tools/ci.py begin --config conprx.mkmk
+      install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk
     # Check that the C code compiles using gcc.
     - language: c
       compiler: gcc
       script: python ci.py run --debug --noisy -- all run-tests
-      install: ./tools/ci.py begin --config conprx.mkmk
-    - language: c
-      compiler: gcc
-      script: env
+      install: ./tools/ci.py begin --config $(basename $TRAVIS_REPO_SLUG).mkmk
