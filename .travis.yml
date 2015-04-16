@@ -20,3 +20,6 @@ matrix:
       compiler: gcc
       script: python ci.py run --debug --noisy -- all run-tests
       install: ./tools/ci.py begin --config conprx.mkmk
+    - language: c
+      compiler: gcc
+      script: env
