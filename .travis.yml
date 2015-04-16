@@ -1,4 +1,5 @@
 language: c
 compiler: gcc
 script: mkmk init --config conprx.mkmk && ./build.sh all run-tests
+before_install: git submodule update --init --recursive
 install: source ./tools/enter-devenv.sh
