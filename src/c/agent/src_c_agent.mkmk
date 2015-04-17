@@ -16,10 +16,9 @@ agent_files = [
 
 utils = get_external("src", "c", "utils", "objects")
 disass = get_external("src", "c", "disass", "objects")
-plankton = get_dep_external("plankton", "src", "c", "library")
 
 objects = get_group("objects")
-objects.add_member(plankton)
+objects.add_member(get_dep_external("plankton", "src", "c", "library"))
 
 for filename in agent_files:
   objects.add_member(build_object(filename))
@@ -37,7 +36,6 @@ host_files = [
 host = c.get_executable("host")
 host.add_object(utils)
 host.add_object(disass)
-host.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 for filename in host_files:
   host.add_object(build_object(filename))
 
