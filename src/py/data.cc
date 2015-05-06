@@ -190,7 +190,7 @@ Handle *Handle::create(handle_t value) {
 PyObject *Handle::to_representation(PyObject *object) {
   Handle *self = Handle::type.cast(object);
   PyObject *format = PyString_FromString("H[0x%x]");
-  PyObject *args = Py_BuildValue("l", reinterpret_cast<long>(self->handle_));
+  PyObject *args = Py_BuildValue("l", reinterpret_cast<address_arith_t>(self->handle_));
   PyObject *result = PyString_Format(format, args);
   return result;
 }

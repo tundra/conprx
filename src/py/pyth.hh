@@ -10,6 +10,8 @@
 // included first and sometimes fails to include if it isn't. What a surprise:
 // python sucks at the api level too.
 
+#define Py_UNICODE_SIZE 4
+
 #ifdef _MSC_VER
 #  pragma warning(push, 0)
 #    include <Python.h>

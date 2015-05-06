@@ -14,7 +14,7 @@
 // silence those.
 #ifdef IS_MSVC
 #pragma warning(push)
-#pragma warning(disable : 4530 4986)
+#pragma warning(disable : 4530 4986 4267)
 #endif
 
 #include <assert.h>

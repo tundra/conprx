@@ -149,11 +149,17 @@ PyType<Console> *Console::type() {
 }
 
 PyObject *Console::create(PyTypeObject *type, PyObject *args, PyObject *kwds) {
-  Console *result = Console::type()->cast(type->tp_alloc(type, 0));
-  result->std_input_handle_ = STD_INPUT_HANDLE;
-  result->std_output_handle_ = STD_OUTPUT_HANDLE;
-  result->std_error_handle_ = STD_ERROR_HANDLE;
-  return result;
+  if (true) {
+    // For now disable the console even on windows until it's clear why it
+    // doesn't work on jenkins.
+    Py_RETURN_NONE;
+  } else {
+    Console *result = Console::type()->cast(type->tp_alloc(type, 0));
+    result->std_input_handle_ = STD_INPUT_HANDLE;
+    result->std_output_handle_ = STD_OUTPUT_HANDLE;
+    result->std_error_handle_ = STD_ERROR_HANDLE;
+    return result;
+  }
 }
 
 PyMemberDef Console::members[kConsoleMemberCount + 1] = {
