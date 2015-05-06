@@ -8,8 +8,7 @@
 using namespace conprx;
 
 TEST(conapi, datatypes) {
-  size_t word_size = IF_64_BIT(8, 4);
-  ASSERT_EQ(word_size, sizeof(dword_t));
+  ASSERT_EQ(sizeof(long), sizeof(dword_t));
   ASSERT_EQ(sizeof(void*), sizeof(handle_t));
 }
 
