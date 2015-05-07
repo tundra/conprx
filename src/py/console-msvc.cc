@@ -82,6 +82,16 @@ PyObject *Console::get_std_handle(PyObject *self, PyObject *args) {
   return Handle::create(handle);
 }
 
+PyObject *Console::is_console_screen_buffer(PyObject *self, PyObject *args) {
+  PyObject *value_obj = NULL;
+  if (!PyArg_ParseTuple(args, "O", &value_obj))
+    return NULL;
+  Handle *value = Handle::type.cast(value_obj);
+  CONSOLE_SCREEN_BUFFER_INFO info;
+  bool result = GetConsoleScreenBufferInfo(value->handle(), &info);
+  return PyBool_FromLong(result);
+}
+
 // BOOL WINAPI SetConsoleTitle(
 //   _In_  LPCTSTR lpConsoleTitle
 // );

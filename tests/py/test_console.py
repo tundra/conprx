@@ -120,7 +120,8 @@ class ConDrvConsoleTest(unittest.TestCase):
       return
     info = ConsoleCursorInfo(0, False)
     conout = console.GetStdHandle(console.STD_ERROR_HANDLE)
-    self.assertTrue(console.GetConsoleCursorInfo(conout, info))
+    if console.IsConsoleScreenBuffer(conout):
+      self.assertTrue(console.GetConsoleCursorInfo(conout, info))
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)

@@ -17,6 +17,7 @@ namespace condrv {
   F(GetConsoleTitleA,           get_console_title_a)                           \
   F(GetConsoleTitleW,           get_console_title_w)                           \
   F(GetStdHandle,               get_std_handle)                                \
+  F(IsConsoleScreenBuffer,      is_console_screen_buffer)                      \
   F(SetConsoleTitleA,           set_console_title_a)                           \
   F(SetConsoleTitleW,           set_console_title_w)                           \
   F(WriteConsoleA,              write_console_a)
