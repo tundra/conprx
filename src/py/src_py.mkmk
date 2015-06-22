@@ -4,34 +4,22 @@
 import os.path
 import platform
 
-# Returns the string includepath to use to get Python.h. This is hacky but the
-# defaults do what the have to and you can always override with PYTHON_INCLUDE.
-def get_python_includepath():
-  env = os.environ.get("PYTHON_INCLUDE", None)
-  if not env is None:
-    return env
-  elif platform.system() == "Windows":
-    return "C:\\Python27\\include"
-  else:
-    return "/usr/include/python2.7"
-
-# Returns a list of libraries to link the extension with. Also a hack.
-def get_python_libs():
-  env = os.environ.get("PYTHON_LIBS", None)
-  if not env is None:
-    return env.split(";")
-  elif platform.system() == "Windows":
-    return ["C:\\Python27\\libs\\python27.lib"]
-  else:
-    return []
+(get_library_info("python27")
+  .add_platform(
+    "windows",
+    includes=["C:\\Python27\\include"],
+    libs=["C:\\Python27\\libs\\python27.lib"])
+  .add_platform(
+    "posix",
+    autoresolve="python-2.7"))
 
 def build_object(filename):
   source_file = c.get_source_file(filename)
   source_file.add_include(get_root().get_child("src", "c"))
   source_file.add_include(get_dep('tclib').get_child("src", "c"))
-  python_includepath = get_python_includepath()
-  source_file.add_include(get_system_file(python_includepath))
-  return source_file.get_object()
+  object = source_file.get_object()
+  object.add_library("python27")
+  return object
 
 condrv_files = [
   "condrv.cc",
@@ -48,8 +36,6 @@ condrv_lib = c.get_shared_library("condrv")
 condrv_lib.add_object(objects)
 condrv_lib.add_object(get_external("src", "c", "utils", "objects"))
 condrv_lib.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
-for python_lib in get_python_libs():
-  condrv_lib.add_library(get_system_file(python_lib))
 
 # Copy the library to a .pyd file.
 condrv_pyd = get_copy("condrv.pyd", condrv_lib)
