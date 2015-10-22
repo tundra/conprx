@@ -4,6 +4,12 @@
 import os.path
 import platform
 
+# The python header includes macros that cause invalid offsetof warnings so
+# disable those for all these files.
+c.get_settings().add_sticky("warnings",
+  "no-invalid-offsetof",
+  toolchain="gcc", language="c++")
+
 (get_library_info("python27")
   .add_platform(
     "windows",

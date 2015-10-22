@@ -82,6 +82,7 @@ Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size)
     // not we're basically screwed but will try anyway, just in case.
     flags |= MAP_32BIT;
 #endif
+  errno = 0;
   void *result = mmap(NULL, page_size_, PROT_READ | PROT_WRITE | PROT_EXEC,
       flags, 0, 0);
   if (result == NULL) {
