@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "utils/types.hh"
+#include <Winsock2.h>
 
 // Ensure that we link with the event log functions.
 #pragma comment(lib, "advapi32.lib")
