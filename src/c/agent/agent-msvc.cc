@@ -3,91 +3,7 @@
 
 #include "utils/types.hh"
 
-// It's a bad idea for the monitor to use other libraries so we only include
-// this when the unpatched monitor is enabled. This also means that any code
-// that requires this must be disabled.
-#if USE_UNPATCHED_MONITOR
-#include <Dbghelp.h>
-#pragma comment(lib, "dbghelp.lib")
-#endif
-
 using namespace conprx;
-
-template <typename T>
-bool UnpatchedMonitor::init_patch(lpc_function_key_t key, module_t ntdll,
-    const char *name, T *repl) {
-  address_t orig_addr = Code::upcast(GetProcAddress(ntdll, name));
-  if (orig_addr == NULL)
-    return false;
-  patches_[key] = PatchRequest(orig_addr, Code::upcast(repl));
-  return true;
-}
-
-bool UnpatchedMonitor::install() {
-  // If a monitor is already installed we bail.
-  if (installed_ != NULL)
-    return false;
-
-  // Initialize the patches.
-  module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-#define MAKE_PATCH(Name, name, RET, PARAMS, ARGS)                              \
-  if (!init_patch(name##_k, ntdll, #Name, name##_bridge))                      \
-    return false;
-  FOR_EACH_LPC_FUNCTION(MAKE_PATCH)
-#undef MAKE_PATCH
-
-  // Set this as the installed monitor.
-  installed_ = this;
-
-  // Sym-initialize the current process so that it's ready for printing stack
-  // traces.
-  IF_USE_UNPATCHED_MONITOR(SymInitialize(GetCurrentProcess(), NULL, true),);
-
-  // Apply the patches.
-  PatchSet patches(Platform::get(), Vector<PatchRequest>(patches_, kLpcFunctionCount));
-  return patches.apply();
-}
-
-void UnpatchedMonitor::print_stack_trace(FILE *out) {
-#if USE_UNPATCHED_MONITOR
-  // Refresh the process's module list. How this works exactly is unclear but
-  // it seems to be required for SymFromAddr to work.
-  handle_t process = GetCurrentProcess();
-  if (!SymRefreshModuleList(process)) {
-    fprintf(out, "Error refreshing module list: %i", GetLastError());
-    return;
-  }
-
-  // Capture the stack trace.
-  static const size_t kMaxStackSize = 32;
-  void *backtrace[kMaxStackSize];
-  size_t frame_count = CaptureStackBackTrace(0, kMaxStackSize, backtrace, NULL);
-
-  // Scan through the trace one frame at a time, resolving symbols as we go.
-  static const size_t kMaxNameLength = 128;
-  static const size_t kSymbolInfoSize = sizeof(SYMBOL_INFO) + (kMaxNameLength * sizeof(char_t));
-  // A SYMBOL_INFO is variable size so we stack allocate a blob of memory and
-  // cast it rather than stack allocate the info directly.
-  byte_t symbol_info_bytes[kSymbolInfoSize];
-  ZeroMemory(symbol_info_bytes, kSymbolInfoSize);
-  SYMBOL_INFO *info = reinterpret_cast<SYMBOL_INFO*>(symbol_info_bytes);
-  // This isn't strictly true, it's symbol_info_bytes, but SymFromAddr requires
-  // it to have this value.
-  info->SizeOfStruct = sizeof(SYMBOL_INFO);
-  info->MaxNameLen = kMaxNameLength;
-  for (size_t i = 0; i < frame_count; i++) {
-    void *addr = backtrace[i];
-    DWORD64 addr64 = reinterpret_cast<DWORD64>(addr);
-    if (SymFromAddr(process, addr64, 0, info)) {
-      fprintf(out, " - 0x%p: %s\n", addr, info->Name);
-    } else {
-      fprintf(out, " - 0x%p\n", addr);
-    }
-  }
-#else
-  fprintf(out, "(stack trace printing disabled)\n");
-#endif // USE_UNPATCHED_MONITOR
-}
 
 // Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
@@ -145,7 +61,7 @@ bool WindowsConsoleAgent::dll_process_attach() {
     return false;
   logger->set_delegate(original);
 
-  return IF_USE_UNPATCHED_MONITOR((new UnpatchedMonitor())->install(), true);
+  return true;
 }
 
 bool WindowsConsoleAgent::is_process_hard_blacklisted() {
@@ -176,22 +92,11 @@ address_t ConsoleAgent::get_console_function_address(cstr_t name) {
   return Code::upcast(GetProcAddress(kernel32, name));
 }
 
-// The registry key under which any options are stored. This doesn't have to
-// exist but if it does we'll read from it.
-#define OPTIONS_REGISTRY_KEY_NAME TEXT("Software\\Tundra\\Console Agent")
-
 // Windows-specific implementation of the options. The reason to make this into
 // a class is such that it has access to the protected fields in Options.
 class WindowsOptions : public Options {
 public:
   WindowsOptions();
-
-  // Reads any options from the registry.
-  void override_from_registry(hkey_t registry);
-
-  // Attempts to read a value from the registry and if present sets the field
-  // to its value.
-  void override_bool_from_registry(bool *field, hkey_t registry, cstr_t name);
 
   // Reads any options from environment variables.
   void override_from_environment();
@@ -202,40 +107,8 @@ public:
 };
 
 WindowsOptions::WindowsOptions() {
-  // First override with any global values from the registry.
-  override_from_registry(HKEY_LOCAL_MACHINE);
-
-  // Then override with any user specific values from the registry.
-  override_from_registry(HKEY_CURRENT_USER);
-
-  // Finally override with values from the environment.
+  // Override with values from the environment.
   override_from_environment();
-}
-
-void WindowsOptions::override_from_registry(hkey_t registry) {
-  // Try to open the registry key under which these values live. If it doesn't
-  // exist there's no point in continuing.
-  hkey_t hkey = 0;
-  long ret = RegOpenKeyEx(registry, OPTIONS_REGISTRY_KEY_NAME, 0, KEY_READ, &hkey);
-  if (ret != ERROR_SUCCESS)
-    return;
-#define __EMIT_REG_READ__(name, defawlt, Name, NAME)                           \
-  override_bool_from_registry(&name##_, hkey, TEXT(Name));
-  FOR_EACH_BOOL_OPTION(__EMIT_REG_READ__)
-#undef __EMIT_REG_READ__
-}
-
-void WindowsOptions::override_bool_from_registry(bool *field, hkey_t hkey,
-    cstr_t name) {
-  // Read the relevant registry entry.
-  dword_t type = 0;
-  dword_t value = 0;
-  dword_t size = sizeof(value);
-  long ret = RegQueryValueEx(hkey, name, 0, &type, reinterpret_cast<byte_t*>(&value),
-      &size);
-  if (ret == ERROR_SUCCESS && type == REG_DWORD)
-    // Only if it was present and had the right type do we use it.
-    *field = !!value;
 }
 
 void WindowsOptions::override_from_environment() {

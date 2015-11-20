@@ -53,15 +53,10 @@ void Log::record_debug_fallback(const char *file, int line, const char *fmt, ...
 Log &Log::get() {
   static Log *instance = NULL;
   if (instance == NULL) {
-    LogBackend *primary = LogBackend::get_default();
-    LogBackend *secondary = new StderrLogBackend();
-    instance = new Log(primary, secondary);
+    LogBackend *primary = new StderrLogBackend();
+    instance = new Log(primary, primary);
   }
   return *instance;
 }
 
-#ifdef IS_MSVC
-#include "log-msvc.cc"
-#else
 #include "log-fallback.cc"
-#endif

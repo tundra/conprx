@@ -7,10 +7,6 @@ address_t ConsoleAgent::get_console_function_address(cstr_t name) {
   return NULL;
 }
 
-void UnpatchedMonitor::print_stack_trace(FILE *out) {
-  fprintf(out, "(no stack trace printing on posix)\n");
-}
-
 Options &Options::get() {
   static Options *instance = NULL;
   if (instance == NULL)

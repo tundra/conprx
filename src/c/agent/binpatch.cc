@@ -2,7 +2,10 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "binpatch.hh"
-#include "utils/log.hh"
+
+BEGIN_C_INCLUDES
+#include "utils/log.h"
+END_C_INCLUDES
 
 using namespace conprx;
 
@@ -13,9 +16,10 @@ bool MemoryManager::ensure_initialized() {
 MemoryManager::~MemoryManager() {
 }
 
-PatchRequest::PatchRequest(address_t original, address_t replacement)
+PatchRequest::PatchRequest(address_t original, address_t replacement, const char *name)
   : original_(original)
   , replacement_(replacement)
+  , name_(name)
   , trampoline_(NULL)
   , code_(NULL)
   , platform_(NULL)
@@ -24,6 +28,7 @@ PatchRequest::PatchRequest(address_t original, address_t replacement)
 PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
+  , name_(NULL)
   , trampoline_(NULL)
   , code_(NULL)
   , platform_(NULL)
@@ -34,6 +39,7 @@ bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code) {
   code_ = code;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
+  HEST("%s", name_);
   if (!platform->instruction_set().get_preamble_size_bytes(original_,
       &preamble_size_))
     return false;
@@ -60,7 +66,7 @@ PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   , old_perms_(0) { }
 
 bool PatchSet::prepare_apply() {
-  LOG_DEBUG("Preparing to apply patch set");
+  INFO("Preparing to apply patch set");
   if (requests().is_empty()) {
     // Trivially succeed if there are no patches to apply.
     status_ = PREPARED;
@@ -68,11 +74,11 @@ bool PatchSet::prepare_apply() {
   }
   // Determine the range within which all the original functions occur.
   Vector<byte_t> range = determine_patch_range();
-  LOG_DEBUG("Patch range: %p .. %p", range.start(), range.end());
+  INFO("Patch range: %p .. %p", range.start(), range.end());
   // Allocate a chunk of memory to hold the stubs.
   Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
       sizeof(PatchCode) * requests().length());
-  LOG_DEBUG("Memory: %p .. %p", memory.start(), memory.end());
+  INFO("Memory: %p .. %p", memory.start(), memory.end());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
     LOG_ERROR("Failed to allocate memory for %i stubs near %p.",
@@ -144,7 +150,7 @@ Vector<byte_t> PatchSet::determine_patch_range() {
 }
 
 bool PatchSet::open_for_patching() {
-  LOG_DEBUG("Opening original code for writing");
+  INFO("Opening original code for writing");
   // Try opening the region for writing.
   Vector<byte_t> region = determine_patch_range();
   if (!memory_manager().open_for_writing(region, &old_perms_)) {
@@ -153,9 +159,9 @@ bool PatchSet::open_for_patching() {
     return false;
   }
   // Validate that writing works.
-  LOG_DEBUG("Validating that code is writable");
+  INFO("Validating that code is writable");
   if (validate_open_for_patching()) {
-    LOG_DEBUG("Successfully validated that code is writable");
+    INFO("Successfully validated that code is writable");
     status_ = OPEN;
     return true;
   } else {
@@ -182,35 +188,35 @@ bool PatchSet::validate_open_for_patching() {
 }
 
 bool PatchSet::close_after_patching(Status success_status) {
-  LOG_DEBUG("Closing original code for writing");
+  INFO("Closing original code for writing");
   Vector<byte_t> region = determine_patch_range();
   if (!memory_manager().close_for_writing(region, old_perms_)) {
     status_ = FAILED;
     return false;
   }
-  LOG_DEBUG("Successfully closed original code");
+  INFO("Successfully closed original code");
   status_ = success_status;
   return true;
 }
 
 void PatchSet::install_redirects() {
-  LOG_DEBUG("Installing redirects");
+  INFO("Installing redirects");
   InstructionSet &inst = instruction_set();
   for (size_t i = 0; i < requests().length(); i++)
     inst.install_redirect(requests()[i]);
-  LOG_DEBUG("Successfully installed redirects");
+  INFO("Successfully installed redirects");
   status_ = APPLIED_OPEN;
 }
 
 void PatchSet::revert_redirects() {
-  LOG_DEBUG("Reverting redirects");
+  INFO("Reverting redirects");
   for (size_t i = 0; i < requests().length(); i++) {
     PatchRequest &request = requests()[i];
     Vector<byte_t> preamble = request.preamble();
     address_t original = request.original();
     memcpy(original, preamble.start(), preamble.length());
   }
-  LOG_DEBUG("Successfully reverted redirects");
+  INFO("Successfully reverted redirects");
   status_ = REVERTED_OPEN;
 }
 

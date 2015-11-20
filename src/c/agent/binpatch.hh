@@ -55,7 +55,7 @@ class PatchRequest {
 public:
   // Initializes a binary patch that replaces the given original function with
   // the given replacement.
-  PatchRequest(address_t original, address_t replacement);
+  PatchRequest(address_t original, address_t replacement, const char *name = NULL);
 
   PatchRequest();
 
@@ -101,6 +101,8 @@ private:
 
   // The address of the replacement function.
   address_t replacement_;
+
+  const char *name_;
 
   // The completed trampoline. Will be null until the trampoline has been
   // written.

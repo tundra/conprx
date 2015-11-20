@@ -38,10 +38,10 @@ bool X64::get_preamble_size_bytes(address_t addr, size_t *size_out) {
     InstructionInfo info;
     if (!disass.resolve(code, offset, &info)) {
       if (info.status() == InstructionInfo::BLACKLISTED) {
-        LOG_WARNING("Instruction 0x%x at offset %i is blacklisted",
+        WARN("Instruction 0x%x at offset %i is blacklisted",
             info.instruction(), offset);
       } else if (info.status() == InstructionInfo::INVALID_INSTRUCTION) {
-        LOG_WARNING("Invalid instruction 0x%x at offset %i was blacklisted",
+        WARN("Invalid instruction 0x%x at offset %i was blacklisted",
             info.instruction(), offset);
       }
       // If the disassembler failed to resolve the instruction for whatever

@@ -87,7 +87,7 @@ Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size)
       flags, 0, 0);
   if (result == NULL) {
     int error = errno;
-    LOG_WARNING("mmap failed: %i", error);
+    WARN("mmap failed: %i", error);
     return Vector<byte_t>();
   }
   return Vector<byte_t>(static_cast<byte_t*>(result), size);

@@ -30,7 +30,6 @@ agent.add_object(disass)
 
 host_files = [
   "host.cc",
-  "subprocess.cc",
 ]
 
 host = c.get_executable("host")
