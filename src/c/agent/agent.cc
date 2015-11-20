@@ -11,19 +11,19 @@ using namespace conprx;
 class OriginalConsole : public Console {
 public:
   OriginalConsole(Vector<PatchRequest*> patches) : patches_(patches) { }
-#define __EMIT_TRAMPOLINE_DECL__(Name, name, RET, PARAMS, ARGS)                \
-  virtual RET name PARAMS;
+#define __EMIT_TRAMPOLINE_DECL__(Name, name, FLAGS, SIG)                       \
+  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_DECL__)
 #undef __EMIT_TRAMPOLINE_DECL__
 private:
   Vector<PatchRequest*> patches_;
 };
 
-#define __EMIT_TRAMPOLINE_IMPL__(Name, name, RET, PARAMS, ARGS)                \
-  RET OriginalConsole::name PARAMS {                                           \
+#define __EMIT_TRAMPOLINE_IMPL__(Name, name, FLAGS, SIG)                       \
+  SIG(GET_SIG_RET) OriginalConsole::name SIG(GET_SIG_PARAMS) {                 \
     PatchRequest *patch = patches_[Console::name##_key];                       \
     Console::name##_t trampoline = patch->get_trampoline<Console::name##_t>(); \
-    return trampoline ARGS;                                                    \
+    return trampoline SIG(GET_SIG_ARGS);                                       \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 #undef __EMIT_TRAMPOLINE_IMPL__
@@ -84,9 +84,9 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
 
 // Expands to a bridge for each api function that calls the object stored in
 // the agent's delegate field.
-#define __EMIT_BRIDGE__(Name, name, RET, PARAMS, ARGS)                         \
-  RET WINAPI ConsoleAgent::name##_bridge PARAMS {                              \
-    return ConsoleAgent::delegate().name ARGS;                                 \
+#define __EMIT_BRIDGE__(Name, name, FLAGS, SIG)                                \
+  SIG(GET_SIG_RET) WINAPI ConsoleAgent::name##_bridge SIG(GET_SIG_PARAMS) {    \
+    return ConsoleAgent::delegate().name SIG(GET_SIG_ARGS);                    \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_BRIDGE__)
 #undef __EMIT_BRIDGE__

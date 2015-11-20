@@ -93,8 +93,8 @@ private:
   // method calls on the delegate object.
   static address_t get_delegate_bridge(int key);
 
-#define __EMIT_DELEGATE_BRIDGE__(Name, name, RET, PARAMS, ARGS)                \
-  static RET WINAPI name##_bridge PARAMS;
+#define __EMIT_DELEGATE_BRIDGE__(Name, name, FLAGS, SIG)                       \
+  static SIG(GET_SIG_RET) WINAPI name##_bridge SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
 #undef __EMIT_DELEGATE_BRIDGE__
 

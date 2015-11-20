@@ -14,98 +14,102 @@
 
 namespace conprx {
 
-#define FOR_EACH_CONAPI_FUNCTION(F)                                            \
-  F(AllocConsole, alloc_console, bool_t,                                       \
-      (),                                                                      \
-      ())                                                                      \
-  F(FreeConsole, free_console, bool_t,                                         \
-      (),                                                                      \
-      ())                                                                      \
-  F(GetConsoleCP, get_console_cp, uint_t,                                      \
-      (),                                                                      \
-      ())                                                                      \
-  F(GetConsoleCursorInfo, get_console_cursor_info, bool_t,                     \
-      (handle_t console_output, console_cursor_info_t *console_cursor_info),   \
-      (console_output, console_cursor_info))                                   \
-  F(GetConsoleMode, get_console_mode, bool_t,                                  \
-      (handle_t console_handle, dword_t *mode),                                \
-      (console_handle, mode))                                                  \
-  F(GetConsoleOutputCP, get_console_output_cp, uint_t,                         \
-      (),                                                                      \
-      ())                                                                      \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, bool_t,        \
-      (handle_t console_output,                                                \
-       console_screen_buffer_info_t *console_screen_buffer_info),              \
-      (console_output, console_screen_buffer_info))                            \
-  F(GetConsoleTitleA, get_console_title_a, dword_t,                            \
-      (ansi_str_t console_title, dword_t size),                                \
-      (console_title, size))                                                   \
-  F(GetConsoleTitleW, get_console_title_w, dword_t,                            \
-      (wide_str_t console_title, dword_t size),                                \
-      (console_title, size))                                                   \
-  F(GetConsoleWindow, get_console_window, hwnd_t,                              \
-      (),                                                                      \
-      ())                                                                      \
-  F(GetStdHandle, get_std_handle, handle_t,                                    \
-      (dword_t std_handle),                                                    \
-      (std_handle))                                                            \
-  F(ReadConsoleA, read_console_a, bool_t,                                      \
-      (handle_t console_input, void *buffer,                                   \
-       dword_t number_of_chars_to_read, dword_t *number_of_chars_read,         \
-       console_readconsole_control_t *input_control),                          \
-      (console_input, buffer, number_of_chars_to_read,                         \
-       number_of_chars_read, input_control))                                   \
-  F(ReadConsoleW, read_console_w, bool_t,                                      \
-      (handle_t console_input, void *buffer,                                   \
-       dword_t number_of_chars_to_read, dword_t *number_of_chars_read,         \
-       console_readconsole_control_t *input_control),                          \
-      (console_input, buffer, number_of_chars_to_read,                         \
-       number_of_chars_read, input_control))                                   \
-  F(ReadConsoleOutputA, read_console_output_a, bool_t,                         \
-      (handle_t console_output, char_info_t *buffer, coord_t buffer_size,      \
-       coord_t buffer_coord, small_rect_t *read_region),                       \
-      (console_output, buffer, buffer_size, buffer_coord, read_region))        \
-  F(ReadConsoleOutputW, read_console_output_w, bool_t,                         \
-      (handle_t console_output, char_info_t *buffer, coord_t buffer_size,      \
-       coord_t buffer_coord, small_rect_t *read_region),                       \
-      (console_output, buffer, buffer_size, buffer_coord, read_region))        \
-  F(SetConsoleCursorInfo, set_console_cursor_info, bool_t,                     \
-      (handle_t console_output,                                                \
-       const console_cursor_info_t *console_cursor_info),                      \
-      (console_output, console_cursor_info))                                   \
-  F(SetConsoleCursorPosition, set_console_cursor_position, bool_t,             \
-      (handle_t console_output, coord_t cursor_position),                      \
-      (console_output, cursor_position))                                       \
-  F(SetConsoleMode, set_console_mode, bool_t,                                  \
-      (handle_t console_handle, dword_t mode),                                 \
-      (console_handle, mode))                                                  \
-  F(SetConsoleTitleA, set_console_title_a, bool_t,                             \
-      (ansi_cstr_t console_title),                                             \
-      (console_title))                                                         \
-  F(SetConsoleTitleW, set_console_title_w, bool_t,                             \
-      (wide_cstr_t console_title),                                             \
-      (console_title))                                                         \
-  F(WriteConsoleA, write_console_a, bool_t,                                    \
-      (handle_t console_output, const void *buffer,                            \
-       dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
-       void *reserved),                                                        \
-      (console_output, buffer, number_of_chars_to_write,                       \
-       number_of_chars_written, reserved))                                     \
-  F(WriteConsoleW, write_console_w, bool_t,                                    \
-      (handle_t console_output, const void *buffer,                            \
-       dword_t number_of_chars_to_write, dword_t *number_of_chars_written,     \
-       void *reserved),                                                        \
-      (console_output, buffer, number_of_chars_to_write,                       \
-       number_of_chars_written, reserved))                                     \
-  F(WriteConsoleOutputA, write_console_output_a, bool_t,                       \
-      (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,\
-       coord_t buffer_coord, small_rect_t *write_region),                      \
-      (console_output, buffer, buffer_size, buffer_coord, write_region))       \
-  F(WriteConsoleOutputW, write_console_output_w, bool_t,                       \
-      (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,\
-       coord_t buffer_coord, small_rect_t *write_region),                      \
-      (console_output, buffer, buffer_size, buffer_coord, write_region))
+#define GET_SIG_RET(RET, PARAMS, ARGS) RET
+#define GET_SIG_PARAMS(RET, PARAMS, ARGS) PARAMS
+#define GET_SIG_ARGS(RET, PARAMS, ARGS) ARGS
 
+#define sigVoidToBool(F) F(bool_t, (), ())
+#define sigVoidToUInt(F) F(uint_t, (), ())
+#define sigVoidToHWnd(F) F(hwnd_t, (), ())
+#define sigWideStrToDWord(F) F(dword_t, (wide_str_t str, dword_t n), (str, n))
+#define sigWideCStrToBool(F) F(bool_t, (wide_cstr_t str), (str))
+#define sigStrToDWord(F) F(dword_t, (str_t str, dword_t n), (str, n))
+#define sigAnsiCStrToBool(F) F(bool_t, (ansi_cstr_t str), (str))
+#define sigDWordToHandle(F) F(handle_t, (dword_t handle), (handle))
+
+#define sigGetConsoleCursorInfo(F) F(bool_t,                                   \
+    (handle_t console_output, console_cursor_info_t *console_cursor_info),     \
+    (console_output, console_cursor_info))
+#define sigGetConsoleMode(F) F(bool_t,                                         \
+    (handle_t console_handle, dword_t *mode),                                  \
+    (console_handle, mode))
+#define sigGetConsoleScreenBufferInfo(F) F(bool_t,                             \
+    (handle_t console_output, console_screen_buffer_info_t *buffer_info),      \
+    (console_output, buffer_info))
+#define sigReadConsoleA(F) F(bool_t,                                           \
+    (handle_t console_input, void *buffer, dword_t chars_to_read,              \
+     dword_t *chars_read, console_readconsole_control_t *input_control),       \
+    (console_input, buffer, chars_to_read, chars_read, input_control))
+#define sigReadConsoleW(F) F(bool_t,                                           \
+    (handle_t console_input, void *buffer, dword_t chars_to_read,              \
+     dword_t *chars_read, console_readconsole_control_t *input_control),       \
+    (console_input, buffer, chars_to_read, chars_read, input_control))
+#define sigReadConsoleOutputA(F) F(bool_t,                                     \
+    (handle_t console_output, char_info_t *buffer, coord_t buffer_size,        \
+     coord_t buffer_coord, small_rect_t *read_region),                         \
+    (console_output, buffer, buffer_size, buffer_coord, read_region))
+#define sigReadConsoleOutputW(F) F(bool_t,                                     \
+    (handle_t console_output, char_info_t *buffer, coord_t buffer_size,        \
+     coord_t buffer_coord, small_rect_t *read_region),                         \
+    (console_output, buffer, buffer_size, buffer_coord, read_region))
+#define sigSetConsoleCursorInfo(F) F(bool_t,                                   \
+    (handle_t console_output, const console_cursor_info_t *info),              \
+    (console_output, info))
+#define sigSetConsoleCursorPosition(F) F(bool_t,                               \
+    (handle_t console_output, coord_t cursor_position),                        \
+    (console_output, cursor_position))
+#define sigSetConsoleMode(F) F(bool_t,                                         \
+    (handle_t console_handle, dword_t mode),                                   \
+    (console_handle, mode))
+#define sigWriteConsoleA(F) F(bool_t,                                          \
+    (handle_t console_output, const void *buffer, dword_t chars_to_write,      \
+     dword_t *chars_written, void *reserved),                                  \
+    (console_output, buffer, chars_to_write, chars_written, reserved))
+#define sigWriteConsoleW(F) F(bool_t,                                          \
+    (handle_t console_output, const void *buffer, dword_t chars_to_write,      \
+     dword_t *chars_written, void *reserved),                                  \
+    (console_output, buffer, chars_to_write, chars_written, reserved))
+#define sigWriteConsoleOutputA(F) F(bool_t,                                    \
+    (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,  \
+     coord_t buffer_coord, small_rect_t *write_region),                        \
+    (console_output, buffer, buffer_size, buffer_coord, write_region))
+#define sigWriteConsoleOutputW(F) F(bool_t,                                    \
+    (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,  \
+     coord_t buffer_coord, small_rect_t *write_region),                        \
+    (console_output, buffer, buffer_size, buffer_coord, write_region))
+
+// Table of console api functions that need some form of treatment. To make it
+// easier to read the function signatures are defined in separate macros above.
+// The flags are,
+//
+//   - _Or_, create a stub for calling the original function.
+//
+//  CamelName                   underscore_name                 (Or) sigSignature
+#define FOR_EACH_CONAPI_FUNCTION(F)                                                               \
+  F(AllocConsole,               alloc_console,                  (X), sigVoidToBool)                \
+  F(FreeConsole,                free_console,                   (X), sigVoidToBool)                \
+  F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt)                \
+  F(GetConsoleCursorInfo,       get_console_cursor_info,        (X), sigGetConsoleCursorInfo)      \
+  F(GetConsoleMode,             get_console_mode,               (X), sigGetConsoleMode)            \
+  F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt)                \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X), sigGetConsoleScreenBufferInfo)\
+  F(GetConsoleTitleA,           get_console_title_a,            (X), sigStrToDWord)                \
+  F(GetConsoleTitleW,           get_console_title_w,            (X), sigWideStrToDWord)            \
+  F(GetConsoleWindow,           get_console_window,             (X), sigVoidToHWnd)                \
+  F(GetStdHandle,               get_std_handle,                 (X), sigDWordToHandle)             \
+  F(ReadConsoleA,               read_console_a,                 (X), sigReadConsoleA)              \
+  F(ReadConsoleW,               read_console_w,                 (X), sigReadConsoleW)              \
+  F(ReadConsoleOutputA,         read_console_output_a,          (X), sigReadConsoleOutputA)        \
+  F(ReadConsoleOutputW,         read_console_output_w,          (X), sigReadConsoleOutputW)        \
+  F(SetConsoleCursorInfo,       set_console_cursor_info,        (X), sigSetConsoleCursorInfo)      \
+  F(SetConsoleCursorPosition,   set_console_cursor_position,    (X), sigSetConsoleCursorPosition)  \
+  F(SetConsoleMode,             set_console_mode,               (X), sigSetConsoleMode)            \
+  F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool)            \
+  F(SetConsoleTitleW,           set_console_title_w,            (X), sigWideCStrToBool)            \
+  F(WriteConsoleA,              write_console_a,                (X), sigWriteConsoleA)             \
+  F(WriteConsoleW,              write_console_w,                (X), sigWriteConsoleW)             \
+  F(WriteConsoleOutputA,        write_console_output_a,         (X), sigWriteConsoleOutputA)       \
+  F(WriteConsoleOutputW,        write_console_output_w,         (X), sigWriteConsoleOutputW)
 
 // A container that holds the various definitions used by the other console
 // types.
@@ -114,21 +118,21 @@ public:
   virtual ~Console();
 
   // The types of the naked console functions.
-#define __DECLARE_CONAPI_FUNCTION__(Name, name, RET, PARAMS, ARGS)             \
-  typedef RET (WINAPI *name##_t)PARAMS;
+#define __DECLARE_CONAPI_FUNCTION__(Name, name, FLAGS, SIG)                    \
+  typedef SIG(GET_SIG_RET) (WINAPI *name##_t)SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
 #undef __DECLARE_CONAPI_FUNCTION__
 
   enum key_t {
-#define __DECLARE_CONAPI_KEY__(Name, name, RET, PARAMS, ARGS)                  \
+#define __DECLARE_CONAPI_KEY__(Name, name, FLAGS, SIG)                         \
     name##_key,
     FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_KEY__)
 #undef __DECLARE_CONAPI_KEY__
     kFunctionCount
   };
 
-#define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
-  virtual RET name PARAMS = 0;
+#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
+  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS) = 0;
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
@@ -156,8 +160,8 @@ public:
   // Sends the given complete log message.
   void emit_message(plankton::Variant message);
 
-#define __DECLARE_CONAPI_METHOD__(Name, name, RET, PARAMS, ARGS)               \
-  virtual RET name PARAMS;
+#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
+  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
