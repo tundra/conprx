@@ -16,15 +16,27 @@ void X64::install_redirect(PatchRequest &request) {
   address_t replacement = request.replacement();
 
   // Write the redirect to the entry stub into the original.
-  ssize_t original_to_replacement = (replacement - original) - kJmpOpSizeBytes;
-  original[0] = kJmpOp;
-  reinterpret_cast<int32_t*>(original + 1)[0] = static_cast<int32_t>(original_to_replacement);
+  write_absolute_jump(original, replacement);
 
   // The redirect may partially overwrite the last instruction, leaving behind
   // invalid code. To avoid that we fill the last bit with one-byte
   // instructions (int3).
-  if (kJmpOpSizeBytes < request.preamble_size())
-    memset(original + kJmpOpSizeBytes, kInt3Op, request.preamble_size() - kJmpOpSizeBytes);
+  if (kRedirectSizeBytes < request.preamble_size())
+    memset(original + kRedirectSizeBytes, kInt3Op, request.preamble_size() - kRedirectSizeBytes);
+}
+
+void X64::write_absolute_jump(address_t code, address_t dest) {
+  size_t offset = 0;
+  // Store the address to jump to i %r11 which, according to all ABIs I've seen,
+  // a callee-save register so it should be safe to clobber.
+  code[offset++] = kRexWB;
+  code[offset++] = kMovR11;
+  *reinterpret_cast<uint64_t*>(code + offset) = reinterpret_cast<uint64_t>(dest);
+  offset += sizeof(uint64_t);
+  // Then long-jump to the contents of %r11.
+  code[offset++] = kRexB;
+  code[offset++] = kJmpQ;
+  code[offset++] = kRmR11;
 }
 
 bool X64::get_preamble_size_bytes(address_t addr, size_t *size_out) {
@@ -63,14 +75,8 @@ void X64::write_trampoline(PatchRequest &request, PatchCode &code) {
   // execute those.
   Vector<byte_t> preamble = request.preamble();
   memcpy(trampoline, preamble.start(), preamble.length());
-  // Now we can jump back to the original. Note that we don't have to account
-  // for the preamble length because even thought we're jumping from that far
-  // into the trampoline the destination is the same length within the original
-  // so they cancel out.
-  ssize_t trampoline_to_original = (request.original() - trampoline) - kJmpOpSizeBytes;
-  address_t jmp_addr = trampoline + preamble.length();
-  jmp_addr[0] = kJmpOp;
-  reinterpret_cast<int32_t*>(jmp_addr + 1)[0] = static_cast<int32_t>(trampoline_to_original);
+  // Then jump back to the original.
+  write_absolute_jump(trampoline + preamble.length(), request.original() + preamble.length());
 }
 
 X64 &X64::get() {

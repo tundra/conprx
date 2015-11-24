@@ -44,11 +44,17 @@ public:
   static X64 &get();
 
 private:
-  static const byte_t kJmpOp = 0xE9;
-  static const size_t kJmpOpSizeBytes = 5;
-  static const byte_t kInt3Op = 0xCC;
+  static void write_absolute_jump(address_t code, address_t dest);
 
-  static const size_t kRedirectSizeBytes = kJmpOpSizeBytes;
+  static const byte_t kInt3Op = 0xCC;
+  static const byte_t kRexWB = 0x49;
+  static const byte_t kMovR11 = 0xbb;
+  static const byte_t kRexB = 0x41;
+  static const byte_t kJmpQ = 0xff;
+  static const byte_t kRmR11 = 0xe3;
+
+  static const size_t kJmpSizeBytes = 2;
+  static const size_t kRedirectSizeBytes = 13;
 };
 
 } // namespace conprx
