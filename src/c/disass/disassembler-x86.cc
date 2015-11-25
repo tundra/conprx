@@ -97,24 +97,20 @@ public:
   // instance, relative jumps have to be adjusted and returns can signify the
   // end of the code. So to be on the safe side we'll refuse to copy
   // instructions not explicitly whitelisted.
-  bool in_whitelist(byte_t instr);
+  bool in_whitelist(byte_t instr) { return in_whitelist_[instr]; }
 
-private:
-  // Adaptor that allows the decoder, which is implemented in C, to read from
-  // vectors.
-  static int vector_byte_reader(const void* arg, uint8_t* byte,
-      uint64_t address);
+public:
 
   // Bools that signify whether a value is in the whitelist or not.
   bool in_whitelist_[256];
 
   // A list of opcodes we're willing to patch.
   static const byte_t kOpcodeWhitelist[];
-  static const size_t kOpcodeWhitelistSize = 43;
 
 };
 
-const byte_t Dis_X86_64::kOpcodeWhitelist[kOpcodeWhitelistSize] = {
+static const byte_t kX86_64WhitelistSize = 43;
+static const byte_t kX86_64Whitelist[kX86_64WhitelistSize] = {
   0x00, // nop
   0x01, // add
   0x33, // xor
@@ -132,25 +128,26 @@ const byte_t Dis_X86_64::kOpcodeWhitelist[kOpcodeWhitelistSize] = {
   0xff // near absolute call
 };
 
-Dis_X86_64::Dis_X86_64() {
+static const byte_t kX86_32WhitelistSize = 3;
+static const byte_t kX86_32Whitelist[kX86_32WhitelistSize] = {
+  0x00, // nop
+  0x03, // add
+  0x8b, // mov
+};
+
+Disassembler::Disassembler(int32_t mode, Vector<const byte_t> whitelist)
+  : mode_(mode) {
   for (size_t i = 0; i < 256; i++)
     in_whitelist_[i] = false;
-  for (size_t i = 0; i < kOpcodeWhitelistSize; i++)
-    in_whitelist_[kOpcodeWhitelist[i]] = true;
+  for (size_t i = 0; i < whitelist.length(); i++)
+    in_whitelist_[whitelist[i]] = true;
 }
 
-bool Dis_X86_64::in_whitelist(byte_t opcode) {
+bool Disassembler::in_whitelist(byte_t opcode) {
   return in_whitelist_[opcode];
 }
 
-Disassembler &Disassembler::x86_64() {
-  static Dis_X86_64 *instance = NULL;
-  if (instance == NULL)
-    instance = new Dis_X86_64();
-  return *instance;
-}
-
-int Dis_X86_64::vector_byte_reader(const void* arg, uint8_t* byte,
+int Disassembler::vector_byte_reader(const void* arg, uint8_t* byte,
     uint64_t address) {
   const Vector<byte_t> &vect = *static_cast<const Vector<byte_t>*>(arg);
   if (address >= vect.length()) {
@@ -161,17 +158,35 @@ int Dis_X86_64::vector_byte_reader(const void* arg, uint8_t* byte,
   }
 }
 
-bool Dis_X86_64::resolve(Vector<byte_t> code, size_t offset,
+bool Disassembler::resolve(Vector<byte_t> code, size_t offset,
     InstructionInfo *info_out) {
   struct InternalInstruction instr;
   int ret = decodeInstruction(&instr, vector_byte_reader, &code, NULL, NULL,
-      NULL, offset, MODE_64BIT);
+      NULL, offset, static_cast<DisassemblerMode>(mode_));
   if (ret)
     // The return value is 0 on success.
     return info_out->fail(InstructionInfo::INVALID_INSTRUCTION, 0);
   if (!in_whitelist(instr.opcode))
-    return info_out->fail(InstructionInfo::BLACKLISTED, instr.opcode);
+    return info_out->fail(InstructionInfo::NOT_WHITELISTED, instr.opcode);
   return info_out->succeed(static_cast<size_t>(instr.readerCursor - offset));
+}
+
+Disassembler &Disassembler::x86_64() {
+  static Disassembler *instance = NULL;
+  if (instance == NULL) {
+    Vector<const byte_t> whitelist(kX86_64Whitelist, kX86_64WhitelistSize);
+    instance = new Disassembler(MODE_64BIT, whitelist);
+  }
+  return *instance;
+}
+
+Disassembler &Disassembler::x86_32() {
+  static Disassembler *instance = NULL;
+  if (instance == NULL) {
+    Vector<const byte_t> whitelist(kX86_32Whitelist, kX86_32WhitelistSize);
+    instance = new Disassembler(MODE_32BIT, whitelist);
+  }
+  return *instance;
 }
 
 #ifdef IS_MSVC

@@ -16,6 +16,14 @@ bool MemoryManager::ensure_initialized() {
 MemoryManager::~MemoryManager() {
 }
 
+bool MessageSink::report(const char *fmt, ...) {
+  va_list argp;
+  va_start(argp, fmt);
+  vlog_message(llWarning, NULL, 0, fmt, argp);
+  va_end(argp);
+  return false;
+}
+
 PatchRequest::PatchRequest(address_t original, address_t replacement, const char *name)
   : original_(original)
   , replacement_(replacement)
@@ -34,14 +42,15 @@ PatchRequest::PatchRequest()
   , platform_(NULL)
   , preamble_size_(0) { }
 
-bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code) {
+bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code,
+    MessageSink *messages) {
   platform_ = platform;
   code_ = code;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
-  if (!platform->instruction_set().get_preamble_size_bytes(original_,
-      &preamble_size_))
+  if (!platform->instruction_set().prepare_patch(original_, replacement_,
+      trampoline_, &preamble_size_, messages))
     return false;
   memcpy(preamble_, original_, preamble_size_);
   return true;
@@ -65,7 +74,7 @@ PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   , status_(NOT_APPLIED)
   , old_perms_(0) { }
 
-bool PatchSet::prepare_apply() {
+bool PatchSet::prepare_apply(MessageSink *messages) {
   DEBUG("Preparing to apply patch set");
   if (requests().is_empty()) {
     // Trivially succeed if there are no patches to apply.
@@ -86,33 +95,15 @@ bool PatchSet::prepare_apply() {
     status_ = FAILED;
     return false;
   }
-  // Calculate the distance between the two blocks of memory.
-  size_t dist = range.distance(memory);
-  // Check that it is possible to jump from within the range of the functions
-  // to the stubs. This is a somewhat conservative estimate -- we're using the
-  // worst case, the two locations farthest away from each other in the two
-  // ranges, but the size of the ranges themselves should be negligible in
-  // comparison and this seems like a safer check.
-  if (!offsets_fit_in_32_bits(dist)) {
-    LOG_ERROR("Memory couldn't be allocated near %p/%llu; distance to %p/%llu is %llu",
-        range.start(), range.length(), memory.start(), memory.length(), dist);
-    status_ = FAILED;
-    return false;
-  }
-  // Cast the memory to a vector of patch stubs.
   codes_ = memory.cast<PatchCode>();
   for (size_t i = 0; i < requests().length(); i++) {
-    if (!requests()[i].prepare_apply(&platform_, &codes_[i])) {
+    if (!requests()[i].prepare_apply(&platform_, &codes_[i], messages)) {
       status_ = FAILED;
       return false;
     }
   }
   status_ = PREPARED;
   return true;
-}
-
-bool PatchSet::offsets_fit_in_32_bits(size_t dist) {
-  return dist < 0x80000000;
 }
 
 Vector<byte_t> PatchSet::determine_address_range() {
@@ -143,7 +134,7 @@ Vector<byte_t> PatchSet::determine_patch_range() {
     return addr_range;
   } else {
     // The amount we're going to write past the last address.
-    size_t write_size = instruction_set().get_redirect_size_bytes() + 1;
+    size_t write_size = instruction_set().redirect_size_bytes() + 1;
     size_t new_length = addr_range.length() + write_size;
     return Vector<byte_t>(addr_range.start(), new_length);
   }
@@ -171,7 +162,7 @@ bool PatchSet::open_for_patching() {
 }
 
 bool PatchSet::validate_open_for_patching() {
-  size_t redirect_size = instruction_set().get_redirect_size_bytes();
+  size_t redirect_size = instruction_set().redirect_size_bytes();
   for (size_t i = 0; i < requests().length(); i++) {
     // Try reading the each byte and then writing it back. This should not
     // have any effect but should fail if the memory is not writeable.
@@ -221,8 +212,8 @@ void PatchSet::revert_redirects() {
 }
 
 
-bool PatchSet::apply() {
-  if (!prepare_apply())
+bool PatchSet::apply(MessageSink *messages) {
+  if (!prepare_apply(messages))
     return false;
   if (!open_for_patching())
     return false;
@@ -261,14 +252,11 @@ Platform &Platform::get() {
 }
 
 
-#include "binpatch-x64.cc"
-
-InstructionSet::~InstructionSet() {
-}
-
-InstructionSet &InstructionSet::get() {
-  return X64::get();
-}
+#ifdef IS_64_BIT
+#  include "binpatch-x86-64.cc"
+#else
+#  include "binpatch-x86-32.cc"
+#endif
 
 #ifdef IS_MSVC
 #include "binpatch-msvc.cc"

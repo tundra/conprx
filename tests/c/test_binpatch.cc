@@ -4,7 +4,6 @@
 /// Code patching.
 
 #include "agent/binpatch.hh"
-#include "agent/binpatch-x64.hh"
 #include "disass/disassembler-x86.hh"
 #include "test.hh"
 
@@ -28,16 +27,14 @@ int new_add(int a, int b) {
 TEST(binpatch, individual_steps) {
   Platform &platform = Platform::get();
   ASSERT_TRUE(platform.ensure_initialized());
+  MessageSink messages;
 
   ASSERT_EQ(8, add(3, 5));
   PatchRequest patch(Code::upcast(add), Code::upcast(new_add));
   PatchSet patches(platform, Vector<PatchRequest>(&patch, 1));
 
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
-  if (!patches.prepare_apply())
-    // Depending on how and where we're compiling this it may fail which is
-    // okay at this stage.
-    return;
+  ASSERT_TRUE(patches.prepare_apply(&messages));
   ASSERT_EQ(PatchSet::PREPARED, patches.status());
 
   ASSERT_TRUE(patches.open_for_patching());
@@ -93,15 +90,6 @@ TEST(binpatch, address_range) {
   ASSERT_PTREQ(reinterpret_cast<address_t>(37), r3.end());
 }
 
-TEST(binpatch, fits_in_32_bits) {
-  ASSERT_TRUE(PatchSet::offsets_fit_in_32_bits(0));
-  ASSERT_TRUE(PatchSet::offsets_fit_in_32_bits(65536));
-  ASSERT_TRUE(PatchSet::offsets_fit_in_32_bits(0x7FFFFFFE));
-  ASSERT_TRUE(PatchSet::offsets_fit_in_32_bits(0x7FFFFFFF));
-  ASSERT_FALSE(PatchSet::offsets_fit_in_32_bits(0x80000000));
-  ASSERT_FALSE(PatchSet::offsets_fit_in_32_bits(0x80000001));
-}
-
 TEST(binpatch, casts) {
   address_t add_addr = CODE_UPCAST(add_impl);
   int (*my_add)(int, int) = reinterpret_cast<int(*)(int, int)>(add_addr);
@@ -139,7 +127,7 @@ TEST(binpatch, x64_disass) {
   CHECK_LENGTH(3, 0x8B, 0x45, 0xfc); // mov %-0x8(%rbp),%eax
   CHECK_LENGTH(2, 0x01, 0xd0); // add %edx,%eax
   CHECK_LENGTH(1, 0x5d); // pop %rbp
-  CHECK_STATUS(BLACKLISTED, 0xc3); // retq
+  CHECK_STATUS(NOT_WHITELISTED, 0xc3); // retq
   CHECK_LENGTH(7, 0x48, 0x89, 0x85, 0x48, 0xfe, 0xff, 0xff); // mov %rax,-0x1b8(%rbp)
   CHECK_LENGTH(3, 0x48, 0x89, 0xc7); // mov %rax,%rdi
   CHECK_LENGTH(4, 0x48, 0x89, 0x04, 0x24); // mov %rax,(%rsp)

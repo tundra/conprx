@@ -45,6 +45,15 @@ struct PatchCode;
 // full nightmare that is windows.h.
 typedef uint32_t standalone_dword_t;
 
+class MessageSink {
+public:
+  // Record that an error occurred and return false, such that you can always
+  // fail an operation by doing,
+  //
+  //   return messages->report(...);
+  bool report(const char *fmt, ...);
+};
+
 /// ## Patch request
 ///
 /// An individual binary patch request is the "unit" of the patching process.
@@ -60,7 +69,7 @@ public:
   PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  bool prepare_apply(Platform *platform, PatchCode *code);
+  bool prepare_apply(Platform *platform, PatchCode *code, MessageSink *messages);
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
@@ -199,7 +208,7 @@ public:
   // Prepares to apply the patches. Preparing makes no code changes, it only
   // checks whether patching is possible and allocates the data needed to do
   // the patching. Returns true iff preparing succeeded.
-  bool prepare_apply();
+  bool prepare_apply(MessageSink *messages);
 
   // Attempts to set the permissions on the code we're going to patch. Returns
   // true iff this succeeds.
@@ -217,7 +226,7 @@ public:
 
   // Given a fresh patch set, runs through the sequence of operations that
   // causes the patches to be applied.
-  bool apply();
+  bool apply(MessageSink *messages);
 
   // Runs through the complete sequence of operations that restores the
   // originals to their initial state.
@@ -235,10 +244,6 @@ public:
   // account that we have to write some amount past the last address. All the
   // memory we'll be writing will be within this range.
   Vector<byte_t> determine_patch_range();
-
-  // Returns true if any offset between two addresses that are at most the given
-  // distance apart will fit in 32 bits.
-  static bool offsets_fit_in_32_bits(size_t dist);
 
   Status status() { return status_; }
 
@@ -320,15 +325,19 @@ public:
 // current platform.
 class InstructionSet {
 public:
-  virtual ~InstructionSet();
+  virtual ~InstructionSet() { }
 
   // Returns the size in bytes of the code patch that redirects execution from
   // the original code to the replacement.
-  virtual size_t get_redirect_size_bytes() = 0;
+  virtual size_t redirect_size_bytes() = 0;
 
-  // Determines the length of the preamble that will be overwritten by the
-  // redirect. Returns true on success.
-  virtual bool get_preamble_size_bytes(address_t original, size_t *size_out) = 0;
+  // Performs any preprocessing to be done before patching, including
+  // calculating the size of the preamble of the original function that will be
+  // overwritten by the redirect. Returns true if successful, false if there is
+  // some reason the function can't be patched; if it returns false a message
+  // will have been reported to the given message sink.
+  virtual bool prepare_patch(address_t original, address_t replacement,
+      address_t trampoline, size_t *size_out, MessageSink *messages) = 0;
 
   // Installs a redirect from the request's original function to its entry
   // stub.

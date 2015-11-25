@@ -53,11 +53,13 @@ bool WindowsConsoleAgent::dll_process_attach() {
   if (!options.is_enabled())
     return true;
 
+  MessageSink messages;
+
   // Okay at this point we can start with the actual work since we've made it
   // safely through the guards above.
   LoggingConsole *logger = new LoggingConsole(NULL);
   Console *original = NULL;
-  if (!install(options, *logger, &original))
+  if (!install(options, *logger, &original, &messages))
     return false;
   logger->set_delegate(original);
 

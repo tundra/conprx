@@ -83,7 +83,8 @@ public:
   // Install the given console instead of the built-in one. Returns true on
   // success. If this succeeds the output parameter will hold another console
   // which can be called to get the original console behavior.
-  static bool install(Options &options, Console &console, Console **original_out);
+  static bool install(Options &options, Console &console, Console **original_out,
+      MessageSink *messages);
 
 private:
   // Returns the address of the console function with the given name.

@@ -30,7 +30,8 @@ FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 
 Console *ConsoleAgent::delegate_ = NULL;
 
-bool ConsoleAgent::install(Options &options, Console &delegate, Console **original_out) {
+bool ConsoleAgent::install(Options &options, Console &delegate, Console **original_out,
+    MessageSink *messages) {
   LOG_DEBUG("Installing agent");
   delegate_ = &delegate;
 
@@ -72,7 +73,7 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
 
   // Create a patch set and apply it.
   PatchSet patches(platform, requests);
-  if (!patches.apply())
+  if (!patches.apply(messages))
     return false;
 
   *original_out = new OriginalConsole(Vector<PatchRequest*>(key_to_request,

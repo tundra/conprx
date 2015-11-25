@@ -15,7 +15,7 @@ public:
   // Status.
   enum Status {
     INVALID_INSTRUCTION,
-    BLACKLISTED,
+    NOT_WHITELISTED,
     RESOLVED,
     NONE
   };
@@ -47,16 +47,38 @@ private:
 // Wrapper around an llvm disassembler.
 class Disassembler {
 public:
+  Disassembler(int32_t mode, Vector<const byte_t> whitelist);
   virtual ~Disassembler();
 
   // Looks up information about the instruction starting at the given offset
   // within the given block of code. Returns true if resolution fails, otherwise
   // true. Information relevant to the resolution is stored in the out
   // parameter.
-  virtual bool resolve(Vector<byte_t> code, size_t offset, InstructionInfo *info_out) = 0;
+  virtual bool resolve(Vector<byte_t> code, size_t offset, InstructionInfo *info_out);
+
+  // Returns true iff the given instruction is in the instruction whitelist.
+  // The whitelist exists because we can't safely copy any instruction -- for
+  // instance, relative jumps have to be adjusted and returns can signify the
+  // end of the code. So to be on the safe side we'll refuse to copy
+  // instructions not explicitly whitelisted.
+  bool in_whitelist(byte_t instr);
 
   // Returns the singleton X86-64 disassembler.
   static Disassembler &x86_64();
+
+  // Returns the singleton X86-32 disassembler.
+  static Disassembler &x86_32();
+
+private:
+  // Adaptor that allows the decoder, which is implemented in C, to read from
+  // vectors.
+  static int vector_byte_reader(const void* arg, uint8_t* byte,
+      uint64_t address);
+
+  int32_t mode_;
+
+  // Bools that signify whether a value is in the whitelist or not.
+  bool in_whitelist_[256];
 };
 
 } // namespace conprx
