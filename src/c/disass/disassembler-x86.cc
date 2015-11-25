@@ -109,7 +109,7 @@ public:
 
 };
 
-static const byte_t kX86_64WhitelistSize = 44;
+static const byte_t kX86_64WhitelistSize = 45;
 static const byte_t kX86_64Whitelist[kX86_64WhitelistSize] = {
   0x00, // nop
   0x01, // add
@@ -125,16 +125,17 @@ static const byte_t kX86_64Whitelist[kX86_64WhitelistSize] = {
   0x8d, // lea
   0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, // mov imm8
   0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf, // mov reg
-  0xc3, // retn
-  0xff // near absolute call
+  0xff, // near absolute call
+  0xcc, // int3
 };
 
-static const byte_t kX86_32WhitelistSize = 11;
+static const byte_t kX86_32WhitelistSize = 12;
 static const byte_t kX86_32Whitelist[kX86_32WhitelistSize] = {
   0x00, // nop
   0x03, // add
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, // push reg
   0x8b, // mov
+  0xcc, // int3
 };
 
 Disassembler::Disassembler(int32_t mode, Vector<const byte_t> whitelist)

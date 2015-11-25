@@ -19,9 +19,10 @@ int add_impl(int a, int b) {
 
 // Alias for add which hopefully eager compilers won't inline, unlike add_impl.
 int (*add)(int, int) = add_impl;
+int extra_value = 0;
 
 int new_add(int a, int b) {
-  return a + b + 1;
+  return a + b + 1 + extra_value;
 }
 
 TEST(binpatch, individual_steps) {
