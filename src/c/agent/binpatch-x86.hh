@@ -16,7 +16,8 @@ public:
   virtual Disassembler *disassembler() = 0;
 
   virtual bool prepare_patch(address_t original, address_t replacement,
-      address_t trampoline, size_t *size_out, MessageSink *messages);
+      address_t trampoline, size_t min_size_required, size_t *size_out,
+      MessageSink *messages);
 
   // Validate that we can patch the given code locations using this instruction
   // set. Returns false on failure and will have written a message to the given

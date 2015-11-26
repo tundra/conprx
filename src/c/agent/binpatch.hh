@@ -337,7 +337,8 @@ public:
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
   virtual bool prepare_patch(address_t original, address_t replacement,
-      address_t trampoline, size_t *size_out, MessageSink *messages) = 0;
+      address_t trampoline, size_t min_size_required, size_t *size_out,
+      MessageSink *messages) = 0;
 
   // Installs a redirect from the request's original function to its entry
   // stub.

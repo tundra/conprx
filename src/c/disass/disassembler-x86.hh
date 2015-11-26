@@ -17,6 +17,7 @@ public:
     INVALID_INSTRUCTION,
     NOT_WHITELISTED,
     RESOLVED,
+    RESOLVED_END,
     NONE
   };
 
@@ -36,7 +37,7 @@ public:
 
   // Sets the state of this info to be a success of the given length. Returns
   // true such that it can be returned as the result of a resolve call.
-  bool succeed(size_t length);
+  bool succeed(size_t length, bool at_end, byte_t instr);
 
 private:
   Status status_;
@@ -47,8 +48,21 @@ private:
 // Wrapper around an llvm disassembler.
 class Disassembler {
 public:
-  Disassembler(int32_t mode, Vector<const byte_t> whitelist);
+  enum InstructionType {
+    // This instruction has no particular type associated with it.
+    NONE,
+    // We allow this instruction to be patched over.
+    WHITELISTED,
+    // This instruction is whitelisted but we don't allow any instructions to
+    // be patched after this point.
+    WHITELISTED_END
+  };
+
+  Disassembler(int32_t mode);
   virtual ~Disassembler();
+
+  // Set the type of the given instructions to the given value.
+  void set_types(Vector<const byte_t> instrs, InstructionType type);
 
   // Looks up information about the instruction starting at the given offset
   // within the given block of code. Returns true if resolution fails, otherwise
@@ -62,6 +76,8 @@ public:
   // end of the code. So to be on the safe side we'll refuse to copy
   // instructions not explicitly whitelisted.
   bool in_whitelist(byte_t instr);
+
+  bool is_end(byte_t instr);
 
   // Returns the singleton X86-64 disassembler.
   static Disassembler &x86_64();
@@ -78,7 +94,7 @@ private:
   int32_t mode_;
 
   // Bools that signify whether a value is in the whitelist or not.
-  bool in_whitelist_[256];
+  InstructionType types_[256];
 };
 
 } // namespace conprx

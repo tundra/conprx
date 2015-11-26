@@ -50,7 +50,8 @@ bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code,
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
   if (!platform->instruction_set().prepare_patch(original_, replacement_,
-      trampoline_, &preamble_size_, messages))
+      trampoline_, platform->instruction_set().redirect_size_bytes(),
+      &preamble_size_, messages))
     return false;
   memcpy(preamble_, original_, preamble_size_);
   return true;

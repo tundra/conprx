@@ -75,79 +75,62 @@ bool InstructionInfo::fail(Status status, byte_t instr) {
   return false;
 }
 
-bool InstructionInfo::succeed(size_t length) {
+bool InstructionInfo::succeed(size_t length, bool at_end, byte_t instr) {
   length_ = length;
-  status_ = RESOLVED;
-  instr_ = 0;
+  status_ = at_end ? RESOLVED_END : RESOLVED;
+  instr_ = instr;
   return true;
 }
 
 Disassembler::~Disassembler() { }
 
-// An x86-64 disassembler implemented by calling through to the llvm
-// disassembler.
-class Dis_X86_64 : public Disassembler {
-public:
-  Dis_X86_64();
-  virtual bool resolve(Vector<byte_t> code, size_t offset,
-      InstructionInfo *info_out);
-
-  // Returns true iff the given instruction is in the instruction whitelist.
-  // The whitelist exists because we can't safely copy any instruction -- for
-  // instance, relative jumps have to be adjusted and returns can signify the
-  // end of the code. So to be on the safe side we'll refuse to copy
-  // instructions not explicitly whitelisted.
-  bool in_whitelist(byte_t instr) { return in_whitelist_[instr]; }
-
-public:
-
-  // Bools that signify whether a value is in the whitelist or not.
-  bool in_whitelist_[256];
-
-  // A list of opcodes we're willing to patch.
-  static const byte_t kOpcodeWhitelist[];
-
-};
-
-static const byte_t kX86_64WhitelistSize = 45;
-static const byte_t kX86_64Whitelist[kX86_64WhitelistSize] = {
-  0x00, // nop
-  0x01, // add
-  0x33, // xor
+// Whitelisted for both 32 and 64 bits.
+static const byte_t kX86_WhitelistSize = 50;
+static const byte_t kX86_Whitelist[kX86_WhitelistSize] = {
+  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, // add
   0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, // push reg
   0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f, // pop reg
+  0x88, 0x89, 0x8a, 0x8b, 0x8c, // mov
+  0x8d, // lea
+  0x90, // nop
+  0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, // mov imm8
+  0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf, // mov reg
+};
+
+// Whitelisted just for 64 bits.
+static const byte_t kX86_64WhitelistSize = 6;
+static const byte_t kX86_64Whitelist[kX86_64WhitelistSize] = {
+  0x33, // xor
   0x68, // push imm16/32
   0x6a, // push imm8
   0x81, // logic (add, or, etc) imm16/32
   0x83, // logic (add, or, etc) imm8
-  0x89, // mov
-  0x8b, // mov
-  0x8d, // lea
-  0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, // mov imm8
-  0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf, // mov reg
   0xff, // near absolute call
+};
+
+static const byte_t kX86_EndsSize = 2;
+static const byte_t kX86_Ends[kX86_EndsSize] = {
+  0xc3, // ret
   0xcc, // int3
 };
 
-static const byte_t kX86_32WhitelistSize = 12;
-static const byte_t kX86_32Whitelist[kX86_32WhitelistSize] = {
-  0x00, // nop
-  0x03, // add
-  0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, // push reg
-  0x8b, // mov
-  0xcc, // int3
-};
-
-Disassembler::Disassembler(int32_t mode, Vector<const byte_t> whitelist)
+Disassembler::Disassembler(int32_t mode)
   : mode_(mode) {
   for (size_t i = 0; i < 256; i++)
-    in_whitelist_[i] = false;
-  for (size_t i = 0; i < whitelist.length(); i++)
-    in_whitelist_[whitelist[i]] = true;
+    types_[i] = NONE;
+}
+
+void Disassembler::set_types(Vector<const byte_t> instrs, InstructionType type) {
+  for (size_t i = 0; i < instrs.length(); i++)
+    types_[instrs[i]] = type;
 }
 
 bool Disassembler::in_whitelist(byte_t opcode) {
-  return in_whitelist_[opcode];
+  return types_[opcode] != NONE;
+}
+
+bool Disassembler::is_end(byte_t opcode) {
+  return types_[opcode] == WHITELISTED_END;
 }
 
 int Disassembler::vector_byte_reader(const void* arg, uint8_t* byte,
@@ -171,14 +154,21 @@ bool Disassembler::resolve(Vector<byte_t> code, size_t offset,
     return info_out->fail(InstructionInfo::INVALID_INSTRUCTION, 0);
   if (!in_whitelist(instr.opcode))
     return info_out->fail(InstructionInfo::NOT_WHITELISTED, instr.opcode);
-  return info_out->succeed(static_cast<size_t>(instr.readerCursor - offset));
+  bool at_end = is_end(instr.opcode);
+  return info_out->succeed(static_cast<size_t>(instr.readerCursor - offset),
+      at_end, instr.opcode);
 }
 
 Disassembler &Disassembler::x86_64() {
   static Disassembler *instance = NULL;
   if (instance == NULL) {
-    Vector<const byte_t> whitelist(kX86_64Whitelist, kX86_64WhitelistSize);
-    instance = new Disassembler(MODE_64BIT, whitelist);
+    instance = new Disassembler(MODE_64BIT);
+    Vector<const byte_t> x86_32_wl(kX86_Whitelist, kX86_WhitelistSize);
+    instance->set_types(x86_32_wl, Disassembler::WHITELISTED);
+    Vector<const byte_t> x86_64_wl(kX86_64Whitelist, kX86_64WhitelistSize);
+    instance->set_types(x86_64_wl, Disassembler::WHITELISTED);
+    Vector<const byte_t> x86_ends(kX86_Ends, kX86_EndsSize);
+    instance->set_types(x86_ends, Disassembler::WHITELISTED_END);
   }
   return *instance;
 }
@@ -186,8 +176,11 @@ Disassembler &Disassembler::x86_64() {
 Disassembler &Disassembler::x86_32() {
   static Disassembler *instance = NULL;
   if (instance == NULL) {
-    Vector<const byte_t> whitelist(kX86_32Whitelist, kX86_32WhitelistSize);
-    instance = new Disassembler(MODE_32BIT, whitelist);
+    instance = new Disassembler(MODE_32BIT);
+    Vector<const byte_t> x86_32_wl(kX86_Whitelist, kX86_WhitelistSize);
+    instance->set_types(x86_32_wl, Disassembler::WHITELISTED);
+    Vector<const byte_t> x86_ends(kX86_Ends, kX86_EndsSize);
+    instance->set_types(x86_ends, Disassembler::WHITELISTED_END);
   }
   return *instance;
 }

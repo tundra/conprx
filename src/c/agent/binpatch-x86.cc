@@ -8,7 +8,8 @@
 using namespace conprx;
 
 bool GenericX86::prepare_patch(address_t original, address_t replacement,
-    address_t trampoline, size_t *size_out, MessageSink *messages) {
+    address_t trampoline, size_t min_size_required, size_t *size_out,
+    MessageSink *messages) {
   // The length of this vector shouldn't matter since the disassembler reads
   // one byte at a time and stops as soon as we've seen enough. It doesn't
   // continue on to the end.
@@ -22,18 +23,25 @@ bool GenericX86::prepare_patch(address_t original, address_t replacement,
     InstructionInfo info;
     if (!disass->resolve(code, offset, &info)) {
       if (info.status() == InstructionInfo::NOT_WHITELISTED) {
-        return messages->report("Instruction 0x%x at offset %i is not whitelisted",
+        return messages->report("Instruction 0x%02x at offset %i is not whitelisted",
             info.instruction(), offset);
       } else if (info.status() == InstructionInfo::INVALID_INSTRUCTION) {
-        return messages->report("Invalid instruction 0x%x at offset %i was invalid",
+        return messages->report("Invalid instruction 0x%02x at offset %i was invalid",
             info.instruction(), offset);
       }
       // If the disassembler failed to resolve the instruction for whatever
       // reason, we bail out.
-      return messages->report("Disassembler failed to resolve byte 0x%x at offset %i",
+      return messages->report("Disassembler failed to resolve byte 0x%02x at offset %i",
           code[offset], offset);
     }
     offset += info.length();
+    if (info.status() == InstructionInfo::RESOLVED_END) {
+      if (offset < min_size_required)
+        return messages->report("Not enough room to patch function; "
+            "required %i found only %i (last instruction was 0x%02x)",
+            min_size_required, offset, info.instruction());
+      break;
+    }
   }
   *size_out = offset;
   return true;

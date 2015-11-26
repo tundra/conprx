@@ -141,3 +141,9 @@ TEST(binpatch, x64_disass) {
   CHECK_STATUS(INVALID_INSTRUCTION, 0x48, 0x48); // (two rex.w prefixes)
   CHECK_STATUS(INVALID_INSTRUCTION, 0x60); // (pusha only exists in 32 bit mode)
 }
+
+// There's no reason these tests can't work on 32-bit, except some bugs with
+// inline asm in gcc.
+#if defined(IS_GCC) && defined(IS_64_BIT)
+#  include "test_binpatch_posix.cc"
+#endif
