@@ -27,8 +27,8 @@ int new_add(int a, int b) {
 
 TEST(binpatch, individual_steps) {
   Platform &platform = Platform::get();
-  ASSERT_TRUE(platform.ensure_initialized());
   MessageSink messages;
+  ASSERT_TRUE(platform.ensure_initialized(&messages));
 
   ASSERT_EQ(8, add(3, 5));
   PatchRequest patch(Code::upcast(add), Code::upcast(new_add));
@@ -45,13 +45,13 @@ TEST(binpatch, individual_steps) {
   }
   ASSERT_EQ(PatchSet::PREPARED, patches.status());
 
-  ASSERT_TRUE(patches.open_for_patching());
+  ASSERT_TRUE(patches.open_for_patching(&messages));
   ASSERT_EQ(PatchSet::OPEN, patches.status());
 
   patches.install_redirects();
   ASSERT_EQ(PatchSet::APPLIED_OPEN, patches.status());
 
-  ASSERT_TRUE(patches.close_after_patching(PatchSet::APPLIED));
+  ASSERT_TRUE(patches.close_after_patching(PatchSet::APPLIED, &messages));
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
   ASSERT_EQ(9, add(3, 5));
@@ -59,13 +59,13 @@ TEST(binpatch, individual_steps) {
   int (*add_tramp)(int, int) = patch.get_trampoline(add);
   ASSERT_EQ(8, add_tramp(3, 5));
 
-  ASSERT_TRUE(patches.open_for_patching());
+  ASSERT_TRUE(patches.open_for_patching(&messages));
   ASSERT_EQ(PatchSet::OPEN, patches.status());
 
   patches.revert_redirects();
   ASSERT_EQ(PatchSet::REVERTED_OPEN, patches.status());
 
-  ASSERT_TRUE(patches.close_after_patching(PatchSet::NOT_APPLIED));
+  ASSERT_TRUE(patches.close_after_patching(PatchSet::NOT_APPLIED, &messages));
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
 
   ASSERT_EQ(8, add(3, 5));
@@ -73,7 +73,8 @@ TEST(binpatch, individual_steps) {
 
 TEST(binpatch, address_range) {
   Platform &platform = Platform::get();
-  ASSERT_TRUE(platform.ensure_initialized());
+  MessageSink messages;
+  ASSERT_TRUE(platform.ensure_initialized(&messages));
 
   PatchSet p0(platform, Vector<PatchRequest>());
   Vector<byte_t> r0 = p0.determine_address_range();

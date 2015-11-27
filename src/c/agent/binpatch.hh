@@ -30,6 +30,7 @@
 #define _BINPATCH
 
 #include "utils/vector.hh"
+#include "c/stdvector.hh"
 
 namespace conprx {
 
@@ -45,13 +46,19 @@ struct PatchCode;
 // full nightmare that is windows.h.
 typedef uint32_t standalone_dword_t;
 
+#define REPORT_MESSAGE(sink, ...) (sink)->report(__FILE__, __LINE__, __VA_ARGS__)
+
 class MessageSink {
 public:
+  ~MessageSink();
   // Record that an error occurred and return false, such that you can always
   // fail an operation by doing,
   //
-  //   return messages->report(...);
-  bool report(const char *fmt, ...);
+  //   return REPORT_MESSAGE(messages, ...);
+  bool report(const char *file, int line, const char *fmt, ...);
+
+private:
+  std::vector<char *> messages_;
 };
 
 /// ## Patch request
@@ -150,7 +157,7 @@ class Platform {
 public:
   // Ensures that the platform object is fully initialized, if it hasn't been
   // already. Returns true on success.
-  bool ensure_initialized();
+  bool ensure_initialized(MessageSink *messages);
 
   MemoryManager &memory_manager() { return memman_; }
 
@@ -212,11 +219,11 @@ public:
 
   // Attempts to set the permissions on the code we're going to patch. Returns
   // true iff this succeeds.
-  bool open_for_patching();
+  bool open_for_patching(MessageSink *messages);
 
   // Attempts to return the permissions on the code that has been patched to
   // the state it was before.
-  bool close_after_patching(Status success_status);
+  bool close_after_patching(Status success_status, MessageSink *messages);
 
   // Patches the redirect instructions into the original functions.
   void install_redirects();
@@ -230,7 +237,7 @@ public:
 
   // Runs through the complete sequence of operations that restores the
   // originals to their initial state.
-  bool revert();
+  bool revert(MessageSink *messages);
 
   // Determines the lower and upper bound of the addresses to patch by scanning
   // over the requests and min/max'ing over the addresses. Note that this is
@@ -250,7 +257,7 @@ public:
 private:
   // Attempts to write all the locations we'll be patching. Returns false or
   // crashes if writing fails.
-  bool validate_open_for_patching();
+  bool validate_open_for_patching(MessageSink *messages);
 
   // The patch engine used to apply this patch set.
   Platform &platform_;
@@ -300,22 +307,25 @@ public:
 
   // If the manager needs any kind of initialization this call will ensure that
   // it has been initialized.
-  virtual bool ensure_initialized();
+  virtual bool ensure_initialized(MessageSink *messages);
 
   // Attempts to open the given memory region such that it can be written. If
   // successful the previous permissions should be stored in the given out
   // parameter.
-  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms) = 0;
+  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms,
+      MessageSink *messages) = 0;
 
   // Attempts to close the given memory region such that it can no longer be
   // written. The old_perms parameter contains the value that was stored by
   // open_for_writing.
-  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms) = 0;
+  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms,
+      MessageSink *messages) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to
   // the given address that we can jump between them. If memory can't be
   // successfully allocated returns an empty vector.
-  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size) = 0;
+  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
+      MessageSink *messages) = 0;
 
   // Returns the memory manager appropriate for this platform.
   static MemoryManager &get();

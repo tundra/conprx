@@ -38,7 +38,7 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
   // Get and initialize the platform.
   LOG_DEBUG("Initializing platform");
   Platform &platform = Platform::get();
-  if (!platform.ensure_initialized())
+  if (!platform.ensure_initialized(messages))
     return false;
 
   LOG_DEBUG("Creating patch requests");

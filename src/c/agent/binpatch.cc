@@ -5,22 +5,35 @@
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
+#include "utils/strbuf.h"
 END_C_INCLUDES
 
 using namespace conprx;
 
-bool MemoryManager::ensure_initialized() {
+bool MemoryManager::ensure_initialized(MessageSink *messages) {
   return true;
 }
 
 MemoryManager::~MemoryManager() {
 }
 
-bool MessageSink::report(const char *fmt, ...) {
+MessageSink::~MessageSink() {
+  for (uint32_t i = 0; i < messages_.size(); i++)
+    free(messages_[i]);
+  messages_.clear();
+}
+
+bool MessageSink::report(const char *file, int line, const char *fmt, ...) {
+  string_buffer_t buf;
+  string_buffer_init(&buf);
+  string_buffer_printf(&buf, "%s: %i: ", file, line);
   va_list argp;
   va_start(argp, fmt);
-  vlog_message(llWarning, NULL, 0, fmt, argp);
+  string_buffer_vprintf(&buf, fmt, argp);
   va_end(argp);
+  utf8_t result = string_buffer_flush(&buf);
+  messages_.push_back(strdup(result.chars));
+  string_buffer_dispose(&buf);
   return false;
 }
 
@@ -87,7 +100,7 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
   DEBUG("Patch range: %p .. %p", range.start(), range.end());
   // Allocate a chunk of memory to hold the stubs.
   Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
-      sizeof(PatchCode) * requests().length());
+      sizeof(PatchCode) * requests().length(), messages);
   DEBUG("Memory: %p .. %p", memory.start(), memory.end());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
@@ -141,19 +154,17 @@ Vector<byte_t> PatchSet::determine_patch_range() {
   }
 }
 
-bool PatchSet::open_for_patching() {
+bool PatchSet::open_for_patching(MessageSink *messages) {
   DEBUG("Opening original code for writing");
   // Try opening the region for writing.
   Vector<byte_t> region = determine_patch_range();
-  if (!memory_manager().open_for_writing(region, &old_perms_)) {
-    LOG_ERROR("Failed to open code for patching.");
+  if (!memory_manager().open_for_writing(region, &old_perms_, messages)) {
     status_= FAILED;
     return false;
   }
   // Validate that writing works.
   DEBUG("Validating that code is writable");
-  if (validate_open_for_patching()) {
-    DEBUG("Successfully validated that code is writable");
+  if (validate_open_for_patching(messages)) {
     status_ = OPEN;
     return true;
   } else {
@@ -162,7 +173,7 @@ bool PatchSet::open_for_patching() {
   }
 }
 
-bool PatchSet::validate_open_for_patching() {
+bool PatchSet::validate_open_for_patching(MessageSink *messages) {
   size_t redirect_size = instruction_set().redirect_size_bytes();
   for (size_t i = 0; i < requests().length(); i++) {
     // Try reading the each byte and then writing it back. This should not
@@ -179,10 +190,10 @@ bool PatchSet::validate_open_for_patching() {
   return true;
 }
 
-bool PatchSet::close_after_patching(Status success_status) {
+bool PatchSet::close_after_patching(Status success_status, MessageSink *messages) {
   DEBUG("Closing original code for writing");
   Vector<byte_t> region = determine_patch_range();
-  if (!memory_manager().close_for_writing(region, old_perms_)) {
+  if (!memory_manager().close_for_writing(region, old_perms_, messages)) {
     status_ = FAILED;
     return false;
   }
@@ -216,19 +227,19 @@ void PatchSet::revert_redirects() {
 bool PatchSet::apply(MessageSink *messages) {
   if (!prepare_apply(messages))
     return false;
-  if (!open_for_patching())
+  if (!open_for_patching(messages))
     return false;
   install_redirects();
-  if (!close_after_patching(PatchSet::APPLIED))
+  if (!close_after_patching(PatchSet::APPLIED, messages))
     return false;
   return true;
 }
 
-bool PatchSet::revert() {
-  if (!open_for_patching())
+bool PatchSet::revert(MessageSink *messages) {
+  if (!open_for_patching(messages))
     return false;
   revert_redirects();
-  if (!close_after_patching(PatchSet::NOT_APPLIED))
+  if (!close_after_patching(PatchSet::NOT_APPLIED, messages))
     return false;
   return true;
 }
@@ -237,8 +248,8 @@ Platform::Platform(InstructionSet &inst, MemoryManager &memman)
   : inst_(inst)
   , memman_(memman) { }
 
-bool Platform::ensure_initialized() {
-  return memory_manager().ensure_initialized();
+bool Platform::ensure_initialized(MessageSink *messages) {
+  return memory_manager().ensure_initialized(messages);
 }
 
 // Returns the current platform.
