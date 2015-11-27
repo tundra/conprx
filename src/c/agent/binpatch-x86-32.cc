@@ -40,10 +40,10 @@ size_t X86_32::redirect_size_bytes() {
 bool X86_32::validate_code_locations(address_t original, address_t replacement,
       address_t trampoline, MessageSink *messages) {
   if (!can_jump_relative_32(original, replacement)) {
-    return messages->report("Can't jump from original %p to %p in 32 bits",
+    return REPORT_MESSAGE(messages, "Can't jump from original %p to %p in 32 bits",
         original, replacement);
   } else if (!can_jump_relative_32(trampoline, original)) {
-    return messages->report("Can't jump from trampoline %p to %p in 32 bits",
+    return REPORT_MESSAGE(messages, "Can't jump from trampoline %p to %p in 32 bits",
         trampoline, original);
   }
   return true;
