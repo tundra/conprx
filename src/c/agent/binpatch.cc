@@ -9,6 +9,7 @@ BEGIN_C_INCLUDES
 END_C_INCLUDES
 
 using namespace conprx;
+using namespace tclib;
 
 bool MemoryManager::ensure_initialized(MessageSink *messages) {
   return true;
@@ -24,6 +25,7 @@ MessageSink::~MessageSink() {
 }
 
 bool MessageSink::report(const char *file, int line, const char *fmt, ...) {
+  // Record the message in the sink.
   string_buffer_t buf;
   string_buffer_init(&buf);
   string_buffer_printf(&buf, "%s: %i: ", file, line);
@@ -32,8 +34,11 @@ bool MessageSink::report(const char *file, int line, const char *fmt, ...) {
   string_buffer_vprintf(&buf, fmt, argp);
   va_end(argp);
   utf8_t result = string_buffer_flush(&buf);
-  messages_.push_back(strdup(result.chars));
+  char *message = strdup(result.chars);
+  messages_.push_back(message);
   string_buffer_dispose(&buf);
+  // Also report the message through normal logging.
+  WARN("Reported %s", message);
   return false;
 }
 
@@ -42,7 +47,7 @@ PatchRequest::PatchRequest(address_t original, address_t replacement, const char
   , replacement_(replacement)
   , name_(name)
   , trampoline_(NULL)
-  , code_(NULL)
+  , trampoline_code_(NULL)
   , platform_(NULL)
   , preamble_size_(0) { }
 
@@ -51,14 +56,14 @@ PatchRequest::PatchRequest()
   , replacement_(NULL)
   , name_(NULL)
   , trampoline_(NULL)
-  , code_(NULL)
+  , trampoline_code_(NULL)
   , platform_(NULL)
   , preamble_size_(0) { }
 
 bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code,
     MessageSink *messages) {
   platform_ = platform;
-  code_ = code;
+  trampoline_code_ = code;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
@@ -78,8 +83,10 @@ address_t PatchRequest::get_or_create_trampoline() {
 
 void PatchRequest::write_trampoline() {
   InstructionSet &inst = platform().instruction_set();
+  address_t addr = code().trampoline_;
   inst.write_trampoline(*this, code());
-  trampoline_ = code().trampoline_;
+  inst.flush_instruction_cache(Blob(addr, kTrampolinePatchStubSizeBytes));
+  trampoline_ = addr;
 }
 
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
@@ -197,6 +204,7 @@ bool PatchSet::close_after_patching(Status success_status, MessageSink *messages
     status_ = FAILED;
     return false;
   }
+  instruction_set().flush_instruction_cache(region.memory());
   DEBUG("Successfully closed original code");
   status_ = success_status;
   return true;

@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "agent/binpatch-x86.hh"
+#include "c/valgrind.h"
 #include "disass/disassembler-x86.hh"
 #include "utils/types.hh"
 
@@ -45,4 +46,10 @@ bool GenericX86::prepare_patch(address_t original, address_t replacement,
   }
   *size_out = offset;
   return true;
+}
+
+void GenericX86::flush_instruction_cache(tclib::Blob memory) {
+  // There's no need to explicitly flush instruction caches on intel but
+  // valgrind does need to be told.
+  VALGRIND_DISCARD_TRANSLATIONS(memory.start(), memory.size());
 }

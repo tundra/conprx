@@ -5,6 +5,7 @@
 #define _VECTOR
 
 #include "c/stdc.h"
+#include "utils/blob.hh"
 
 // A thin wrapper around an array with a length and various utilities.
 template <typename T>
@@ -74,6 +75,9 @@ public:
            result = maximum(result, delta(end(), that.end()));
     return result;
   }
+
+  // Returns the memory range covered by this vector.
+  tclib::Blob memory() { return tclib::Blob(elms_, length_ * sizeof(T)); }
 
 private:
   // Given two pointers, returns the distance between them.

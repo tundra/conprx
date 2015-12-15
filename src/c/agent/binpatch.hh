@@ -29,8 +29,9 @@
 #ifndef _BINPATCH
 #define _BINPATCH
 
-#include "utils/vector.hh"
 #include "c/stdvector.hh"
+#include "utils/blob.hh"
+#include "utils/vector.hh"
 
 namespace conprx {
 
@@ -87,7 +88,7 @@ public:
 
   size_t preamble_size() { return preamble_size_; }
 
-  PatchCode &code() { return *code_; }
+  PatchCode &code() { return *trampoline_code_; }
 
   Platform &platform() { return *platform_; }
 
@@ -125,7 +126,7 @@ private:
   address_t trampoline_;
 
   // The custom code stubs associated with this patch.
-  PatchCode *code_;
+  PatchCode *trampoline_code_;
 
   // A copy of the original method's preamble which we'll overwrite later on.
   byte_t preamble_[kMaxPreambleSizeBytes];
@@ -357,6 +358,9 @@ public:
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
   virtual void write_trampoline(PatchRequest &request, PatchCode &code) = 0;
+
+  // Notify the processor that there have been code changes.
+  virtual void flush_instruction_cache(tclib::Blob memory) = 0;
 
   // Returns the instruction set to use on this platform.
   static InstructionSet &get();

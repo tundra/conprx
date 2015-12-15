@@ -25,6 +25,8 @@ public:
   virtual bool validate_code_locations(address_t original, address_t replacement,
       address_t trampoline, MessageSink *messages) = 0;
 
+  virtual void flush_instruction_cache(tclib::Blob memory);
+
 protected:
   static const byte_t kInt3 = 0xcc;
 
