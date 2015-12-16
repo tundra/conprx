@@ -11,7 +11,7 @@ class X86_32 : public GenericX86 {
 public:
   virtual size_t redirect_size_bytes();
   virtual void install_redirect(PatchRequest &request);
-  virtual void write_trampoline(PatchRequest &request, TrampolineCode &code);
+  virtual void write_trampoline(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual bool validate_code_locations(address_t original, address_t replacement,
       address_t trampoline, MessageSink *messages);
@@ -63,10 +63,10 @@ void X86_32::install_redirect(PatchRequest &request) {
     memset(original + kRedirectSizeBytes, kInt3, request.preamble_size() - kRedirectSizeBytes);
 }
 
-void X86_32::write_trampoline(PatchRequest &request, TrampolineCode &code) {
+void X86_32::write_trampoline(PatchRequest &request, tclib::Blob memory) {
   // Initially let the trampoline interrupt (int3) when called. Just in case
   // anyone should decide to call it in the case that we failed below.
-  address_t trampoline = code.trampoline_;
+  address_t trampoline = static_cast<address_t>(memory.start());
   trampoline[0] = kInt3;
   // Copy the overwritten bytes into the trampoline. We'll definitely have to
   // execute those.

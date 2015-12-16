@@ -38,7 +38,7 @@ namespace conprx {
 class InstructionSet;
 class MemoryManager;
 class Platform;
-struct TrampolineCode;
+class TrampolineCode;
 
 // The biggest possible redirect sequence.
 #define kMaxPreambleSizeBytes 16
