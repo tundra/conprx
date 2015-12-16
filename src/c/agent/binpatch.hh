@@ -38,7 +38,7 @@ namespace conprx {
 class InstructionSet;
 class MemoryManager;
 class Platform;
-struct PatchCode;
+struct TrampolineCode;
 
 // The biggest possible redirect sequence.
 #define kMaxPreambleSizeBytes 16
@@ -77,7 +77,7 @@ public:
   PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  bool prepare_apply(Platform *platform, PatchCode *code, MessageSink *messages);
+  bool prepare_apply(Platform *platform, TrampolineCode *code, MessageSink *messages);
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
@@ -88,7 +88,7 @@ public:
 
   size_t preamble_size() { return preamble_size_; }
 
-  PatchCode &code() { return *trampoline_code_; }
+  TrampolineCode *trampoline_code() { return trampoline_code_; }
 
   Platform &platform() { return *platform_; }
 
@@ -126,7 +126,7 @@ private:
   address_t trampoline_;
 
   // The custom code stubs associated with this patch.
-  PatchCode *trampoline_code_;
+  TrampolineCode *trampoline_code_;
 
   // A copy of the original method's preamble which we'll overwrite later on.
   byte_t preamble_[kMaxPreambleSizeBytes];
@@ -139,7 +139,7 @@ private:
 };
 
 // Size of the helper component of a patch stub.
-#define kTrampolinePatchStubSizeBytes 32
+#define kTrampolineCodeStubSizeBytes 32
 
 /// ## Patch code
 ///
@@ -149,8 +149,12 @@ private:
 /// To make the initial application of the patch set as cheap as possible we
 /// initially only redirect and then generate the trampoline on demand. The
 /// request keeps track of the state of the code.
-struct PatchCode {
-  byte_t trampoline_[kTrampolinePatchStubSizeBytes];
+class TrampolineCode {
+public:
+  tclib::Blob memory() { return tclib::Blob(stub_, kTrampolineCodeStubSizeBytes); }
+
+private:
+  byte_t stub_[kTrampolineCodeStubSizeBytes];
 };
 
 // All the platform dependent objects bundled together.
@@ -270,7 +274,7 @@ private:
   Vector<PatchRequest> &requests() { return requests_; }
 
   // The patch stubs that hold the code implementing the requests.
-  Vector<PatchCode> codes_;
+  Vector<TrampolineCode> codes_;
 
   // The current status.
   Status status_;
@@ -357,7 +361,7 @@ public:
 
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
-  virtual void write_trampoline(PatchRequest &request, PatchCode &code) = 0;
+  virtual void write_trampoline(PatchRequest &request, tclib::Blob memory) = 0;
 
   // Notify the processor that there have been code changes.
   virtual void flush_instruction_cache(tclib::Blob memory) = 0;

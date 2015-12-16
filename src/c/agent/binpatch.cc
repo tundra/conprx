@@ -60,7 +60,7 @@ PatchRequest::PatchRequest()
   , platform_(NULL)
   , preamble_size_(0) { }
 
-bool PatchRequest::prepare_apply(Platform *platform, PatchCode *code,
+bool PatchRequest::prepare_apply(Platform *platform, TrampolineCode *code,
     MessageSink *messages) {
   platform_ = platform;
   trampoline_code_ = code;
@@ -83,10 +83,10 @@ address_t PatchRequest::get_or_create_trampoline() {
 
 void PatchRequest::write_trampoline() {
   InstructionSet &inst = platform().instruction_set();
-  address_t addr = code().trampoline_;
-  inst.write_trampoline(*this, code());
-  inst.flush_instruction_cache(Blob(addr, kTrampolinePatchStubSizeBytes));
-  trampoline_ = addr;
+  tclib::Blob memory = trampoline_code()->memory();
+  inst.write_trampoline(*this, memory);
+  inst.flush_instruction_cache(memory);
+  trampoline_ = static_cast<address_t>(memory.start());
 }
 
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
@@ -107,7 +107,7 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
   DEBUG("Patch range: %p .. %p", range.start(), range.end());
   // Allocate a chunk of memory to hold the stubs.
   Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
-      sizeof(PatchCode) * requests().length(), messages);
+      sizeof(TrampolineCode) * requests().length(), messages);
   DEBUG("Memory: %p .. %p", memory.start(), memory.end());
   if (memory.is_empty()) {
     // We couldn't get any memory for the stubs; fail.
@@ -116,7 +116,7 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
     status_ = FAILED;
     return false;
   }
-  codes_ = memory.cast<PatchCode>();
+  codes_ = memory.cast<TrampolineCode>();
   for (size_t i = 0; i < requests().length(); i++) {
     if (!requests()[i].prepare_apply(&platform_, &codes_[i], messages)) {
       status_ = FAILED;
