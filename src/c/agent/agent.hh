@@ -78,6 +78,7 @@ namespace conprx {
 
 class Options;
 
+// The block of data passed through to the agent's dll connector.
 typedef struct {
   int32_t magic;
   standalone_dword_t parent_process_id;
