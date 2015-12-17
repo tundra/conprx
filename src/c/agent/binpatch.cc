@@ -18,28 +18,24 @@ bool MemoryManager::ensure_initialized(MessageSink *messages) {
 MemoryManager::~MemoryManager() {
 }
 
-MessageSink::~MessageSink() {
-  for (uint32_t i = 0; i < messages_.size(); i++)
-    free(messages_[i]);
-  messages_.clear();
-}
 
 bool MessageSink::report(const char *file, int line, const char *fmt, ...) {
   // Record the message in the sink.
   string_buffer_t buf;
   string_buffer_init(&buf);
-  string_buffer_printf(&buf, "%s: %i: ", file, line);
+  string_buffer_printf(&buf, "%s:%i: ", file, line);
   va_list argp;
   va_start(argp, fmt);
   string_buffer_vprintf(&buf, fmt, argp);
   va_end(argp);
   utf8_t result = string_buffer_flush(&buf);
-  char *message = strdup(result.chars);
-  messages_.push_back(message);
+  handle_message(result);
   string_buffer_dispose(&buf);
-  // Also report the message through normal logging.
-  WARN("Reported %s", message);
   return false;
+}
+
+void MessageSink::handle_message(utf8_t message) {
+  WARN("Message: %s", message.chars);
 }
 
 PatchRequest::PatchRequest(address_t original, address_t replacement, const char *name)

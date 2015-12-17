@@ -33,6 +33,10 @@
 #include "utils/blob.hh"
 #include "utils/vector.hh"
 
+BEGIN_C_INCLUDES
+#include "utils/string.h"
+END_C_INCLUDES
+
 namespace conprx {
 
 class InstructionSet;
@@ -51,15 +55,21 @@ typedef uint32_t standalone_dword_t;
 
 class MessageSink {
 public:
-  ~MessageSink();
+  virtual ~MessageSink() { }
+
   // Record that an error occurred and return false, such that you can always
   // fail an operation by doing,
   //
   //   return REPORT_MESSAGE(messages, ...);
   bool report(const char *file, int line, const char *fmt, ...);
 
-private:
-  std::vector<char *> messages_;
+protected:
+  // Handle the given message appropriately for this sink. The message is owned
+  // by the caller so if you want to hang on to it you need to dup it
+  // explicitly.
+  //
+  // The default implementation logs the message.
+  virtual void handle_message(utf8_t message);
 };
 
 /// ## Patch request

@@ -2,8 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "host.hh"
-#include "sync/process.hh"
-#include "async/promise-inl.hh"
+#include "launch.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -11,6 +10,7 @@ BEGIN_C_INCLUDES
 END_C_INCLUDES
 
 using namespace tclib;
+using namespace conprx;
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
@@ -26,18 +26,13 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < new_argc; i++)
     new_argv[i] = new_c_string(argv[skip_count + i]);
 
-  HEST("host: starting process %s", command.chars);
-  NativeProcess process;
-  process.set_flags(pfStartSuspendedOnWindows);
-  if (!process.start(command, new_argc, new_argv))
-    LOG_ERROR("Failed to start %s.", command.chars);
-  if (!process.inject_library(library))
-    LOG_ERROR("Failed to inject %s.", library.chars);
-  if (!process.resume())
-    LOG_ERROR("Failed to resume %s.", library.chars);
-  ProcessWaitIop wait(&process, o0());
-  if (!wait.execute())
-    LOG_ERROR("Failed to wait for %s.", command.chars);
-  fprintf(stderr, "--- host: process done ---\n");
-  return process.exit_code().peek_value(1);
+  Launcher launcher;
+  if (!launcher.start(command, new_argc, new_argv, library))
+    return 1;
+
+  int exit_code = 0;
+  if (!launcher.join(&exit_code))
+    return 1;
+
+  return exit_code;
 }

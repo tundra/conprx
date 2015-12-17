@@ -1,13 +1,17 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "sync/injectee.hh"
 #include "utils/types.hh"
+#include "io/stream.hh"
 
 using namespace conprx;
 
 // Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
 public:
+  WindowsConsoleAgent();
+
   // Returns true iff the current process is hardcoded blacklisted. Returns true
   // if this process should not be patched under any circumstances, no matter
   // what options are set.
@@ -16,11 +20,37 @@ public:
   // Called when the dll process attach notification is received.
   static bool dll_process_attach();
 
+  static bool dll_process_detach();
+
+  bool install_agent(MessageSink *messages);
+
+  int connect(blob_t data_in, blob_t data_out);
+
+  static WindowsConsoleAgent *get() { return instance_; }
+
 private:
+  tclib::OutStream *logout_;
+
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
   static cstr_t kBlacklist[kBlacklistSize];
+
+  static WindowsConsoleAgent *instance_;
 };
+
+class LoggingMessageSink : public MessageSink {
+public:
+  LoggingMessageSink(tclib::OutStream *out)
+    : out_(out) { }
+
+protected:
+  virtual void handle_message(utf8_t message);
+
+private:
+  tclib::OutStream *out_;
+};
+
+WindowsConsoleAgent *WindowsConsoleAgent::instance_ = NULL;
 
 cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     // These are internal windows services that become unhappy if we try to
@@ -33,7 +63,21 @@ cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     TEXT("regedit.exe")
 };
 
+WindowsConsoleAgent::WindowsConsoleAgent()
+  : logout_(NULL) { }
+
 bool WindowsConsoleAgent::dll_process_attach() {
+  instance_ = new WindowsConsoleAgent();
+  return true;
+}
+
+bool WindowsConsoleAgent::dll_process_detach() {
+  delete instance_;
+  instance_ = NULL;
+  return true;
+}
+
+bool WindowsConsoleAgent::install_agent(MessageSink *messages) {
   // The blacklist is one way to protect against hosing the system completely
   // if there's a bug, and a more fundamental one than the options since we
   // use the blacklist to ensure that you can change the options using the
@@ -53,13 +97,11 @@ bool WindowsConsoleAgent::dll_process_attach() {
   if (!options.is_enabled())
     return true;
 
-  MessageSink messages;
-
   // Okay at this point we can start with the actual work since we've made it
   // safely through the guards above.
   LoggingConsole *logger = new LoggingConsole(NULL);
   Console *original = NULL;
-  if (!install(options, *logger, &original, &messages))
+  if (!install(options, *logger, &original, messages))
     return false;
   logger->set_delegate(original);
 
@@ -87,6 +129,33 @@ bool WindowsConsoleAgent::is_process_hard_blacklisted() {
       return true;
   }
   return false;
+}
+
+int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
+  // Validate that the input data looks sane.
+  if (data_in.size < sizeof(connect_data_t))
+    return cInvalidConnectDataSize;
+  connect_data_t *connect_data = static_cast<connect_data_t*>(data_in.start);
+  if (connect_data->magic != kConnectDataMagic)
+    return cInvalidConnectDataMagic;
+
+  // Create a connection to the parent process so we can pass back error and
+  // status messages.
+  handle_t parent_process = OpenProcess(PROCESS_DUP_HANDLE, false,
+      connect_data->parent_process_id);
+  if (parent_process == NULL)
+    return cFailedToOpenParentProcess + GetLastError();
+  handle_t logout_handle = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(parent_process, connect_data->parent_logout_handle,
+      GetCurrentProcess(), &logout_handle, GENERIC_WRITE, false, 0))
+    return cFailedToDuplicateLogout + GetLastError();
+  logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
+
+  LoggingMessageSink messages(logout_);
+  if (!install_agent(&messages))
+    return cInstallationFailed;
+
+  return cSuccess;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {
@@ -139,10 +208,24 @@ Options &Options::get() {
   return *options;
 }
 
+void LoggingMessageSink::handle_message(utf8_t message) {
+  uint32_t size = static_cast<uint32_t>(message.size);
+  tclib::WriteIop size_write(out_, &size, sizeof(size));
+  size_write.execute();
+  tclib::WriteIop data_write(out_, message.chars, size);
+  data_write.execute();
+}
+
 bool APIENTRY DllMain(module_t module, dword_t reason, void *) {
   switch (reason) {
     case DLL_PROCESS_ATTACH:
       return WindowsConsoleAgent::dll_process_attach();
+    case DLL_PROCESS_DETACH:
+      return WindowsConsoleAgent::dll_process_detach();
   }
   return true;
+}
+
+CONNECTOR_IMPL(ConprxAgentConnect, data_in, data_out) {
+  return WindowsConsoleAgent::get()->connect(data_in, data_out);
 }

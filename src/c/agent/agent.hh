@@ -72,10 +72,17 @@
 #include "binpatch.hh"
 #include "conapi.hh"
 #include "utils/types.hh"
+#include "io/stream.hh"
 
 namespace conprx {
 
 class Options;
+
+typedef struct {
+  int32_t magic;
+  standalone_dword_t parent_process_id;
+  tclib::naked_file_handle_t parent_logout_handle;
+} connect_data_t;
 
 // Controls the injection of the console agent.
 class ConsoleAgent {
@@ -85,6 +92,15 @@ public:
   // which can be called to get the original console behavior.
   static bool install(Options &options, Console &console, Console **original_out,
       MessageSink *messages);
+
+  static const int32_t kConnectDataMagic = 0xFABACAEA;
+
+  static const int cInvalidConnectDataSize = 0x11110000;
+  static const int cInvalidConnectDataMagic = 0x11120000;
+  static const int cInstallationFailed = 0x11130000;
+  static const int cFailedToOpenParentProcess = 0x11140000;
+  static const int cFailedToDuplicateLogout = 0x11150000;
+  static const int cSuccess = 0x0;
 
 private:
   // Returns the address of the console function with the given name.

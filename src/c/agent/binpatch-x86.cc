@@ -27,7 +27,7 @@ bool GenericX86::prepare_patch(address_t original, address_t replacement,
         return REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i is not whitelisted",
             info.instruction(), offset);
       } else if (info.status() == InstructionInfo::INVALID_INSTRUCTION) {
-        return REPORT_MESSAGE(messages, "Invalid instruction 0x%02x at offset %i was invalid",
+        return REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i was invalid",
             info.instruction(), offset);
       }
       // If the disassembler failed to resolve the instruction for whatever
