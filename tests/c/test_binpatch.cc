@@ -14,15 +14,15 @@ TEST(binpatch, datatypes) {
 }
 
 int add_impl(int a, int b) {
-  return a + b;
+  return a + b + 1;
 }
 
 // Alias for add which hopefully eager compilers won't inline, unlike add_impl.
 int (*add)(int, int) = add_impl;
-int extra_value = 0;
+int new_extra_incr = 2;
 
 int new_add(int a, int b) {
-  return a + b + 1 + extra_value;
+  return a + b + new_extra_incr;
 }
 
 TEST(binpatch, individual_steps) {
@@ -30,7 +30,7 @@ TEST(binpatch, individual_steps) {
   MessageSink messages;
   ASSERT_TRUE(platform.ensure_initialized(&messages));
 
-  ASSERT_EQ(8, add(3, 5));
+  ASSERT_EQ(9, add(3, 5));
   PatchRequest patch(Code::upcast(add), Code::upcast(new_add));
   PatchSet patches(platform, Vector<PatchRequest>(&patch, 1));
 
@@ -47,10 +47,10 @@ TEST(binpatch, individual_steps) {
   ASSERT_TRUE(patches.close_after_patching(PatchSet::APPLIED, &messages));
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
-  ASSERT_EQ(9, add(3, 5));
+  ASSERT_EQ(10, add(3, 5));
 
   int (*add_imposter)(int, int) = patch.get_imposter(add);
-  ASSERT_EQ(8, add_imposter(3, 5));
+  ASSERT_EQ(9, add_imposter(3, 5));
 
   ASSERT_TRUE(patches.open_for_patching(&messages));
   ASSERT_EQ(PatchSet::OPEN, patches.status());
@@ -61,7 +61,7 @@ TEST(binpatch, individual_steps) {
   ASSERT_TRUE(patches.close_after_patching(PatchSet::NOT_APPLIED, &messages));
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
 
-  ASSERT_EQ(8, add(3, 5));
+  ASSERT_EQ(9, add(3, 5));
 }
 
 TEST(binpatch, address_range) {
@@ -96,10 +96,10 @@ TEST(binpatch, casts) {
   address_t add_addr = CODE_UPCAST(add_impl);
   int (*my_add)(int, int) = reinterpret_cast<int(*)(int, int)>(add_addr);
   ASSERT_TRUE(my_add == add_impl);
-  ASSERT_EQ(7, my_add(3, 4));
+  ASSERT_EQ(8, my_add(3, 4));
   int (*my_add_2)(int, int) = Code::downcast(add_impl, add_addr);
   ASSERT_TRUE(my_add_2 == add_impl);
-  ASSERT_EQ(7, my_add_2(3, 4));
+  ASSERT_EQ(8, my_add_2(3, 4));
   address_t add_addr_2 = Code::upcast(add_impl);
   ASSERT_PTREQ(add_addr, add_addr_2);
 }

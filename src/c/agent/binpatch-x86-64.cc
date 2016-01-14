@@ -59,10 +59,11 @@ Redirection *X86_64::create_redirection(address_t original, address_t replacemen
     PreambleInfo *info, MessageSink *messages) {
   if (info->size() >= kAbsoluteJump64Size) {
     return new AbsoluteJump64Redirection();
-  } else if (info->size() < kJmpSize) {
+  } else if (info->size() >= kJmpSize) {
+    return new RelativeJump32Redirection();
+  } else {
     return NULL;
   }
-  return NULL;
 }
 
 void X86_64::write_imposter(PatchRequest &request, tclib::Blob memory) {
