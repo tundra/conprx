@@ -62,7 +62,7 @@ PatchRequest::~PatchRequest() {
   delete redirection_;
 }
 
-bool PatchRequest::prepare_apply(Platform *platform, TrampolineCode *code,
+bool PatchRequest::prepare_apply(Platform *platform, ImposterCode *code,
     MessageSink *messages) {
   platform_ = platform;
   imposter_code_ = code;
@@ -92,6 +92,9 @@ address_t PatchRequest::get_or_create_imposter() {
 void PatchRequest::write_imposter() {
   InstructionSet &inst = platform().instruction_set();
   tclib::Blob imposter_memory = imposter_code()->memory();
+  // Clear the memory to halt such that if the imposter doesn't fill the memory
+  // completely there'll be sane code there.
+  inst.write_halt(imposter_memory);
   inst.write_imposter(*this, imposter_memory);
   inst.flush_instruction_cache(imposter_memory);
   imposter_ = static_cast<address_t>(imposter_memory.start());
@@ -111,10 +114,10 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
     return true;
   }
   Vector<byte_t> trampoline_memory = memory_manager().alloc_executable(NULL,
-      sizeof(TrampolineCode) * requests().length(), messages);
+      sizeof(ImposterCode) * requests().length(), messages);
   if (trampoline_memory.is_empty())
     return REPORT_MESSAGE(messages, "Failed to allocate trampolines");
-  codes_ = trampoline_memory.cast<TrampolineCode>();
+  codes_ = trampoline_memory.cast<ImposterCode>();
   for (size_t i = 0; i < requests().length(); i++) {
     if (!requests()[i].prepare_apply(&platform_, &codes_[i], messages)) {
       status_ = FAILED;
@@ -217,6 +220,12 @@ void PatchSet::install_redirects() {
 }
 
 void PatchRequest::install_redirect() {
+  CHECK_TRUE("no redirection", redirection_ != NULL);
+  // First clear the whole preamble to halt such that if there is any space left
+  // over after writing the redirect it will be valid instructions but shouldn't
+  // be useful to anyone.
+  tclib::Blob orig_preamble(original_, preamble_size_);
+  platform().instruction_set().write_halt(orig_preamble);
   redirection_->write_redirect(original_, replacement_);
 }
 

@@ -14,7 +14,7 @@ public:
     virtual size_t write_redirect(address_t code, address_t dest);
   };
 
-  virtual void write_imposter(PatchRequest &request, tclib::Blob memory);
+  virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kAbsoluteJump64Size; }
   virtual Redirection *create_redirection(address_t original, address_t replacement,
@@ -60,13 +60,14 @@ Redirection *X86_64::create_redirection(address_t original, address_t replacemen
   if (info->size() >= kAbsoluteJump64Size) {
     return new AbsoluteJump64Redirection();
   } else if (info->size() >= kJmpSize) {
+    // TODO: ensure that the jump is no longer than 32 bits.
     return new RelativeJump32Redirection();
   } else {
     return NULL;
   }
 }
 
-void X86_64::write_imposter(PatchRequest &request, tclib::Blob memory) {
+size_t X86_64::write_imposter(PatchRequest &request, tclib::Blob memory) {
   // Initially let the trampoline interrupt (int3) when called. Just in case
   // anyone should decide to call it in the case that we failed below.
   address_t trampoline = static_cast<address_t>(memory.start());
@@ -76,7 +77,8 @@ void X86_64::write_imposter(PatchRequest &request, tclib::Blob memory) {
   Vector<byte_t> preamble_copy = request.preamble_copy();
   memcpy(trampoline, preamble_copy.start(), preamble_copy.length());
   // Then jump back to the original.
-  write_absolute_jump_64(trampoline + preamble_copy.length(), request.original() + preamble_copy.length());
+  return write_absolute_jump_64(trampoline + preamble_copy.length(),
+      request.original() + preamble_copy.length());
 }
 
 Disassembler *X86_64::disassembler() {

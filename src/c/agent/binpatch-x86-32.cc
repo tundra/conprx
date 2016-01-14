@@ -9,7 +9,7 @@ using namespace conprx;
 
 class X86_32 : public GenericX86 {
 public:
-  virtual void write_imposter(PatchRequest &request, tclib::Blob memory);
+  virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kJmpSize; }
   virtual Redirection *create_redirection(address_t original, address_t replacement,
@@ -24,17 +24,15 @@ private:
   bool can_jump_relative_32(address_t from, address_t to);
 };
 
-void X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
-  // Initially let the trampoline interrupt (int3) when called. Just in case
-  // anyone should decide to call it in the case that we failed below.
+size_t X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
   address_t trampoline = static_cast<address_t>(memory.start());
-  trampoline[0] = kInt3;
   // Copy the overwritten bytes into the trampoline. We'll definitely have to
   // execute those.
   Vector<byte_t> preamble_copy = request.preamble_copy();
   memcpy(trampoline, preamble_copy.start(), preamble_copy.length());
   // Then jump back to the original.
-  write_relative_jump_32(trampoline + preamble_copy.length(), request.original() + preamble_copy.length());
+  return write_relative_jump_32(trampoline + preamble_copy.length(),
+      request.original() + preamble_copy.length());
 }
 
 Redirection *X86_32::create_redirection(address_t original, address_t replacement,

@@ -42,7 +42,7 @@ namespace conprx {
 class InstructionSet;
 class MemoryManager;
 class Platform;
-class TrampolineCode;
+class ImposterCode;
 
 // The biggest possible redirect sequence. Since the preamble may be as large as
 // 13 bytes the worst case it where the last instruction which starts at byte
@@ -74,10 +74,15 @@ protected:
   virtual void handle_message(utf8_t message);
 };
 
-// Encapsulates state associated with redirecting a function.
+// Encapsulates state associated with redirecting a function. The main reason
+// for separating this into a class is such that there's a place to store
+// temporary data associated with redirecting and have it destroyed properly
+// when the patch request is destroyed.
 class Redirection {
 public:
   virtual ~Redirection() { }
+
+  // Write the redirect to the given destination into the given code.
   virtual size_t write_redirect(address_t code, address_t dest) = 0;
 };
 
@@ -120,8 +125,9 @@ public:
   ~PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  bool prepare_apply(Platform *platform, TrampolineCode *code, MessageSink *messages);
+  bool prepare_apply(Platform *platform, ImposterCode *code, MessageSink *messages);
 
+  // Destructively install this request's redirect.
   void install_redirect();
 
   // Attempts to apply this patch.
@@ -133,7 +139,7 @@ public:
 
   size_t preamble_size() { return preamble_size_; }
 
-  TrampolineCode *imposter_code() { return imposter_code_; }
+  ImposterCode *imposter_code() { return imposter_code_; }
 
   Platform &platform() { return *platform_; }
 
@@ -166,14 +172,15 @@ private:
   // The address of the replacement function.
   address_t replacement_;
 
+  // Optional display name, used for debugging.
   const char *name_;
 
-  // The completed trampoline. Will be null until the trampoline has been
+  // The completed imposter stub. Will be null until the imposter has been
   // written.
   address_t imposter_;
 
   // The custom code stubs associated with this patch.
-  TrampolineCode *imposter_code_;
+  ImposterCode *imposter_code_;
 
   // A copy of the original method's preamble which we'll overwrite later on.
   byte_t preamble_copy_[kMaxPreambleSizeBytes];
@@ -189,22 +196,23 @@ private:
 };
 
 // Size of the helper component of a patch stub.
-#define kTrampolineCodeStubSizeBytes 32
+#define kImposterCodeStubSizeBytes 32
 
 /// ## Patch code
 ///
-/// The patch code struct is a container for the executable code used by a
-/// patch. Each patch request has a patch code struct associated with it.
+/// The imposter code struct is a container for the executable code used by a
+/// patch to call the original code. Each patch request has an imposter code
+/// struct associated with it.
 ///
 /// To make the initial application of the patch set as cheap as possible we
-/// initially only redirect and then generate the trampoline on demand. The
+/// initially only redirect and then generate the imposter on demand. The
 /// request keeps track of the state of the code.
-class TrampolineCode {
+class ImposterCode {
 public:
-  tclib::Blob memory() { return tclib::Blob(stub_, kTrampolineCodeStubSizeBytes); }
+  tclib::Blob memory() { return tclib::Blob(stub_, kImposterCodeStubSizeBytes); }
 
 private:
-  byte_t stub_[kTrampolineCodeStubSizeBytes];
+  byte_t stub_[kImposterCodeStubSizeBytes];
 };
 
 // All the platform dependent objects bundled together.
@@ -280,10 +288,17 @@ public:
   // the state it was before.
   bool close_after_patching(Status success_status, MessageSink *messages);
 
-  // Patches the redirect instructions into the original functions.
+  // Patches the redirect instructions into the original functions. It shouldn't
+  // be possible for this to fail, any potential failure reasons should have
+  // been checked in prepare_apply. It is important that prepare_apply catches
+  // those problems because we want to avoid the case where we think the changes
+  // can be applied but part way through we fail, potentially leaving the code
+  // in a partially patched state which would be Bad. We definitely want to
+  // fail gracefully before starting to overwrite code if at all possible.
   void install_redirects();
 
-  // Restores the original functions to their initial state.
+  // Restores the original functions to their initial state. The same
+  // considerations about failing apply as with install_redirects.
   void revert_redirects();
 
   // Given a fresh patch set, runs through the sequence of operations that
@@ -324,7 +339,7 @@ private:
   Vector<PatchRequest> &requests() { return requests_; }
 
   // The patch stubs that hold the code implementing the requests.
-  Vector<TrampolineCode> codes_;
+  Vector<ImposterCode> codes_;
 
   // The current status.
   Status status_;
@@ -386,15 +401,24 @@ public:
   static MemoryManager &get();
 };
 
+// Information about the preamble returned when scanning over the original
+// function.
 class PreambleInfo {
 public:
+  // Initialize an empty info.
   PreambleInfo();
 
+  // Store information about the preamble in this info.
   void populate(size_t size, byte_t last_instr);
 
+  // Returns the preamble size in bytes.
   size_t size() { return size_; }
 
+  // Returns the last instruction processed; this may or may not be included in
+  // the preamble depending on which instruction it is. Useful for logging and
+  // debugging, don't let behavior depend on this.
   byte_t last_instr() { return last_instr_; }
+
 private:
   size_t size_;
   byte_t last_instr_;
@@ -425,7 +449,8 @@ public:
 
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
-  virtual void write_imposter(PatchRequest &request, tclib::Blob memory) = 0;
+  // Returns the number of bytes written.
+  virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory) = 0;
 
   // Notify the processor that there have been code changes.
   virtual void flush_instruction_cache(tclib::Blob memory) = 0;
