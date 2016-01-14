@@ -8,48 +8,67 @@
 
 using namespace conprx;
 
-bool GenericX86::prepare_patch(address_t original, address_t replacement,
-    address_t trampoline, size_t min_size_required, size_t *size_out,
+Redirection *GenericX86::prepare_patch(address_t original, address_t replacement,
+    PreambleInfo *info_out,
     MessageSink *messages) {
   // The length of this vector shouldn't matter since the disassembler reads
   // one byte at a time and stops as soon as we've seen enough. It doesn't
   // continue on to the end.
-  if (!validate_code_locations(original, replacement, trampoline, messages))
-    return false;
   Vector<byte_t> code(original, kMaxPreambleSizeBytes);
   size_t offset = 0;
-  size_t limit = redirect_size_bytes();
+  // This is the amount of space we're hoping to allocate, though we'll be okay
+  // if we just get more than min_size.
   Disassembler *disass = disassembler();
-  while (offset < limit) {
+  byte_t last_instr = 0;
+  size_t target_size = optimal_preable_size();
+  while (offset < target_size) {
     InstructionInfo info;
     if (!disass->resolve(code, offset, &info)) {
-      if (info.status() == InstructionInfo::NOT_WHITELISTED) {
-        return REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i is not whitelisted",
+      // Failed to even resolve the instruction. Report an error depending on
+      // the cause.
+      if (info.status() == InstructionInfo::UNKNOWN) {
+        REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i is unknown",
             info.instruction(), offset);
-      } else if (info.status() == InstructionInfo::INVALID_INSTRUCTION) {
-        return REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i was invalid",
-            info.instruction(), offset);
-      }
-      // If the disassembler failed to resolve the instruction for whatever
-      // reason, we bail out.
-      return REPORT_MESSAGE(messages, "Disassembler failed to resolve byte 0x%02x at offset %i",
+        return NULL;
+      } else if (info.status() == InstructionInfo::INVALID) {
+        REPORT_MESSAGE(messages, "Instruction at offset %i was invalid", offset);
+        return NULL;
+      } else {
+        REPORT_MESSAGE(messages, "Disassembler failed to resolve byte 0x%02x at offset %i",
           code[offset], offset);
+        return NULL;
+      }
     }
-    offset += info.length();
-    if (info.status() == InstructionInfo::RESOLVED_END) {
-      if (offset < min_size_required)
-        return REPORT_MESSAGE(messages, "Not enough room to patch function; "
-            "required %i found only %i (last instruction was 0x%02x)",
-            min_size_required, offset, info.instruction());
+    last_instr = info.instruction();
+    if (info.status() != InstructionInfo::SENSITIVE)
+      // We successfully decoded the instruction and it's one we're allowed to
+      // skip over, so we skip over it.
+      offset += info.length();
+    if (info.status() != InstructionInfo::BENIGN)
+      // Whether we skipped or not, we've gotten as far as we're allowed to get.
       break;
-    }
   }
-  *size_out = offset;
-  return true;
+  info_out->populate(offset, last_instr);
+  return create_redirection(original, replacement, info_out, messages);
 }
 
 void GenericX86::flush_instruction_cache(tclib::Blob memory) {
   // There's no need to explicitly flush instruction caches on intel but
   // valgrind does need to be told.
   VALGRIND_DISCARD_TRANSLATIONS(memory.start(), memory.size());
+}
+
+void GenericX86::write_halt(tclib::Blob memory) {
+  blob_fill(memory, kInt3);
+}
+
+size_t GenericX86::write_relative_jump_32(address_t code, address_t dest) {
+  int32_t distance = static_cast<int32_t>(dest - (code + kJmpSize));
+  code[0] = kJmp;
+  *reinterpret_cast<int32_t*>(code + 1) = distance;
+  return kJmpSize;
+}
+
+size_t GenericX86::RelativeJump32Redirection::write_redirect(address_t code, address_t dest) {
+  return write_relative_jump_32(code, dest);
 }

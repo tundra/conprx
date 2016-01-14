@@ -42,47 +42,59 @@ PatchRequest::PatchRequest(address_t original, address_t replacement, const char
   : original_(original)
   , replacement_(replacement)
   , name_(name)
-  , trampoline_(NULL)
-  , trampoline_code_(NULL)
+  , imposter_(NULL)
+  , imposter_code_(NULL)
   , platform_(NULL)
-  , preamble_size_(0) { }
+  , preamble_size_(0)
+  , redirection_(NULL) { }
 
 PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
   , name_(NULL)
-  , trampoline_(NULL)
-  , trampoline_code_(NULL)
+  , imposter_(NULL)
+  , imposter_code_(NULL)
   , platform_(NULL)
-  , preamble_size_(0) { }
+  , preamble_size_(0)
+  , redirection_(NULL) { }
+
+PatchRequest::~PatchRequest() {
+  delete redirection_;
+}
 
 bool PatchRequest::prepare_apply(Platform *platform, TrampolineCode *code,
     MessageSink *messages) {
   platform_ = platform;
-  trampoline_code_ = code;
+  imposter_code_ = code;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
-  if (!platform->instruction_set().prepare_patch(original_, replacement_,
-      trampoline_, platform->instruction_set().redirect_size_bytes(),
-      &preamble_size_, messages))
+  PreambleInfo pinfo;
+
+  Redirection *redir = platform->instruction_set().prepare_patch(original_,
+      replacement_, &pinfo, messages);
+  if (redir == NULL)
     return false;
-  memcpy(preamble_, original_, preamble_size_);
+  redirection_ = redir;
+  size_t size = pinfo.size();
+  CHECK_REL("preamble too big", size, <=, kMaxPreambleSizeBytes);
+  memcpy(preamble_copy_, original_, pinfo.size());
+  preamble_size_ = size;
   return true;
 }
 
-address_t PatchRequest::get_or_create_trampoline() {
-  if (trampoline_ == NULL)
-    write_trampoline();
-  return trampoline_;
+address_t PatchRequest::get_or_create_imposter() {
+  if (imposter_ == NULL)
+    write_imposter();
+  return imposter_;
 }
 
-void PatchRequest::write_trampoline() {
+void PatchRequest::write_imposter() {
   InstructionSet &inst = platform().instruction_set();
-  tclib::Blob memory = trampoline_code()->memory();
-  inst.write_trampoline(*this, memory);
-  inst.flush_instruction_cache(memory);
-  trampoline_ = static_cast<address_t>(memory.start());
+  tclib::Blob imposter_memory = imposter_code()->memory();
+  inst.write_imposter(*this, imposter_memory);
+  inst.flush_instruction_cache(imposter_memory);
+  imposter_ = static_cast<address_t>(imposter_memory.start());
 }
 
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
@@ -98,21 +110,11 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
     status_ = PREPARED;
     return true;
   }
-  // Determine the range within which all the original functions occur.
-  Vector<byte_t> range = determine_patch_range();
-  DEBUG("Patch range: %p .. %p", range.start(), range.end());
-  // Allocate a chunk of memory to hold the stubs.
-  Vector<byte_t> memory = memory_manager().alloc_executable(range.start(),
+  Vector<byte_t> trampoline_memory = memory_manager().alloc_executable(NULL,
       sizeof(TrampolineCode) * requests().length(), messages);
-  DEBUG("Memory: %p .. %p", memory.start(), memory.end());
-  if (memory.is_empty()) {
-    // We couldn't get any memory for the stubs; fail.
-    LOG_ERROR("Failed to allocate memory for %i stubs near %p.",
-        requests().length(), range.start());
-    status_ = FAILED;
-    return false;
-  }
-  codes_ = memory.cast<TrampolineCode>();
+  if (trampoline_memory.is_empty())
+    return REPORT_MESSAGE(messages, "Failed to allocate trampolines");
+  codes_ = trampoline_memory.cast<TrampolineCode>();
   for (size_t i = 0; i < requests().length(); i++) {
     if (!requests()[i].prepare_apply(&platform_, &codes_[i], messages)) {
       status_ = FAILED;
@@ -151,8 +153,7 @@ Vector<byte_t> PatchSet::determine_patch_range() {
     return addr_range;
   } else {
     // The amount we're going to write past the last address.
-    size_t write_size = instruction_set().redirect_size_bytes() + 1;
-    size_t new_length = addr_range.length() + write_size;
+    size_t new_length = addr_range.length() + kMaxPreambleSizeBytes;
     return Vector<byte_t>(addr_range.start(), new_length);
   }
 }
@@ -177,7 +178,6 @@ bool PatchSet::open_for_patching(MessageSink *messages) {
 }
 
 bool PatchSet::validate_open_for_patching(MessageSink *messages) {
-  size_t redirect_size = instruction_set().redirect_size_bytes();
   for (size_t i = 0; i < requests().length(); i++) {
     // Try reading the each byte and then writing it back. This should not
     // have any effect but should fail if the memory is not writeable.
@@ -185,7 +185,7 @@ bool PatchSet::validate_open_for_patching(MessageSink *messages) {
     // TODO: check whether making the address volatile is enough for this to
     //   not be optimized away or otherwise tampered with by the compiler.
     volatile address_t addr = requests()[i].original();
-    for (size_t i = 0; i < redirect_size; i++) {
+    for (size_t i = 0; i < kMaxPreambleSizeBytes; i++) {
       byte_t value = addr[i];
       addr[i] = value;
     }
@@ -208,18 +208,23 @@ bool PatchSet::close_after_patching(Status success_status, MessageSink *messages
 
 void PatchSet::install_redirects() {
   DEBUG("Installing redirects");
-  InstructionSet &inst = instruction_set();
-  for (size_t i = 0; i < requests().length(); i++)
-    inst.install_redirect(requests()[i]);
+  for (size_t ri = 0; ri < requests().length(); ri++) {
+    PatchRequest &request = requests()[ri];
+    request.install_redirect();
+  }
   DEBUG("Successfully installed redirects");
   status_ = APPLIED_OPEN;
+}
+
+void PatchRequest::install_redirect() {
+  redirection_->write_redirect(original_, replacement_);
 }
 
 void PatchSet::revert_redirects() {
   DEBUG("Reverting redirects");
   for (size_t i = 0; i < requests().length(); i++) {
     PatchRequest &request = requests()[i];
-    Vector<byte_t> preamble = request.preamble();
+    Vector<byte_t> preamble = request.preamble_copy();
     address_t original = request.original();
     memcpy(original, preamble.start(), preamble.length());
   }
@@ -267,6 +272,14 @@ Platform &Platform::get() {
   return *instance;
 }
 
+PreambleInfo::PreambleInfo()
+  : size_(0)
+  , last_instr_(0) { }
+
+void PreambleInfo::populate(size_t size, byte_t last_instr) {
+  size_ = size;
+  last_instr_ = last_instr;
+}
 
 #ifdef IS_64_BIT
 #  include "binpatch-x86-64.cc"

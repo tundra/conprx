@@ -44,8 +44,10 @@ class MemoryManager;
 class Platform;
 class TrampolineCode;
 
-// The biggest possible redirect sequence.
-#define kMaxPreambleSizeBytes 16
+// The biggest possible redirect sequence. Since the preamble may be as large as
+// 13 bytes the worst case it where the last instruction which starts at byte
+// 12 is really long; this leaves room for it to be 20b which should be plenty.
+#define kMaxPreambleSizeBytes 32
 
 // This is just another name for a dword_t but can be used without including the
 // full nightmare that is windows.h.
@@ -72,12 +74,41 @@ protected:
   virtual void handle_message(utf8_t message);
 };
 
+// Encapsulates state associated with redirecting a function.
+class Redirection {
+public:
+  virtual ~Redirection() { }
+  virtual size_t write_redirect(address_t code, address_t dest) = 0;
+};
+
 /// ## Patch request
 ///
 /// An individual binary patch request is the "unit" of the patching process.
 /// It contains an address of the function to replace and an address of its
 /// intended replacement, as well as extra information tracking the state of
 /// the patching process.
+///
+/// There's a number of different buffers and snippets in play here and it's
+/// important to keep their different purposes straight. They are,
+///
+///   original: the address of the original function. Depending on whether the
+///     patch has been applied calling the original will either have the
+///     original behavior or the behavior of the replacement.
+///
+///   replacement: the address of the behavior we want the original function to
+///     have after applying the patch.
+///
+///   preamble: the first part of the original function that we're going to
+///     overwrite to give it the replacement behavior.
+///
+///   preamble copy: the contents of the preamble before it has been patched
+///     which gets recorded in the patch request such that it can be used later,
+///     for instance to restore the original back to its original behavior.
+///
+///   imposter: a function that when called implements the original behavior
+///     even after the patch has been applied. So it's not the original function
+///     which now has the replacement behavior but a different one that happens
+///     to behave exactly like the original.
 class PatchRequest {
 public:
   // Initializes a binary patch that replaces the given original function with
@@ -86,8 +117,12 @@ public:
 
   PatchRequest();
 
+  ~PatchRequest();
+
   // Marks this request as having been prepared to be applied.
   bool prepare_apply(Platform *platform, TrampolineCode *code, MessageSink *messages);
+
+  void install_redirect();
 
   // Attempts to apply this patch.
   bool apply(MemoryManager &memman);
@@ -98,27 +133,29 @@ public:
 
   size_t preamble_size() { return preamble_size_; }
 
-  TrampolineCode *trampoline_code() { return trampoline_code_; }
+  TrampolineCode *imposter_code() { return imposter_code_; }
 
   Platform &platform() { return *platform_; }
 
   // Returns the trampoline code viewed as the given type.
   template <typename T>
-  T get_trampoline() { return reinterpret_cast<T>(get_or_create_trampoline()); }
+  T get_imposter() { return reinterpret_cast<T>(get_or_create_imposter()); }
 
   // Returns the trampoline code viewed as the same type as the given argument.
   // Since function types are so long this can be a convenient shorthand.
   template <typename T>
-  T get_trampoline(T prototype) { return get_trampoline<T>(); }
+  T get_imposter(T prototype) { return get_imposter<T>(); }
 
-  Vector<byte_t> preamble() { return Vector<byte_t>(preamble_, preamble_size_); }
+  tclib::Blob original_preamble() { return tclib::Blob(original_, preamble_size_); }
+
+  Vector<byte_t> preamble_copy() { return Vector<byte_t>(preamble_copy_, preamble_size_); }
 
 private:
   // Returns the address of the trampoline, creating it on first call.
-  address_t get_or_create_trampoline();
+  address_t get_or_create_imposter();
 
   // Writes the trampoline code.
-  void write_trampoline();
+  void write_imposter();
 
   // The address of the original function. Note that when the patch has been
   // applied the function at this address will effectively be the replacement,
@@ -133,19 +170,22 @@ private:
 
   // The completed trampoline. Will be null until the trampoline has been
   // written.
-  address_t trampoline_;
+  address_t imposter_;
 
   // The custom code stubs associated with this patch.
-  TrampolineCode *trampoline_code_;
+  TrampolineCode *imposter_code_;
 
   // A copy of the original method's preamble which we'll overwrite later on.
-  byte_t preamble_[kMaxPreambleSizeBytes];
+  byte_t preamble_copy_[kMaxPreambleSizeBytes];
 
   // The platform utilities.
   Platform *platform_;
 
   // The length of the original's preamble.
   size_t preamble_size_;
+
+  // Object that keeps track of how to redirect this patch.
+  Redirection *redirection_;
 };
 
 // Size of the helper component of a patch stub.
@@ -346,32 +386,46 @@ public:
   static MemoryManager &get();
 };
 
+class PreambleInfo {
+public:
+  PreambleInfo();
+
+  void populate(size_t size, byte_t last_instr);
+
+  size_t size() { return size_; }
+
+  byte_t last_instr() { return last_instr_; }
+private:
+  size_t size_;
+  byte_t last_instr_;
+};
+
 // An instruction set encapsulates the flavor of machine code used on the
 // current platform.
 class InstructionSet {
 public:
   virtual ~InstructionSet() { }
 
-  // Returns the size in bytes of the code patch that redirects execution from
-  // the original code to the replacement.
-  virtual size_t redirect_size_bytes() = 0;
+  // Given a blob covering the preamble available to be overwritten, the address
+  // of the replacement, and a memory manager, returns a redirection object that
+  // controls the redirection. This doesn't change the original function but may
+  // allocate through the memory manager. If no redirection works under the
+  // given circumstances NULL is returned.
 
   // Performs any preprocessing to be done before patching, including
   // calculating the size of the preamble of the original function that will be
   // overwritten by the redirect. Returns true if successful, false if there is
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
-  virtual bool prepare_patch(address_t original, address_t replacement,
-      address_t trampoline, size_t min_size_required, size_t *size_out,
-      MessageSink *messages) = 0;
+  virtual Redirection *prepare_patch(address_t original, address_t replacement,
+      PreambleInfo *info_out, MessageSink *messages) = 0;
 
-  // Installs a redirect from the request's original function to its entry
-  // stub.
-  virtual void install_redirect(PatchRequest &request) = 0;
+  // Fills the given memory with code that causes execution to halt.
+  virtual void write_halt(tclib::Blob memory) = 0;
 
   // Writes trampoline code into the given code object that implements the same
   // behavior as the request's original function did before it was replaced.
-  virtual void write_trampoline(PatchRequest &request, tclib::Blob memory) = 0;
+  virtual void write_imposter(PatchRequest &request, tclib::Blob memory) = 0;
 
   // Notify the processor that there have been code changes.
   virtual void flush_instruction_cache(tclib::Blob memory) = 0;

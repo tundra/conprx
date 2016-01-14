@@ -75,14 +75,20 @@ bool InstructionInfo::fail(Status status, byte_t instr) {
   return false;
 }
 
-bool InstructionInfo::succeed(size_t length, bool at_end, byte_t instr) {
+bool InstructionInfo::succeed(size_t length, byte_t instr, Status status) {
   length_ = length;
-  status_ = at_end ? RESOLVED_END : RESOLVED;
+  status_ = status;
   instr_ = instr;
   return true;
 }
 
 Disassembler::~Disassembler() { }
+
+// Blacklisted for both 32 and 64 bits.
+static const byte_t kX86_BlacklistSize = 1;
+static const byte_t kX86_Blacklist[kX86_BlacklistSize] = {
+  0xe9 // jmp rel
+};
 
 // Whitelisted for both 32 and 64 bits.
 static const byte_t kX86_WhitelistSize = 50;
@@ -126,11 +132,15 @@ void Disassembler::set_types(Vector<const byte_t> instrs, InstructionType type) 
 }
 
 bool Disassembler::in_whitelist(byte_t opcode) {
-  return types_[opcode] != NONE;
+  return types_[opcode] >= WHITELISTED;
 }
 
-bool Disassembler::is_end(byte_t opcode) {
-  return types_[opcode] == WHITELISTED_END;
+bool Disassembler::in_blacklist(byte_t opcode) {
+  return types_[opcode] == BLACKLISTED;
+}
+
+bool Disassembler::is_terminator(byte_t opcode) {
+  return types_[opcode] == TERMINATOR;
 }
 
 int Disassembler::vector_byte_reader(const void* arg, uint8_t* byte,
@@ -151,24 +161,33 @@ bool Disassembler::resolve(Vector<byte_t> code, size_t offset,
       NULL, offset, static_cast<DisassemblerMode>(mode_));
   if (ret)
     // The return value is 0 on success.
-    return info_out->fail(InstructionInfo::INVALID_INSTRUCTION, 0);
-  if (!in_whitelist(instr.opcode))
-    return info_out->fail(InstructionInfo::NOT_WHITELISTED, instr.opcode);
-  bool at_end = is_end(instr.opcode);
+    return info_out->fail(InstructionInfo::INVALID, 0);
+  InstructionInfo::Status status;
+  if (in_whitelist(instr.opcode)) {
+    status = is_terminator(instr.opcode)
+          ? InstructionInfo::TERMINATOR
+          : InstructionInfo::BENIGN;
+  } else if (in_blacklist(instr.opcode)) {
+    status = InstructionInfo::SENSITIVE;
+  } else {
+    return info_out->fail(InstructionInfo::UNKNOWN, instr.opcode);
+  }
   return info_out->succeed(static_cast<size_t>(instr.readerCursor - offset),
-      at_end, instr.opcode);
+      instr.opcode, status);
 }
 
 Disassembler &Disassembler::x86_64() {
   static Disassembler *instance = NULL;
   if (instance == NULL) {
     instance = new Disassembler(MODE_64BIT);
-    Vector<const byte_t> x86_32_wl(kX86_Whitelist, kX86_WhitelistSize);
-    instance->set_types(x86_32_wl, Disassembler::WHITELISTED);
+    Vector<const byte_t> x86_bl(kX86_Blacklist, kX86_BlacklistSize);
+    instance->set_types(x86_bl, Disassembler::BLACKLISTED);
+    Vector<const byte_t> x86_wl(kX86_Whitelist, kX86_WhitelistSize);
+    instance->set_types(x86_wl, Disassembler::WHITELISTED);
     Vector<const byte_t> x86_64_wl(kX86_64Whitelist, kX86_64WhitelistSize);
     instance->set_types(x86_64_wl, Disassembler::WHITELISTED);
     Vector<const byte_t> x86_ends(kX86_Ends, kX86_EndsSize);
-    instance->set_types(x86_ends, Disassembler::WHITELISTED_END);
+    instance->set_types(x86_ends, Disassembler::TERMINATOR);
   }
   return *instance;
 }
@@ -177,10 +196,12 @@ Disassembler &Disassembler::x86_32() {
   static Disassembler *instance = NULL;
   if (instance == NULL) {
     instance = new Disassembler(MODE_32BIT);
-    Vector<const byte_t> x86_32_wl(kX86_Whitelist, kX86_WhitelistSize);
-    instance->set_types(x86_32_wl, Disassembler::WHITELISTED);
+    Vector<const byte_t> x86_bl(kX86_Blacklist, kX86_BlacklistSize);
+    instance->set_types(x86_bl, Disassembler::BLACKLISTED);
+    Vector<const byte_t> x86_wl(kX86_Whitelist, kX86_WhitelistSize);
+    instance->set_types(x86_wl, Disassembler::WHITELISTED);
     Vector<const byte_t> x86_ends(kX86_Ends, kX86_EndsSize);
-    instance->set_types(x86_ends, Disassembler::WHITELISTED_END);
+    instance->set_types(x86_ends, Disassembler::TERMINATOR);
   }
   return *instance;
 }

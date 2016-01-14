@@ -35,14 +35,7 @@ TEST(binpatch, individual_steps) {
   PatchSet patches(platform, Vector<PatchRequest>(&patch, 1));
 
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
-  bool allow_failure = IF_64_BIT(true, false);
-  if (allow_failure) {
-    // TODO: Get rid of this!
-    if (!patches.prepare_apply(&messages))
-      return;
-  } else {
-    ASSERT_TRUE(patches.prepare_apply(&messages));
-  }
+  ASSERT_TRUE(patches.prepare_apply(&messages));
   ASSERT_EQ(PatchSet::PREPARED, patches.status());
 
   ASSERT_TRUE(patches.open_for_patching(&messages));
@@ -56,8 +49,8 @@ TEST(binpatch, individual_steps) {
 
   ASSERT_EQ(9, add(3, 5));
 
-  int (*add_tramp)(int, int) = patch.get_trampoline(add);
-  ASSERT_EQ(8, add_tramp(3, 5));
+  int (*add_imposter)(int, int) = patch.get_imposter(add);
+  ASSERT_EQ(8, add_imposter(3, 5));
 
   ASSERT_TRUE(patches.open_for_patching(&messages));
   ASSERT_EQ(PatchSet::OPEN, patches.status());
@@ -116,7 +109,7 @@ TEST(binpatch, casts) {
   byte_t bytes[16] = {__VA_ARGS__, 0x00};                                      \
   InstructionInfo info;                                                        \
   ASSERT_EQ(true, disass.resolve(Vector<byte_t>(bytes, 16), 0, &info));        \
-  ASSERT_EQ(InstructionInfo::RESOLVED, info.status());                         \
+  ASSERT_EQ(InstructionInfo::BENIGN, info.status());                           \
   ASSERT_EQ(EXP, info.length());                                               \
 } while (false)
 
@@ -139,8 +132,8 @@ TEST(binpatch, x64_disass) {
   CHECK_LENGTH(7, 0x48, 0x89, 0x85, 0x48, 0xfe, 0xff, 0xff); // mov %rax,-0x1b8(%rbp)
   CHECK_LENGTH(3, 0x48, 0x89, 0xc7); // mov %rax,%rdi
   CHECK_LENGTH(4, 0x48, 0x89, 0x04, 0x24); // mov %rax,(%rsp)
-  CHECK_STATUS(INVALID_INSTRUCTION, 0x48, 0x48); // (two rex.w prefixes)
-  CHECK_STATUS(INVALID_INSTRUCTION, 0x60); // (pusha only exists in 32 bit mode)
+  CHECK_STATUS(INVALID, 0x48, 0x48); // (two rex.w prefixes)
+  CHECK_STATUS(INVALID, 0x60); // (pusha only exists in 32 bit mode)
 }
 
 // There's no reason these tests can't work on 32-bit, except some bugs with

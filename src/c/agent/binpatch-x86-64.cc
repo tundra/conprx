@@ -9,53 +9,38 @@ using namespace conprx;
 
 class X86_64 : public GenericX86 {
 public:
-  virtual size_t redirect_size_bytes();
-  virtual void install_redirect(PatchRequest &request);
-  virtual void write_trampoline(PatchRequest &request, tclib::Blob memory);
+  class AbsoluteJump64Redirection : public Redirection {
+  public:
+    virtual size_t write_redirect(address_t code, address_t dest);
+  };
+
+  virtual void write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
-  virtual bool validate_code_locations(address_t original, address_t replacement,
-      address_t trampoline, MessageSink *messages);
+  virtual size_t optimal_preable_size() { return kAbsoluteJump64Size; }
+  virtual Redirection *create_redirection(address_t original, address_t replacement,
+      PreambleInfo *info, MessageSink *messages);
 
   // Returns the singleton ia32 instance.
   static X86_64 &get();
 
-private:
-  static void write_absolute_jump_64(address_t code, address_t dest);
 
+private:
   static const byte_t kRexWB = 0x49;
   static const byte_t kMovR11 = 0xbb;
   static const byte_t kRexB = 0x41;
   static const byte_t kJmpQ = 0xff;
   static const byte_t kRmR11 = 0xe3;
 
-  static const size_t kRedirectSizeBytes = 13;
+  static const size_t kAbsoluteJump64Size = 13;
+
+  static size_t write_absolute_jump_64(address_t code, address_t dest);
 };
 
-size_t X86_64::redirect_size_bytes() {
-  return kRedirectSizeBytes;
+size_t X86_64::AbsoluteJump64Redirection::write_redirect(address_t code, address_t dest) {
+  return write_absolute_jump_64(code, dest);
 }
 
-bool X86_64::validate_code_locations(address_t original, address_t replacement,
-      address_t trampoline, MessageSink *messages) {
-  // On x86-64 we can jump anywhere from anywhere.
-  return true;
-}
-
-void X86_64::install_redirect(PatchRequest &request) {
-  address_t original = request.original();
-  address_t replacement = request.replacement();
-
-  // Write the redirect to the entry stub into the original.
-  write_absolute_jump_64(original, replacement);
-
-  // The redirect may partially overwrite the last instruction, leaving behind
-  // invalid code. To avoid that we fill the last bit with one-byte
-  // instructions (int3).
-  if (kRedirectSizeBytes < request.preamble_size())
-    memset(original + kRedirectSizeBytes, kInt3, request.preamble_size() - kRedirectSizeBytes);
-}
-
-void X86_64::write_absolute_jump_64(address_t code, address_t dest) {
+size_t X86_64::write_absolute_jump_64(address_t code, address_t dest) {
   size_t offset = 0;
   // Store the address to jump to i %r11 which, according to all ABIs I've seen,
   // a callee-save register so it should be safe to clobber.
@@ -67,19 +52,30 @@ void X86_64::write_absolute_jump_64(address_t code, address_t dest) {
   code[offset++] = kRexB;
   code[offset++] = kJmpQ;
   code[offset++] = kRmR11;
+  return kAbsoluteJump64Size;
 }
 
-void X86_64::write_trampoline(PatchRequest &request, tclib::Blob memory) {
+Redirection *X86_64::create_redirection(address_t original, address_t replacement,
+    PreambleInfo *info, MessageSink *messages) {
+  if (info->size() >= kAbsoluteJump64Size) {
+    return new AbsoluteJump64Redirection();
+  } else if (info->size() < kJmpSize) {
+    return NULL;
+  }
+  return NULL;
+}
+
+void X86_64::write_imposter(PatchRequest &request, tclib::Blob memory) {
   // Initially let the trampoline interrupt (int3) when called. Just in case
   // anyone should decide to call it in the case that we failed below.
   address_t trampoline = static_cast<address_t>(memory.start());
   trampoline[0] = kInt3;
   // Copy the overwritten bytes into the trampoline. We'll definitely have to
   // execute those.
-  Vector<byte_t> preamble = request.preamble();
-  memcpy(trampoline, preamble.start(), preamble.length());
+  Vector<byte_t> preamble_copy = request.preamble_copy();
+  memcpy(trampoline, preamble_copy.start(), preamble_copy.length());
   // Then jump back to the original.
-  write_absolute_jump_64(trampoline + preamble.length(), request.original() + preamble.length());
+  write_absolute_jump_64(trampoline + preamble_copy.length(), request.original() + preamble_copy.length());
 }
 
 Disassembler *X86_64::disassembler() {

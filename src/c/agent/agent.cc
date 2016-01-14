@@ -22,8 +22,8 @@ private:
 #define __EMIT_TRAMPOLINE_IMPL__(Name, name, FLAGS, SIG)                       \
   SIG(GET_SIG_RET) OriginalConsole::name SIG(GET_SIG_PARAMS) {                 \
     PatchRequest *patch = patches_[Console::name##_key];                       \
-    Console::name##_t trampoline = patch->get_trampoline<Console::name##_t>(); \
-    return trampoline SIG(GET_SIG_ARGS);                                       \
+    Console::name##_t imposter = patch->get_imposter<Console::name##_t>();     \
+    return imposter SIG(GET_SIG_ARGS);                                         \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 #undef __EMIT_TRAMPOLINE_IMPL__

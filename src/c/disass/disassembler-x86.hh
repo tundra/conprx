@@ -12,13 +12,17 @@ namespace conprx {
 // about the failure.
 class InstructionInfo {
 public:
-  // Status.
   enum Status {
-    INVALID_INSTRUCTION,
-    NOT_WHITELISTED,
-    RESOLVED,
-    RESOLVED_END,
-    NONE
+    // This instruction was garbage.
+    INVALID,
+    // We decoded the instruction but don't know how to deal with it.
+    UNKNOWN,
+    // Decoded the instruction and we can skip over it no problem.
+    BENIGN,
+    // Decoded the instruction and we can skip over it but not longer.
+    TERMINATOR,
+    // Decoded but we can't move this instruction, it needs to be left alone.
+    SENSITIVE
   };
 
   Status status() { return status_; }
@@ -37,7 +41,7 @@ public:
 
   // Sets the state of this info to be a success of the given length. Returns
   // true such that it can be returned as the result of a resolve call.
-  bool succeed(size_t length, bool at_end, byte_t instr);
+  bool succeed(size_t length, byte_t instr, Status status);
 
 private:
   Status status_;
@@ -50,12 +54,14 @@ class Disassembler {
 public:
   enum InstructionType {
     // This instruction has no particular type associated with it.
-    NONE,
+    NONE = 0x0,
+    // We don't allow this instruction to be patched
+    BLACKLISTED = 0x1,
     // We allow this instruction to be patched over.
-    WHITELISTED,
+    WHITELISTED = 0x2,
     // This instruction is whitelisted but we don't allow any instructions to
     // be patched after this point.
-    WHITELISTED_END
+    TERMINATOR = 0x3,
   };
 
   Disassembler(int32_t mode);
@@ -77,7 +83,9 @@ public:
   // instructions not explicitly whitelisted.
   bool in_whitelist(byte_t instr);
 
-  bool is_end(byte_t instr);
+  bool in_blacklist(byte_t instr);
+
+  bool is_terminator(byte_t instr);
 
   // Returns the singleton X86-64 disassembler.
   static Disassembler &x86_64();
