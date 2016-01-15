@@ -69,6 +69,12 @@ size_t GenericX86::write_relative_jump_32(address_t code, address_t dest) {
   return kJmpSize;
 }
 
+bool GenericX86::can_jump_relative_32(address_t from, address_t to) {
+  ONLY_32_BIT(return true);
+  ssize_t distance = (from + kJmpSize) - to;
+  return static_cast<int32_t>(distance) == distance;
+}
+
 size_t GenericX86::RelativeJump32Redirection::write_redirect(address_t code, address_t dest) {
   return write_relative_jump_32(code, dest);
 }

@@ -59,8 +59,9 @@ Redirection *X86_64::create_redirection(address_t original, address_t replacemen
     PreambleInfo *info, MessageSink *messages) {
   if (info->size() >= kAbsoluteJump64Size) {
     return new AbsoluteJump64Redirection();
-  } else if (info->size() >= kJmpSize) {
-    // TODO: ensure that the jump is no longer than 32 bits.
+  } else if (info->size() < kJmpSize) {
+    return NULL;
+  } else if (can_jump_relative_32(original, replacement)) {
     return new RelativeJump32Redirection();
   } else {
     return NULL;

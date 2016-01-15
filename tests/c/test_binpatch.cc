@@ -5,6 +5,7 @@
 
 #include "agent/binpatch.hh"
 #include "disass/disassembler-x86.hh"
+#include "agent/binpatch-x86.hh"
 #include "test.hh"
 
 using namespace conprx;
@@ -134,6 +135,27 @@ TEST(binpatch, x64_disass) {
   CHECK_LENGTH(4, 0x48, 0x89, 0x04, 0x24); // mov %rax,(%rsp)
   CHECK_STATUS(INVALID, 0x48, 0x48); // (two rex.w prefixes)
   CHECK_STATUS(INVALID, 0x60); // (pusha only exists in 32 bit mode)
+}
+
+static void check_jump_32(bool exp64, uint64_t a, uint64_t b) {
+  bool expected = IF_32_BIT(true, exp64);
+  ASSERT_EQ(expected, GenericX86::can_jump_relative_32(
+      reinterpret_cast<address_t>(a), reinterpret_cast<address_t>(b)));
+}
+
+TEST(binpatch, can_jump_32) {
+  uint64_t i30 = 1ULL << 30;
+  check_jump_32(true, 0, i30);
+  check_jump_32(true, i30, 0);
+  uint64_t i31 = 1ULL << 31;
+  check_jump_32(true, 0, i31 + 4);
+  check_jump_32(true, 0, i31 + 5);
+  check_jump_32(false, 0, i31 + 6);
+  check_jump_32(false, 0, i31 + 7);
+  check_jump_32(true, i31 - 7, 0);
+  check_jump_32(true, i31 - 6, 0);
+  check_jump_32(false, i31 - 5, 0);
+  check_jump_32(false, i31 - 4, 0);
 }
 
 // There's no reason these tests can't work on 32-bit, except some bugs with

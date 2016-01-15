@@ -35,6 +35,11 @@ public:
 
   virtual void write_halt(tclib::Blob memory);
 
+  // Returns true iff it is possible to jump from the given from-address to the
+  // given to-address with a 32-bit relative jump, the from address being the
+  // beginning of the jump instruction.
+  static bool can_jump_relative_32(address_t from, address_t to);
+
 protected:
   static const byte_t kInt3 = 0xcc;
   static const byte_t kJmp = 0xe9;
