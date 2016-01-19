@@ -340,18 +340,15 @@ uint64_t ProximityAllocator::bottom_anchor_from_address(uint64_t addr,
     // If there is no distance restriction we use the trivial bottom anchor.
     return 0;
   CHECK_TRUE("unaligned distance", is_power_of_2(distance));
-  uint64_t addr_value = reinterpret_cast<uint64_t>(addr);
   // There are kAnchorCount anchors within the distance and the alignment and
   // this is the alignment they snap to.
   uint64_t anchor_alignment = distance >> kLogAnchorCount;
   // Align the address as an anchor; this will yield the anchor in the middle of
   // the range.
-  uint64_t middle_anchor_value = addr_value & ~(anchor_alignment - 1);
+  uint64_t middle_anchor = addr & ~(anchor_alignment - 1);
   // Subtract half the distance; this will yield the bottom anchor.
   uint64_t half_distance = (distance >> 1);
-  uint64_t bottom_anchor_value = minus_saturate_zero(middle_anchor_value,
-      half_distance);
-  return bottom_anchor_value;
+  return minus_saturate_zero(middle_anchor, half_distance);
 }
 
 uint64_t ProximityAllocator::minus_saturate_zero(uint64_t a, uint64_t b) {
