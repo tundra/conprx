@@ -5,6 +5,7 @@
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
+#include "utils/misc-inl.h"
 #include "utils/strbuf.h"
 END_C_INCLUDES
 
@@ -288,6 +289,77 @@ PreambleInfo::PreambleInfo()
 void PreambleInfo::populate(size_t size, byte_t last_instr) {
   size_ = size;
   last_instr_ = last_instr;
+}
+
+ProximityAllocator::ProximityAllocator(VirtualAllocator *direct, uint64_t alignment,
+    uint64_t block_size)
+  : direct_(direct)
+  , alignment_(alignment)
+  , block_size_(block_size) {
+  CHECK_TRUE("unaligned alignment", is_power_of_2(alignment));
+  CHECK_TRUE("unaligned block size", is_power_of_2(block_size));
+}
+
+ProximityAllocator::Block *ProximityAllocator::find_existing_block(uint64_t addr,
+    uint64_t distance, uint64_t size) {
+  BlockMap::iterator iter = anchors_.begin();
+  for (; iter != anchors_.end(); iter++) {
+    Block *candidate = &iter->second;
+    if (candidate->can_provide(addr, distance, size))
+      return candidate;
+  }
+  return NULL;
+}
+
+bool ProximityAllocator::Block::can_provide(uint64_t addr, uint64_t distance,
+    uint64_t size) {
+  return is_within(addr, distance, next_) && is_within(addr, distance, next_ + size);
+}
+
+bool ProximityAllocator::Block::is_within(uint64_t base, uint64_t distance,
+    uint64_t addr) {
+  uint64_t half_distance = distance >> 1;
+  uint64_t min = minus_saturate_zero(base, half_distance);
+  uint64_t max = plus_saturate_max64(base, half_distance);
+  return (min <= addr) && (addr < max);
+}
+
+Vector<byte_t> ProximityAllocator::alloc_executable(address_t raw_addr,
+    uint64_t distance, size_t size, MessageSink *messages) {
+  uint64_t addr = reinterpret_cast<uint64_t>(raw_addr);
+  Block *block = find_existing_block(addr, distance, size);
+  if (block != NULL)
+    return Vector<byte_t>();
+//  address_t bottom_anchor = bottom_anchor_from_address(addr, distance);
+  return Vector<byte_t>();
+}
+
+uint64_t ProximityAllocator::bottom_anchor_from_address(uint64_t addr,
+    uint64_t distance) {
+  if (distance == 0)
+    // If there is no distance restriction we use the trivial bottom anchor.
+    return 0;
+  CHECK_TRUE("unaligned distance", is_power_of_2(distance));
+  uint64_t addr_value = reinterpret_cast<uint64_t>(addr);
+  // There are kAnchorCount anchors within the distance and the alignment and
+  // this is the alignment they snap to.
+  uint64_t anchor_alignment = distance >> kLogAnchorCount;
+  // Align the address as an anchor; this will yield the anchor in the middle of
+  // the range.
+  uint64_t middle_anchor_value = addr_value & ~(anchor_alignment - 1);
+  // Subtract half the distance; this will yield the bottom anchor.
+  uint64_t half_distance = (distance >> 1);
+  uint64_t bottom_anchor_value = minus_saturate_zero(middle_anchor_value,
+      half_distance);
+  return bottom_anchor_value;
+}
+
+uint64_t ProximityAllocator::minus_saturate_zero(uint64_t a, uint64_t b) {
+  return (a <= b) ? 0 : (a - b);
+}
+
+uint64_t ProximityAllocator::plus_saturate_max64(uint64_t a, uint64_t b) {
+  return (a <= (-1ULL - b)) ? (a + b) : -1ULL;
 }
 
 #ifdef IS_64_BIT

@@ -158,6 +158,72 @@ TEST(binpatch, can_jump_32) {
   check_jump_32(false, i31 - 4, 0);
 }
 
+class TestVirtualAllocator : public VirtualAllocator {
+public:
+  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
+      MessageSink *messages);
+};
+
+Vector<byte_t> TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
+    MessageSink *messages) {
+  return Vector<byte_t>();
+}
+
+TEST(binpatch, saturate) {
+  ASSERT_EQ(5, ProximityAllocator::minus_saturate_zero(8, 3));
+  ASSERT_EQ(3, ProximityAllocator::minus_saturate_zero(8, 5));
+  ASSERT_EQ(1, ProximityAllocator::minus_saturate_zero(8, 7));
+  ASSERT_EQ(0, ProximityAllocator::minus_saturate_zero(8, 9));
+  ASSERT_EQ(0, ProximityAllocator::minus_saturate_zero(8, 13));
+  uint64_t u63 = 1ULL << 63;
+  ASSERT_EQ(0, ProximityAllocator::minus_saturate_zero(8, u63));
+  ASSERT_EQ(5, ProximityAllocator::minus_saturate_zero(u63 + 5, u63));
+  uint64_t l64 = -1ULL;
+  ASSERT_EQ(l64, ProximityAllocator::minus_saturate_zero(l64, 0));
+  ASSERT_EQ(5, ProximityAllocator::minus_saturate_zero(l64, l64 - 5));
+  ASSERT_EQ(0, ProximityAllocator::minus_saturate_zero(l64, l64));
+
+  ASSERT_EQ(l64 - 2, ProximityAllocator::plus_saturate_max64(l64 - 5, 3));
+  ASSERT_EQ(l64 - 1, ProximityAllocator::plus_saturate_max64(l64 - 5, 4));
+  ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, 5));
+  ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, 6));
+  ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, 7));
+  ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, u63));
+  ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, l64));
+}
+
+static void check_bottom_anchor(uint64_t expected, uint64_t addr, uint64_t distance) {
+  ASSERT_EQ(expected, reinterpret_cast<uint64_t>(
+      ProximityAllocator::bottom_anchor_from_address(
+          addr, distance)));
+}
+
+TEST(binpatch, proxy_bottom_anchor) {
+  check_bottom_anchor(1024 - 128, 1024, 256);
+  check_bottom_anchor(1024 - 128, 1024 + 7, 256);
+  check_bottom_anchor(1024 - 120, 1024 + 8, 256);
+  check_bottom_anchor(1024 - 120, 1024 + 15, 256);
+  check_bottom_anchor(1024 - 112, 1024 + 16, 256);
+  check_bottom_anchor(1024 - 8, 1024 + 127, 256);
+
+  uint64_t u32 = 1ULL << 32;
+  uint64_t b32 = u32 >> 5;
+  check_bottom_anchor(u32 - (16 * b32), u32, u32);
+  check_bottom_anchor(u32 - (16 * b32), u32 + (b32 / 2), u32);
+  check_bottom_anchor(u32 - (15 * b32), u32 + b32, u32);
+
+  check_bottom_anchor(0, 0, 256);
+  check_bottom_anchor(0, 64, 256);
+  check_bottom_anchor(0, 128, 256);
+  check_bottom_anchor(64, 192, 256);
+}
+
+TEST(binpatch, proximity_allocator) {
+  TestVirtualAllocator direct;
+  ProximityAllocator alloc(&direct, 1024, 1024 * 1024);
+  alloc.alloc_executable(0, 0, 8, NULL);
+}
+
 // There's no reason these tests can't work on 32-bit, except some bugs with
 // inline asm in gcc.
 #if defined(IS_GCC) && defined(IS_64_BIT)

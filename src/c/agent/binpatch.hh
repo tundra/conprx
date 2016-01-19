@@ -30,6 +30,7 @@
 #define _BINPATCH
 
 #include "c/stdvector.hh"
+#include "c/stdhashmap.hh"
 #include "utils/blob.hh"
 #include "utils/vector.hh"
 
@@ -370,8 +371,95 @@ public:
   }
 };
 
+// An allocator that allocates directly near an address, that is, it allocates
+// either exactly at a given address or fails.
+class VirtualAllocator {
+public:
+  virtual ~VirtualAllocator() { }
+  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
+      MessageSink *messages) = 0;
+};
+
+// An allocator that allocates near an address and makes multiple attempts at
+// different locations within a certain range and succeeds if any attempt
+// succeeds, only failing if all attempts fail.
+class ProximityAllocator {
+public:
+  // A block of memory that's already been allocated and that we can hand out
+  // to callers.
+  class Block {
+  public:
+    Block(tclib::Blob blob)
+      : next_(reinterpret_cast<uint64_t>(blob.start()))
+      , limit_(reinterpret_cast<uint64_t>(blob.end())) { }
+
+    // Returns true if allocating the given size within this block will yield
+    // memory within the requested restrictions. Note that it's possible that
+    // this block contains memory within the restrictions but if it's not the
+    // next memory that would be returned this call will return false.
+    bool can_provide(uint64_t addr, uint64_t distance, uint64_t size);
+
+    // Returns true iff the given address is within the given distance of the
+    // given base address.
+    static bool is_within(uint64_t base, uint64_t distance, uint64_t addr);
+
+  private:
+    uint64_t next_;
+    uint64_t limit_;
+  };
+
+  typedef IF_32_BIT(uint32_t, uint64_t) anchor_key_t;
+
+  typedef platform_hash_map<anchor_key_t, Block> BlockMap;
+
+  // Initialize this proximity allocator; allocate from the given direct
+  // allocator, return memory with the given alignment (must be a power of 2),
+  // allocate blocks in chunks of the given block_size (also power of 2).
+  ProximityAllocator(VirtualAllocator *direct, uint64_t alignment, uint64_t block_size);
+
+  // Allocate a block of executable memory no further than the given distance
+  // from the given address. Returns a block of memory if allocation succeeds,
+  // otherwise an empty block. The distance must either be a power of 2 or 0
+  // which means that there is no distance restriction, any memory is
+  // acceptable. The distance must be a multiple of the allocator's block_size.
+  Vector<byte_t> alloc_executable(address_t addr, uint64_t distance, size_t size,
+      MessageSink *messages);
+
+  // If we already have a block that works for the given address returns it.
+  Block *find_existing_block(uint64_t addr, uint64_t distance, uint64_t size);
+
+  // Given an address and a distance returns the anchor of the least block
+  // we'll attempt. The result will never be larger than the given address so
+  // if you pass in a 32-bit value you're guaranteed to get one back.
+  static uint64_t bottom_anchor_from_address(uint64_t addr, uint64_t distance);
+
+  // Subtract b from a but return 0 in the case where the result would have
+  // become negative had it been signed.
+  static uint64_t minus_saturate_zero(uint64_t a, uint64_t b);
+
+  // Add b to a but return max int 64 (2^64-1) in the case where the result
+  // would have become larger had it had wider range.
+  static uint64_t plus_saturate_max64(uint64_t a, uint64_t b);
+
+private:
+  // How many anchors within the requested distance from the address will we
+  // try?
+  static const size_t kLogAnchorCount = 5;
+  static const size_t kAnchorCount = 1 << kLogAnchorCount;
+  // The underlying allocator to ask for virtual memory.
+  VirtualAllocator *direct_;
+  // Memory allocated through this allocator will have this alignment.
+  uint64_t alignment_;
+  // The size of an individual block of memory to allocate. This must be larger
+  // than any range requested.
+  uint64_t block_size_;
+  // A mapping from anchor addresses to the currently active block for that
+  // anchor.
+  BlockMap anchors_;
+};
+
 // The platform-specific object that knows how to allocate and manipulate memory.
-class MemoryManager {
+class MemoryManager : public VirtualAllocator {
 public:
   virtual ~MemoryManager();
 
