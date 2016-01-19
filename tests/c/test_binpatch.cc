@@ -193,9 +193,8 @@ TEST(binpatch, saturate) {
 }
 
 static void check_bottom_anchor(uint64_t expected, uint64_t addr, uint64_t distance) {
-  ASSERT_EQ(expected, reinterpret_cast<uint64_t>(
-      ProximityAllocator::bottom_anchor_from_address(
-          addr, distance)));
+  ASSERT_EQ(expected, ProximityAllocator::bottom_anchor_from_address(addr,
+      distance));
 }
 
 TEST(binpatch, proxy_bottom_anchor) {
