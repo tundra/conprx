@@ -162,11 +162,16 @@ class TestVirtualAllocator : public VirtualAllocator {
 public:
   virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
       MessageSink *messages);
+  virtual bool free_block(Vector<byte_t> block);
 };
 
 Vector<byte_t> TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
     MessageSink *messages) {
   return Vector<byte_t>();
+}
+
+bool TestVirtualAllocator::free_block(Vector<byte_t> block) {
+  return true;
 }
 
 TEST(binpatch, saturate) {
@@ -192,29 +197,44 @@ TEST(binpatch, saturate) {
   ASSERT_EQ(l64, ProximityAllocator::plus_saturate_max64(l64 - 5, l64));
 }
 
-static void check_bottom_anchor(uint64_t expected, uint64_t addr, uint64_t distance) {
-  ASSERT_EQ(expected, ProximityAllocator::bottom_anchor_from_address(addr,
-      distance));
+static void check_anchor(uint64_t expected, uint64_t addr, uint64_t distance,
+    uint32_t index) {
+  ASSERT_EQ(expected, ProximityAllocator::get_anchor_from_address(addr,
+      distance, index));
 }
 
-TEST(binpatch, proxy_bottom_anchor) {
-  check_bottom_anchor(1024 - 128, 1024, 256);
-  check_bottom_anchor(1024 - 128, 1024 + 7, 256);
-  check_bottom_anchor(1024 - 120, 1024 + 8, 256);
-  check_bottom_anchor(1024 - 120, 1024 + 15, 256);
-  check_bottom_anchor(1024 - 112, 1024 + 16, 256);
-  check_bottom_anchor(1024 - 8, 1024 + 127, 256);
+static void check_anchors(uint64_t bottom, uint64_t middle, uint64_t top,
+    uint64_t addr, uint64_t distance) {
+  check_anchor(bottom, addr, distance, 0);
+  check_anchor(middle, addr, distance, ProximityAllocator::kAnchorCount / 2);
+  check_anchor(top, addr, distance, ProximityAllocator::kAnchorCount);
+}
+
+TEST(binpatch, proxy_anchor) {
+  check_anchors(1024 - 128, 1024, 1024 + 128, 1024, 256);
+  check_anchors(1024 - 128, 1024, 1024 + 128, 1024 + 7, 256);
+  check_anchors(1024 - 120, 1024 + 8, 1024 + 136, 1024 + 8, 256);
+  check_anchors(1024 - 120, 1024 + 8, 1024 + 136, 1024 + 15, 256);
+  check_anchors(1024 - 112, 1024 + 16, 1024 + 144, 1024 + 16, 256);
+  check_anchors(1024 - 8, 1024 + 120, 1024 + 248, 1024 + 127, 256);
 
   uint64_t u32 = 1ULL << 32;
   uint64_t b32 = u32 >> 5;
-  check_bottom_anchor(u32 - (16 * b32), u32, u32);
-  check_bottom_anchor(u32 - (16 * b32), u32 + (b32 / 2), u32);
-  check_bottom_anchor(u32 - (15 * b32), u32 + b32, u32);
+  check_anchors(u32 - (16 * b32), u32, u32 + (16 * b32), u32, u32);
+  check_anchors(u32 - (16 * b32), u32, u32 + (16 * b32), u32 + (b32 / 2), u32);
+  check_anchors(u32 - (15 * b32), u32 + b32, u32 + (17 * b32), u32 + b32, u32);
 
-  check_bottom_anchor(0, 0, 256);
-  check_bottom_anchor(0, 64, 256);
-  check_bottom_anchor(0, 128, 256);
-  check_bottom_anchor(64, 192, 256);
+  check_anchors(0, 0, 128, 0, 256);
+  check_anchors(0, 64, 192, 64, 256);
+  check_anchors(0, 128, 256, 128, 256);
+  check_anchors(64, 192, 320, 192, 256);
+
+  uint64_t u64 = -1ULL;
+  uint64_t au64 = u64 - 7; // Max value aligned as an anchor.
+  check_anchors(au64 - 128, au64, au64, u64, 256);
+  check_anchors(au64 - 192, au64 - 64, au64, u64 - 64, 256);
+  check_anchors(au64 - 256, au64 - 128, au64, u64 - 128, 256);
+  check_anchors(au64 - 320, au64 - 192, au64 - 64, u64 - 192, 256);
 }
 
 TEST(binpatch, proximity_allocator) {

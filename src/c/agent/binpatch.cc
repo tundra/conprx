@@ -44,7 +44,6 @@ PatchRequest::PatchRequest(address_t original, address_t replacement, const char
   , replacement_(replacement)
   , name_(name)
   , imposter_(NULL)
-  , imposter_code_(NULL)
   , platform_(NULL)
   , preamble_size_(0)
   , redirection_(NULL) { }
@@ -54,7 +53,6 @@ PatchRequest::PatchRequest()
   , replacement_(NULL)
   , name_(NULL)
   , imposter_(NULL)
-  , imposter_code_(NULL)
   , platform_(NULL)
   , preamble_size_(0)
   , redirection_(NULL) { }
@@ -63,10 +61,12 @@ PatchRequest::~PatchRequest() {
   delete redirection_;
 }
 
-bool PatchRequest::prepare_apply(Platform *platform, ImposterCode *code,
+bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc,
     MessageSink *messages) {
   platform_ = platform;
-  imposter_code_ = code;
+  imposter_code_ = alloc->alloc_executable(0, 0, kImposterCodeStubSizeBytes, messages);
+  if (imposter_code_.is_empty())
+    return false;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
@@ -92,7 +92,7 @@ address_t PatchRequest::get_or_create_imposter() {
 
 void PatchRequest::write_imposter() {
   InstructionSet &inst = platform().instruction_set();
-  tclib::Blob imposter_memory = imposter_code()->memory();
+  tclib::Blob imposter_memory = imposter_code();
   // Clear the memory to halt such that if the imposter doesn't fill the memory
   // completely there'll be sane code there.
   inst.write_halt(imposter_memory);
@@ -104,6 +104,7 @@ void PatchRequest::write_imposter() {
 PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   : platform_(platform)
   , requests_(requests)
+  , alloc_(&platform.memory_manager(), 16, 1024 * 1024)
   , status_(NOT_APPLIED)
   , old_perms_(0) { }
 
@@ -114,13 +115,8 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
     status_ = PREPARED;
     return true;
   }
-  Vector<byte_t> trampoline_memory = memory_manager().alloc_executable(NULL,
-      sizeof(ImposterCode) * requests().length(), messages);
-  if (trampoline_memory.is_empty())
-    return REPORT_MESSAGE(messages, "Failed to allocate trampolines");
-  codes_ = trampoline_memory.cast<ImposterCode>();
   for (size_t i = 0; i < requests().length(); i++) {
-    if (!requests()[i].prepare_apply(&platform_, &codes_[i], messages)) {
+    if (!requests()[i].prepare_apply(&platform_, alloc(), messages)) {
       status_ = FAILED;
       return false;
     }
@@ -291,20 +287,44 @@ void PreambleInfo::populate(size_t size, byte_t last_instr) {
   last_instr_ = last_instr;
 }
 
+const uint32_t ProximityAllocator::kAnchorOrder[ProximityAllocator::kAnchorCount] = {
+    25, 10, 22,  2, 29, 12, 17,  4,
+    11, 31, 13,  6,  1,  0, 20, 15,
+     7, 27, 16, 23, 30, 14, 19, 18,
+     5, 26, 24,  9, 21, 28,  8,  3
+};
+
 ProximityAllocator::ProximityAllocator(VirtualAllocator *direct, uint64_t alignment,
     uint64_t block_size)
   : direct_(direct)
   , alignment_(alignment)
-  , block_size_(block_size) {
+  , block_size_(block_size)
+  , unrestricted_(NULL) {
   CHECK_TRUE("unaligned alignment", is_power_of_2(alignment));
   CHECK_TRUE("unaligned block size", is_power_of_2(block_size));
+}
+
+ProximityAllocator::~ProximityAllocator() {
+  if (unrestricted_ != NULL)
+    delete_block(unrestricted_);
+  BlockMap::iterator iter = anchors_.begin();
+  for (; iter != anchors_.end(); iter++)
+    delete_block(iter->second);
+}
+
+bool ProximityAllocator::delete_block(Block *block) {
+  std::vector< Vector<byte_t> > *chunks = block->to_free();
+  for (size_t i = 0; i < chunks->size(); i++)
+    direct_->free_block(chunks->at(i));
+  delete block;
+  return true;
 }
 
 ProximityAllocator::Block *ProximityAllocator::find_existing_block(uint64_t addr,
     uint64_t distance, uint64_t size) {
   BlockMap::iterator iter = anchors_.begin();
   for (; iter != anchors_.end(); iter++) {
-    Block *candidate = &iter->second;
+    Block *candidate = iter->second;
     if (candidate->can_provide(addr, distance, size))
       return candidate;
   }
@@ -313,7 +333,17 @@ ProximityAllocator::Block *ProximityAllocator::find_existing_block(uint64_t addr
 
 bool ProximityAllocator::Block::can_provide(uint64_t addr, uint64_t distance,
     uint64_t size) {
-  return is_within(addr, distance, next_) && is_within(addr, distance, next_ + size);
+  return is_active_
+      && is_within(addr, distance, next_)
+      && is_within(addr, distance, next_ + size)
+      && plus_saturate_max64(next_, size) < limit_;
+}
+
+tclib::Blob ProximityAllocator::Block::alloc(uint64_t size) {
+  // TODO: align result
+  uint64_t start = next_;
+  next_ += size;
+  return tclib::Blob(reinterpret_cast<void*>(start), static_cast<size_t>(size));
 }
 
 bool ProximityAllocator::Block::is_within(uint64_t base, uint64_t distance,
@@ -324,18 +354,61 @@ bool ProximityAllocator::Block::is_within(uint64_t base, uint64_t distance,
   return (min <= addr) && (addr < max);
 }
 
-Vector<byte_t> ProximityAllocator::alloc_executable(address_t raw_addr,
-    uint64_t distance, size_t size, MessageSink *messages) {
-  uint64_t addr = reinterpret_cast<uint64_t>(raw_addr);
-  Block *block = find_existing_block(addr, distance, size);
-  if (block != NULL)
-    return Vector<byte_t>();
-//  address_t bottom_anchor = bottom_anchor_from_address(addr, distance);
-  return Vector<byte_t>();
+bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocator *owner,
+    MessageSink *messages) {
+  // If there's room immediately we use that capacity.
+  uint64_t remaining = limit_ - next_;
+  if (remaining >= size)
+    return true;
+  // There's no room so we allocate a new block.
+  Vector<byte_t> block;
+  if (is_restricted_) {
+    block = owner->direct_->alloc_executable(reinterpret_cast<address_t>(limit_),
+        static_cast<size_t>(owner->block_size_), messages);
+  } else {
+    block = owner->direct_->alloc_executable(0,
+        static_cast<size_t>(owner->block_size_), messages);
+  }
+  if (block.is_empty()) {
+    // We could get no memory so we deactivate this block such that we'll ignore
+    // it from here on.
+    is_active_ = false;
+    return false;
+  }
+  next_ = reinterpret_cast<uint64_t>(block.start());
+  limit_ = reinterpret_cast<uint64_t>(block.end());
+  return true;
 }
 
-uint64_t ProximityAllocator::bottom_anchor_from_address(uint64_t addr,
-    uint64_t distance) {
+tclib::Blob ProximityAllocator::alloc_executable(address_t raw_addr,
+    uint64_t distance, size_t size, MessageSink *messages) {
+  CHECK_REL("alloc too big", size, <=, block_size_);
+  if (distance == 0) {
+    // There are no restrictions on this allocation so try to use the
+    // unrestricted allocator.
+    Block *unrestricted = get_or_create_unrestricted();
+    return unrestricted->ensure_capacity(size, this, messages)
+      ? unrestricted->alloc(size)
+      : tclib::Blob();
+  }
+  uint64_t addr = reinterpret_cast<uint64_t>(raw_addr);
+  // First attempt to get the memory from an existing block.
+  Block *block = find_existing_block(addr, distance, size);
+  if (block != NULL)
+    return block->alloc(size);
+  for (size_t ia = 0; ia < kAnchorCount; ia++) {
+    uint32_t index = kAnchorOrder[ia];
+    uint64_t anchor = get_anchor_from_address(addr, distance, index);
+    Block *block = get_or_create_anchor(anchor);
+    if (block->ensure_capacity(size, this, messages) && block->can_provide(addr, distance, size))
+      return block->alloc(size);
+  }
+  return tclib::Blob();
+}
+
+uint64_t ProximityAllocator::get_anchor_from_address(uint64_t addr,
+    uint64_t distance, uint32_t index) {
+  CHECK_REL("invalid anchor index", index, <=, kAnchorCount);
   if (distance == 0)
     // If there is no distance restriction we use the trivial bottom anchor.
     return 0;
@@ -343,12 +416,18 @@ uint64_t ProximityAllocator::bottom_anchor_from_address(uint64_t addr,
   // There are kAnchorCount anchors within the distance and the alignment and
   // this is the alignment they snap to.
   uint64_t anchor_alignment = distance >> kLogAnchorCount;
-  // Align the address as an anchor; this will yield the anchor in the middle of
-  // the range.
-  uint64_t middle_anchor = addr & ~(anchor_alignment - 1);
-  // Subtract half the distance; this will yield the bottom anchor.
-  uint64_t half_distance = (distance >> 1);
-  return minus_saturate_zero(middle_anchor, half_distance);
+  // The index relative to the middle of the range.
+  int64_t relative_index = static_cast<int64_t>(index) - (kAnchorCount >> 1);
+  // The distance to jump relative to the address.
+  int64_t relative_offset = relative_index * anchor_alignment;
+  // Use saturating ops to add the offset.
+  uint64_t unaligned = (relative_offset < 0)
+      ? minus_saturate_zero(addr, -relative_offset)
+      : plus_saturate_max64(addr, relative_offset);
+  // Finally align the result to get an anchor. The difference between aligning
+  // before or after adding the offset is whether we align the saturation
+  // boundaries or not; this way we do.
+  return unaligned & ~(anchor_alignment - 1);
 }
 
 uint64_t ProximityAllocator::minus_saturate_zero(uint64_t a, uint64_t b) {
@@ -357,6 +436,22 @@ uint64_t ProximityAllocator::minus_saturate_zero(uint64_t a, uint64_t b) {
 
 uint64_t ProximityAllocator::plus_saturate_max64(uint64_t a, uint64_t b) {
   return (a <= (-1ULL - b)) ? (a + b) : -1ULL;
+}
+
+ProximityAllocator::Block *ProximityAllocator::get_or_create_unrestricted() {
+  if (unrestricted_ == NULL)
+    unrestricted_ = new Block();
+  return unrestricted_;
+}
+
+ProximityAllocator::Block *ProximityAllocator::get_or_create_anchor(uint64_t anchor) {
+  anchor_key_t key = static_cast<anchor_key_t>(anchor);
+  BlockMap::iterator existing = anchors_.find(key);
+  if (existing != anchors_.end())
+    return existing->second;
+  Block *new_block = new Block(anchor);
+  anchors_[key] = new_block;
+  return new_block;
 }
 
 #ifdef IS_64_BIT

@@ -21,6 +21,7 @@ public:
       MessageSink *messages);
   virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
       MessageSink *messages);
+  virtual bool free_block(Vector<byte_t> block);
 private:
   bool is_initialized_;
   size_t page_size_;
@@ -91,6 +92,10 @@ Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size,
     return Vector<byte_t>();
   }
   return Vector<byte_t>(static_cast<byte_t*>(result), size);
+}
+
+bool PosixMemoryManager::free_block(Vector<byte_t> block) {
+  return munmap(block.start(), block.length()) == 0;
 }
 
 MemoryManager &MemoryManager::get() {

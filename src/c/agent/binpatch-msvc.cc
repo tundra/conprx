@@ -15,6 +15,7 @@ public:
       standalone_dword_t old_perms, MessageSink *messages);
   virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
       MessageSink *messages);
+  virtual bool free_block(Vector<byte_t> block);
 };
 
 bool WindowsMemoryManager::open_for_writing(Vector<byte_t> region,
@@ -50,6 +51,10 @@ Vector<byte_t> WindowsMemoryManager::alloc_executable(address_t addr, size_t siz
     return Vector<byte_t>();
   }
   return Vector<byte_t>(static_cast<address_t>(memory), size);
+}
+
+bool WindowsMemoryManager::free_block(Vector<byte_t> block) {
+  return VirtualFree(block.start(), 0, MEM_RELEASE);
 }
 
 MemoryManager &MemoryManager::get() {
