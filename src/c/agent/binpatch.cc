@@ -340,7 +340,6 @@ bool ProximityAllocator::Block::can_provide(uint64_t addr, uint64_t distance,
 }
 
 tclib::Blob ProximityAllocator::Block::alloc(uint64_t size) {
-  // TODO: align result
   uint64_t start = next_;
   next_ += size;
   return tclib::Blob(reinterpret_cast<void*>(start), static_cast<size_t>(size));
