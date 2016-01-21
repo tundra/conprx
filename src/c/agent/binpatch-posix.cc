@@ -15,20 +15,20 @@ class PosixMemoryManager : public MemoryManager {
 public:
   PosixMemoryManager();
   virtual bool ensure_initialized(MessageSink *messages);
-  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms,
+  virtual bool open_for_writing(tclib::Blob region, standalone_dword_t *old_perms,
       MessageSink *messages);
-  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms,
+  virtual bool close_for_writing(tclib::Blob region, standalone_dword_t old_perms,
       MessageSink *messages);
-  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
       MessageSink *messages);
-  virtual bool free_block(Vector<byte_t> block);
+  virtual bool free_block(tclib::Blob block);
 private:
   bool is_initialized_;
   size_t page_size_;
 
   // Attempts to set the permissions of the page containing the given address
   // to the given value.
-  bool set_permissions(Vector<byte_t> region, int prot, MessageSink *messages);
+  bool set_permissions(tclib::Blob region, int prot, MessageSink *messages);
 };
 
 PosixMemoryManager::PosixMemoryManager()
@@ -48,7 +48,7 @@ bool PosixMemoryManager::ensure_initialized(MessageSink *messages) {
   return true;
 }
 
-bool PosixMemoryManager::open_for_writing(Vector<byte_t> region,
+bool PosixMemoryManager::open_for_writing(tclib::Blob region,
     standalone_dword_t *old_perms, MessageSink *messages) {
   // TODO: store the old permissions rather than assume they're read+exec. As
   //   far as I've been able to determine you're meant to get this info by
@@ -57,12 +57,12 @@ bool PosixMemoryManager::open_for_writing(Vector<byte_t> region,
   return set_permissions(region, PROT_READ | PROT_WRITE | PROT_EXEC, messages);
 }
 
-bool PosixMemoryManager::close_for_writing(Vector<byte_t> region,
+bool PosixMemoryManager::close_for_writing(tclib::Blob region,
     standalone_dword_t old_perms, MessageSink *messages) {
   return set_permissions(region, old_perms, messages);
 }
 
-bool PosixMemoryManager::set_permissions(Vector<byte_t> region, int prot,
+bool PosixMemoryManager::set_permissions(tclib::Blob region, int prot,
     MessageSink *messages) {
   // Determine the range of addresses to set.
   address_arith_t start_addr = reinterpret_cast<address_arith_t>(region.start());
@@ -80,7 +80,7 @@ bool PosixMemoryManager::set_permissions(Vector<byte_t> region, int prot,
   return true;
 }
 
-Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size,
+tclib::Blob PosixMemoryManager::alloc_executable(address_t addr, size_t size,
     MessageSink *messages) {
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   int protect = PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -89,13 +89,13 @@ Vector<byte_t> PosixMemoryManager::alloc_executable(address_t addr, size_t size,
   if (result == MAP_FAILED) {
     REPORT_MESSAGE(messages, "mmap(NULL, %i, %i, %i, 0, 0): %i",
         page_size_, protect, flags, errno);
-    return Vector<byte_t>();
+    return tclib::Blob();
   }
-  return Vector<byte_t>(static_cast<byte_t*>(result), size);
+  return tclib::Blob(result, size);
 }
 
-bool PosixMemoryManager::free_block(Vector<byte_t> block) {
-  return munmap(block.start(), block.length()) == 0;
+bool PosixMemoryManager::free_block(tclib::Blob block) {
+  return munmap(block.start(), block.size()) == 0;
 }
 
 MemoryManager &MemoryManager::get() {

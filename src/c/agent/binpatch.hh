@@ -156,7 +156,7 @@ public:
 
   tclib::Blob original_preamble() { return tclib::Blob(original_, preamble_size_); }
 
-  Vector<byte_t> preamble_copy() { return Vector<byte_t>(preamble_copy_, preamble_size_); }
+  tclib::Blob preamble_copy() { return tclib::Blob(preamble_copy_, preamble_size_); }
 
 private:
   // Returns the address of the trampoline, creating it on first call.
@@ -243,11 +243,11 @@ private:
 class VirtualAllocator {
 public:
   virtual ~VirtualAllocator() { }
-  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
       MessageSink *messages) = 0;
   // Frees a block that was returned from alloc_executable. Returns true iff
   // freeing succeeds.
-  virtual bool free_block(Vector<byte_t> block) = 0;
+  virtual bool free_block(tclib::Blob block) = 0;
 };
 
 // An allocator that allocates near an address and makes multiple attempts at
@@ -286,14 +286,10 @@ public:
     // Returns a block from this allocator.
     tclib::Blob alloc(uint64_t size);
 
-    // Returns true iff the given address is within the given distance of the
-    // given base address.
-    static bool is_within(uint64_t base, uint64_t distance, uint64_t addr);
-
-    std::vector< Vector<byte_t> > *to_free() { return &to_free_; }
+    std::vector<tclib::Blob> *to_free() { return &to_free_; }
 
   private:
-    std::vector< Vector<byte_t> > to_free_;
+    std::vector<tclib::Blob> to_free_;
     bool is_restricted_;
     bool is_active_;
     uint64_t next_;
@@ -342,6 +338,11 @@ public:
   // would have become larger had it had wider range.
   static uint64_t plus_saturate_max64(uint64_t a, uint64_t b);
 
+  // Returns true iff the given address is within the given distance of the
+  // given base address.
+  static bool is_within(uint64_t base, uint64_t distance, uint64_t addr);
+
+  // Deletes the given block along with any data held by it.
   bool delete_block(Block *block);
 
   static const size_t kLogAnchorCount = 5;
@@ -443,12 +444,12 @@ public:
   // stops at the beginning of the last function to write and we'll be writing
   // a little bit past the beginning. Use determine_patch_range to get the
   // full range we'll be writing.
-  Vector<byte_t> determine_address_range();
+  tclib::Blob determine_address_range();
 
   // Does basically the same thing as determine_address_range but takes into
   // account that we have to write some amount past the last address. All the
   // memory we'll be writing will be within this range.
-  Vector<byte_t> determine_patch_range();
+  tclib::Blob determine_patch_range();
 
   Status status() { return status_; }
 
@@ -511,13 +512,13 @@ public:
   // Attempts to open the given memory region such that it can be written. If
   // successful the previous permissions should be stored in the given out
   // parameter.
-  virtual bool open_for_writing(Vector<byte_t> region, standalone_dword_t *old_perms,
+  virtual bool open_for_writing(tclib::Blob region, standalone_dword_t *old_perms,
       MessageSink *messages) = 0;
 
   // Attempts to close the given memory region such that it can no longer be
   // written. The old_perms parameter contains the value that was stored by
   // open_for_writing.
-  virtual bool close_for_writing(Vector<byte_t> region, standalone_dword_t old_perms,
+  virtual bool close_for_writing(tclib::Blob region, standalone_dword_t old_perms,
       MessageSink *messages) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to

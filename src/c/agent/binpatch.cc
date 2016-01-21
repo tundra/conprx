@@ -125,10 +125,10 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
   return true;
 }
 
-Vector<byte_t> PatchSet::determine_address_range() {
+tclib::Blob PatchSet::determine_address_range() {
   if (requests().length() == 0) {
     // There are no patches so the range is empty.
-    return Vector<byte_t>();
+    return tclib::Blob();
   } else {
     // Scan through the patches to determine the range. Note that the result
     // will have its endpoint one past the highest address, hence the +1 at the
@@ -143,25 +143,25 @@ Vector<byte_t> PatchSet::determine_address_range() {
       if (addr > highest)
         highest = addr;
     }
-    return Vector<byte_t>(lowest, highest + 1);
+    return tclib::Blob(lowest, (highest - lowest) + 1);
   }
 }
 
-Vector<byte_t> PatchSet::determine_patch_range() {
-  Vector<byte_t> addr_range = determine_address_range();
+tclib::Blob PatchSet::determine_patch_range() {
+  tclib::Blob addr_range = determine_address_range();
   if (addr_range.is_empty()) {
     return addr_range;
   } else {
     // The amount we're going to write past the last address.
-    size_t new_length = addr_range.length() + kMaxPreambleSizeBytes;
-    return Vector<byte_t>(addr_range.start(), new_length);
+    size_t new_length = addr_range.size() + kMaxPreambleSizeBytes;
+    return tclib::Blob(addr_range.start(), new_length);
   }
 }
 
 bool PatchSet::open_for_patching(MessageSink *messages) {
   DEBUG("Opening original code for writing");
   // Try opening the region for writing.
-  Vector<byte_t> region = determine_patch_range();
+  tclib::Blob region = determine_patch_range();
   if (!memory_manager().open_for_writing(region, &old_perms_, messages)) {
     status_= FAILED;
     return false;
@@ -195,12 +195,12 @@ bool PatchSet::validate_open_for_patching(MessageSink *messages) {
 
 bool PatchSet::close_after_patching(Status success_status, MessageSink *messages) {
   DEBUG("Closing original code for writing");
-  Vector<byte_t> region = determine_patch_range();
+  tclib::Blob region = determine_patch_range();
   if (!memory_manager().close_for_writing(region, old_perms_, messages)) {
     status_ = FAILED;
     return false;
   }
-  instruction_set().flush_instruction_cache(region.memory());
+  instruction_set().flush_instruction_cache(region);
   DEBUG("Successfully closed original code");
   status_ = success_status;
   return true;
@@ -230,9 +230,9 @@ void PatchSet::revert_redirects() {
   DEBUG("Reverting redirects");
   for (size_t i = 0; i < requests().length(); i++) {
     PatchRequest &request = requests()[i];
-    Vector<byte_t> preamble = request.preamble_copy();
+    tclib::Blob preamble = request.preamble_copy();
     address_t original = request.original();
-    memcpy(original, preamble.start(), preamble.length());
+    memcpy(original, preamble.start(), preamble.size());
   }
   DEBUG("Successfully reverted redirects");
   status_ = REVERTED_OPEN;
@@ -313,7 +313,7 @@ ProximityAllocator::~ProximityAllocator() {
 }
 
 bool ProximityAllocator::delete_block(Block *block) {
-  std::vector< Vector<byte_t> > *chunks = block->to_free();
+  std::vector<tclib::Blob> *chunks = block->to_free();
   for (size_t i = 0; i < chunks->size(); i++)
     direct_->free_block(chunks->at(i));
   delete block;
@@ -346,7 +346,7 @@ tclib::Blob ProximityAllocator::Block::alloc(uint64_t size) {
   return tclib::Blob(reinterpret_cast<void*>(start), static_cast<size_t>(size));
 }
 
-bool ProximityAllocator::Block::is_within(uint64_t base, uint64_t distance,
+bool ProximityAllocator::is_within(uint64_t base, uint64_t distance,
     uint64_t addr) {
   uint64_t half_distance = distance >> 1;
   uint64_t min = minus_saturate_zero(base, half_distance);
@@ -356,12 +356,15 @@ bool ProximityAllocator::Block::is_within(uint64_t base, uint64_t distance,
 
 bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocator *owner,
     MessageSink *messages) {
+  if (!is_active_)
+    // If this block is inactive we don't try ensuring again, we leave it dead.
+    return false;
   // If there's room immediately we use that capacity.
   uint64_t remaining = limit_ - next_;
   if (remaining >= size)
     return true;
   // There's no room so we allocate a new block.
-  Vector<byte_t> block;
+  tclib::Blob block;
   if (is_restricted_) {
     block = owner->direct_->alloc_executable(reinterpret_cast<address_t>(limit_),
         static_cast<size_t>(owner->block_size_), messages);
@@ -381,7 +384,8 @@ bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocato
 }
 
 tclib::Blob ProximityAllocator::alloc_executable(address_t raw_addr,
-    uint64_t distance, size_t size, MessageSink *messages) {
+    uint64_t distance, size_t raw_size, MessageSink *messages) {
+  uint64_t size = align_uint64(alignment_, raw_size);
   CHECK_REL("alloc too big", size, <=, block_size_);
   if (distance == 0) {
     // There are no restrictions on this allocation so try to use the

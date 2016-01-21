@@ -28,11 +28,11 @@ size_t X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
   address_t trampoline = static_cast<address_t>(memory.start());
   // Copy the overwritten bytes into the trampoline. We'll definitely have to
   // execute those.
-  Vector<byte_t> preamble_copy = request.preamble_copy();
-  memcpy(trampoline, preamble_copy.start(), preamble_copy.length());
+  tclib::Blob preamble_copy = request.preamble_copy();
+  memcpy(trampoline, preamble_copy.start(), preamble_copy.size());
   // Then jump back to the original.
-  return write_relative_jump_32(trampoline + preamble_copy.length(),
-      request.original() + preamble_copy.length());
+  return write_relative_jump_32(trampoline + preamble_copy.size(),
+      request.original() + preamble_copy.size());
 }
 
 Redirection *X86_32::create_redirection(address_t original, address_t replacement,

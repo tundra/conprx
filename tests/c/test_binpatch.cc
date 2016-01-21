@@ -71,14 +71,14 @@ TEST(binpatch, address_range) {
   ASSERT_TRUE(platform.ensure_initialized(&messages));
 
   PatchSet p0(platform, Vector<PatchRequest>());
-  Vector<byte_t> r0 = p0.determine_address_range();
+  tclib::Blob r0 = p0.determine_address_range();
   ASSERT_PTREQ(NULL, r0.start());
 
   PatchRequest p1s[1] = {
     PatchRequest(CODE_UPCAST(7), NULL),
   };
   PatchSet p1(platform, Vector<PatchRequest>(p1s, 1));
-  Vector<byte_t> r1 = p1.determine_address_range();
+  tclib::Blob r1 = p1.determine_address_range();
   ASSERT_PTREQ(reinterpret_cast<address_t>(7), r1.start());
   ASSERT_PTREQ(reinterpret_cast<address_t>(8), r1.end());
 
@@ -88,7 +88,7 @@ TEST(binpatch, address_range) {
     PatchRequest(CODE_UPCAST(36), NULL)
   };
   PatchSet p3(platform, Vector<PatchRequest>(p3s, 3));
-  Vector<byte_t> r3 = p3.determine_address_range();
+  tclib::Blob r3 = p3.determine_address_range();
   ASSERT_PTREQ(reinterpret_cast<address_t>(10), r3.start());
   ASSERT_PTREQ(reinterpret_cast<address_t>(37), r3.end());
 }
@@ -158,22 +158,6 @@ TEST(binpatch, can_jump_32) {
   check_jump_32(false, i31 - 4, 0);
 }
 
-class TestVirtualAllocator : public VirtualAllocator {
-public:
-  virtual Vector<byte_t> alloc_executable(address_t addr, size_t size,
-      MessageSink *messages);
-  virtual bool free_block(Vector<byte_t> block);
-};
-
-Vector<byte_t> TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
-    MessageSink *messages) {
-  return Vector<byte_t>();
-}
-
-bool TestVirtualAllocator::free_block(Vector<byte_t> block) {
-  return true;
-}
-
 TEST(binpatch, saturate) {
   ASSERT_EQ(5, ProximityAllocator::minus_saturate_zero(8, 3));
   ASSERT_EQ(3, ProximityAllocator::minus_saturate_zero(8, 5));
@@ -237,10 +221,139 @@ TEST(binpatch, proxy_anchor) {
   check_anchors(au64 - 320, au64 - 192, au64 - 64, u64 - 192, 256);
 }
 
-TEST(binpatch, proximity_allocator) {
-  TestVirtualAllocator direct;
-  ProximityAllocator alloc(&direct, 1024, 1024 * 1024);
-  alloc.alloc_executable(0, 0, 8, NULL);
+class AllocRequest {
+public:
+  AllocRequest() : addr(0), size(0) { }
+  AllocRequest(address_t _addr, size_t _size) : addr(_addr), size(_size) { }
+  address_t addr;
+  size_t size;
+};
+
+class TestVirtualAllocator : public VirtualAllocator {
+public:
+  enum behavior_t {
+    ALWAYS_FAIL,
+    ALWAYS_SUCCEED,
+    SUCCEED_AFTER_7
+  };
+  TestVirtualAllocator(behavior_t behavior) : behavior_(behavior) { }
+  typedef platform_hash_map<address_arith_t, AllocRequest> AllocMap;
+
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
+      MessageSink *messages);
+  virtual bool free_block(tclib::Blob block);
+  AllocMap &allocs() { return allocs_; }
+private:
+  behavior_t behavior_;
+  AllocMap allocs_;
+};
+
+tclib::Blob TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
+    MessageSink *messages) {
+  bool should_succeed = (behavior_ == ALWAYS_SUCCEED)
+      || ((behavior_ == SUCCEED_AFTER_7) && (allocs_.size() >= 7));
+  address_arith_t key = reinterpret_cast<address_arith_t>(addr);
+  ASSERT_EQ(0, allocs_.count(key));
+  allocs_[key] = AllocRequest(addr, size);
+  if (should_succeed) {
+    address_t result = (addr == NULL) ? reinterpret_cast<address_t>(1 << 24) : addr;
+    return tclib::Blob(result, size);
+  } else {
+    return tclib::Blob();
+  }
+}
+
+bool TestVirtualAllocator::free_block(tclib::Blob block) {
+  return true;
+}
+
+TEST(binpatch, failing_unrestricted) {
+  TestVirtualAllocator direct(TestVirtualAllocator::ALWAYS_FAIL);
+  size_t block_size = 1024 * 1024;
+  ProximityAllocator alloc(&direct, 1024, block_size);
+
+  // We haven't allocated in the underlying allocator yet.
+  ASSERT_EQ(0, direct.allocs().size());
+
+  // First allocation tries to grab virtual memory.
+  tclib::Blob block = alloc.alloc_executable(0, 0, 8, NULL);
+  ASSERT_TRUE(block.is_empty());
+  ASSERT_EQ(1, direct.allocs().size());
+  ASSERT_EQ(block_size, direct.allocs()[0].size);
+
+  // If we failed the first time we don't try again, we just keep failing.
+  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8, NULL);
+  ASSERT_TRUE(block2.is_empty());
+  ASSERT_EQ(1, direct.allocs().size());
+}
+
+TEST(binpatch, failing_restricted) {
+  TestVirtualAllocator direct(TestVirtualAllocator::ALWAYS_FAIL);
+  size_t block_size = 1024 * 1024;
+  ProximityAllocator alloc(&direct, 1024, block_size);
+
+  // We haven't allocated in the underlying allocator yet.
+  ASSERT_EQ(0, direct.allocs().size());
+
+  address_arith_t u30 = 1 << 30;
+  address_t a30 = reinterpret_cast<address_t>(u30);
+  tclib::Blob block = alloc.alloc_executable(a30, 1 << 16, 8, NULL);
+  ASSERT_TRUE(block.is_empty());
+  ASSERT_EQ(ProximityAllocator::kAnchorCount, direct.allocs().size());
+  ASSERT_EQ(block_size, direct.allocs()[u30].size);
+
+  tclib::Blob block2 = alloc.alloc_executable(a30, 1 << 16, 8, NULL);
+  ASSERT_TRUE(block2.is_empty());
+  ASSERT_EQ(ProximityAllocator::kAnchorCount, direct.allocs().size());
+}
+
+TEST(binpatch, succeeding_unrestricted) {
+  TestVirtualAllocator direct(TestVirtualAllocator::ALWAYS_SUCCEED);
+  size_t alignment = 1024;
+  size_t block_size = 1024 * 1024;
+  ProximityAllocator alloc(&direct, alignment, block_size);
+
+  // We haven't allocated in the underlying allocator yet.
+  ASSERT_EQ(0, direct.allocs().size());
+
+  // First allocation tries to grab virtual memory.
+  tclib::Blob block = alloc.alloc_executable(0, 0, 8, NULL);
+  ASSERT_EQ(alignment, block.size());
+  ASSERT_EQ(1, direct.allocs().size());
+  ASSERT_EQ(block_size, direct.allocs()[0].size);
+
+  // If we failed the first time we don't try again, we just keep failing.
+  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8, NULL);
+  ASSERT_EQ(alignment, block2.size());
+  ASSERT_EQ(1, direct.allocs().size());
+}
+
+TEST(binpatch, succeeding_restricted) {
+  TestVirtualAllocator direct(TestVirtualAllocator::SUCCEED_AFTER_7);
+  size_t alignment = 1024;
+  size_t block_size = 1024 * 1024;
+  ProximityAllocator alloc(&direct, alignment, block_size);
+
+  ASSERT_EQ(0, direct.allocs().size());
+
+  address_arith_t u30 = 1 << 30;
+  address_t a30 = reinterpret_cast<address_t>(u30);
+  size_t dist = 1 << 24;
+  tclib::Blob block = alloc.alloc_executable(a30, dist, 8, NULL);
+  ASSERT_EQ(alignment, block.size());
+  ASSERT_EQ(8, direct.allocs().size());
+  ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
+      reinterpret_cast<address_arith_t>(block.start())));
+  ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
+      reinterpret_cast<address_arith_t>(block.end())));
+
+  tclib::Blob block2 = alloc.alloc_executable(a30, dist, 8, NULL);
+  ASSERT_EQ(alignment, block2.size());
+  ASSERT_EQ(8, direct.allocs().size());
+  ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
+      reinterpret_cast<address_arith_t>(block2.start())));
+  ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
+      reinterpret_cast<address_arith_t>(block2.end())));
 }
 
 // There's no reason these tests can't work on 32-bit, except some bugs with
