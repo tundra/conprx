@@ -4,6 +4,7 @@
 import re
 
 filenames = [
+  "test_driver.cc",
   "test_binpatch.cc",
   "test_conapi.cc",
   "test_vector.cc",
@@ -17,6 +18,12 @@ def compile_test_file(source):
   source.add_include(get_dep("tclib").get_child("src", "c"))
   source.add_include(get_dep("plankton").get_child("src", "c"))
   return source.get_object()
+
+driver_main = c.get_executable("driver")
+driver_main.add_object(compile_test_file(c.get_source_file("driver.cc")))
+driver_main.add_object(get_dep_external("plankton", "src", "c", "library"))
+driver_main.add_object(get_dep_external("tclib", "src", "c", "sync", "library"))
+driver_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 
 test_library = get_group("library")
 
@@ -33,8 +40,10 @@ test_main.add_object(get_dep_external("tclib", "src", "c", "test", "library"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "test", "log-fail"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 test_main.add_object(get_external("src", "objects"))
+test_main.add_dependency(driver_main)
 
 run_tests = get_group("run-tests")
+agent = get_external("src", "c", "agent", "agent")
 
 # Add targets to run the test cases.
 for filename in filenames:
@@ -42,4 +51,6 @@ for filename in filenames:
   test_case.set_runner(test_main)
   stripped_test_case_name = re.match(r"test_(\w+).c", filename).group(1)
   test_case.set_arguments(stripped_test_case_name)
+  test_case.add_env("AGENT", agent.get_output_path())
+  test_case.add_env("DRIVER", driver_main.get_output_path())
   run_tests.add_member(test_case)
