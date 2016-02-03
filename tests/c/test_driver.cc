@@ -15,19 +15,26 @@ END_C_INCLUDES
 using namespace tclib;
 using namespace plankton;
 
+// Manages a driver instance.
+//
+// TODO: factor out into a header once the api has stabilized.
 class Driver {
 public:
   Driver();
+
+  // Start up the driver executable.
   bool start();
+
+  // Connect to the running driver.
   bool connect();
+
+  // Wait for the driver to terminate.
   bool join();
 
 private:
   NativeProcess process_;
   def_ref_t<ServerChannel> channel_;
-
   ServerChannel *channel() { return *channel_;}
-
   static utf8_t executable_path();
 };
 
@@ -35,13 +42,14 @@ Driver::Driver() {
   channel_ = ServerChannel::create();
 }
 
+// Utility for building command-line arguments.
 class CommandLineBuilder {
 public:
   CommandLineBuilder();
   void add_option(Variant key, Variant value);
-  Arena *arena() { return &arena_; }
   utf8_t flush();
 private:
+  Arena *arena() { return &arena_; }
   Arena arena_;
   Map map_;
   TextWriter writer_;
