@@ -27,6 +27,9 @@ int new_add(int a, int b) {
 }
 
 TEST(binpatch, individual_steps) {
+  if (IF_GCC(true, false) || IF_DEBUG(true, false))
+    return;
+
   Platform &platform = Platform::get();
   MessageSink messages;
   ASSERT_TRUE(platform.ensure_initialized(&messages));

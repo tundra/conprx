@@ -60,6 +60,8 @@ Redirection *X86_64::create_redirection(address_t original, address_t replacemen
   if (info->size() >= kAbsoluteJump64Size) {
     return new AbsoluteJump64Redirection();
   } else if (info->size() < kJmpSize) {
+    REPORT_MESSAGE(messages, "Not enough room to create redirection (0x%02x): %i",
+        info->last_instr(), info->size());
     return NULL;
   } else if (can_jump_relative_32(original, replacement)) {
     return new RelativeJump32Redirection();

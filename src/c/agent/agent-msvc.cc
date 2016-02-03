@@ -6,6 +6,7 @@
 #include "io/stream.hh"
 
 using namespace conprx;
+using namespace tclib;
 
 // Windows-specific console agent code.
 class WindowsConsoleAgent : public ConsoleAgent {
@@ -29,7 +30,7 @@ public:
   static WindowsConsoleAgent *get() { return instance_; }
 
 private:
-  tclib::OutStream *logout_;
+  def_ref_t<OutStream> logout_;
 
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
@@ -63,8 +64,7 @@ cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     TEXT("regedit.exe")
 };
 
-WindowsConsoleAgent::WindowsConsoleAgent()
-  : logout_(NULL) { }
+WindowsConsoleAgent::WindowsConsoleAgent() { }
 
 bool WindowsConsoleAgent::dll_process_attach() {
   instance_ = new WindowsConsoleAgent();
@@ -151,7 +151,7 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  LoggingMessageSink messages(logout_);
+  LoggingMessageSink messages(*logout_);
   if (!install_agent(&messages))
     return cInstallationFailed;
 
