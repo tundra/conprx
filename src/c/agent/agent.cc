@@ -4,7 +4,10 @@
 #include "agent.hh"
 #include "binpatch.hh"
 #include "conapi.hh"
+
+BEGIN_C_INCLUDES
 #include "utils/log.h"
+END_C_INCLUDES
 
 using namespace conprx;
 

@@ -93,7 +93,8 @@ bool WindowsConsoleAgent::install_agent(MessageSink *messages) {
   // before it.
   Options &options = Options::get();
   if (options.verbose_logging())
-    Log::get().set_debug_log_enabled(true);
+    // TODO: ensble verbose logging
+    ((void) 0);
   if (!options.is_enabled())
     return true;
 
