@@ -4,9 +4,12 @@
 /// Shared console api implementation.
 
 #include "conapi.hh"
-#include "utils/log.hh"
 #include "utils/string.hh"
 #include "plankton-inl.hh"
+
+BEGIN_C_INCLUDES
+#include "utils/log.h"
+END_C_INCLUDES
 
 using namespace conprx;
 using namespace plankton;
@@ -68,7 +71,7 @@ Variant log_arena_t::new_small_rect(const small_rect_t &small_rect) {
 void LoggingConsole::emit_message(Variant message) {
   TextWriter writer;
   writer.write(message);
-  LOG_INFO("\n%s\n", *writer);
+  INFO("\n%s\n", *writer);
 }
 
 static Variant handle_variant(handle_t handle) {

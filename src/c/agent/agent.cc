@@ -4,7 +4,7 @@
 #include "agent.hh"
 #include "binpatch.hh"
 #include "conapi.hh"
-#include "utils/log.hh"
+#include "utils/log.h"
 
 using namespace conprx;
 

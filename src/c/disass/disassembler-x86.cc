@@ -5,7 +5,6 @@
 /// changes to that code minimal so to the extent possible we effect changes by
 /// defining stuff here and then source-including their source.
 
-#include "utils/log.hh"
 #include "disassembler-x86.hh"
 #include "utils/types.hh"
 #include "fake-llvm-inl.hh"
