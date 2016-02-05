@@ -2,7 +2,9 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "driver.hh"
+#include "socket.hh"
 #include "sync/pipe.hh"
+#include "rpc.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
@@ -12,35 +14,87 @@ END_C_INCLUDES
 using namespace plankton;
 using namespace tclib;
 
-class ConsoleDriver {
+class ConsoleDriver : public rpc::Service {
 public:
-  static int main(int argc, const char **argv);
+  ConsoleDriver();
+  void echo(Variant value, ResponseCallback callback);
 };
 
-int ConsoleDriver::main(int argc, const char **argv) {
-  CommandLineReader reader;
-  CommandLine *cmdline = reader.parse(argc - 1, argv + 1);
+ConsoleDriver::ConsoleDriver() {
+  register_method("echo", new_callback(&ConsoleDriver::echo, this));
+}
+
+void ConsoleDriver::echo(Variant value, ResponseCallback callback) {
+  callback(rpc::OutgoingResponse::success(value));
+}
+
+class ConsoleDriverMain {
+public:
+  ConsoleDriverMain();
+
+  // Parse command-line arguments and store their values in the fields.
+  bool parse_args(int argc, const char **argv);
+
+  // Open the connection to the server.
+  bool open_connection();
+
+  // Runs the driver service.
+  bool run();
+
+  // Main entry-point.
+  int main(int argc, const char **argv);
+
+private:
+  CommandLineReader reader_;
+  utf8_t channel_name_;
+  def_ref_t<ClientChannel> channel_;
+  ClientChannel *channel() { return *channel_; }
+};
+
+ConsoleDriverMain::ConsoleDriverMain()
+  : channel_name_(string_empty()) { }
+
+bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
+  CommandLine *cmdline = reader_.parse(argc - 1, argv + 1);
   if (!cmdline->is_valid()) {
     SyntaxError *error = cmdline->error();
     ERROR("Error parsing command-line at %i (char '%c')", error->offset(),
         error->offender());
-    return 1;
+    return false;
   }
-  const char *name = cmdline->option("channel", Variant::null()).string_chars();
-  if (name == NULL) {
+  const char *channel = cmdline->option("channel", Variant::null()).string_chars();
+  if (channel == NULL) {
     ERROR("No channel name specified");
-    return 1;
+    return false;
   }
-  def_ref_t<ClientChannel> channel = ClientChannel::create();
-  if (!channel->open(new_c_string(name)))
-    return 1;
-  char buf[1024];
-  ReadIop read(channel->in(), buf, 1024);
-  if (!read.execute())
-    return 1;
-  return 0;
+  channel_name_ = new_c_string(channel);
+  return true;
+}
+
+bool ConsoleDriverMain::open_connection() {
+  channel_ = ClientChannel::create();
+  if (!channel()->open(channel_name_))
+    return false;
+  return true;
+}
+
+bool ConsoleDriverMain::run() {
+  rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
+  ConsoleDriver driver;
+  if (!connector.init(driver.handler()))
+    return false;
+  bool result = connector.process_all_messages();
+  channel()->out()->close();
+  return result;
+}
+
+int ConsoleDriverMain::main(int argc, const char **argv) {
+  if (parse_args(argc, argv) && open_connection() && run())
+    return 0;
+  return 1;
 }
 
 int main(int argc, const char *argv[]) {
-  return ConsoleDriver::main(argc, argv);
+  ConsoleDriverMain main;
+  return main.main(argc, argv);
 }
