@@ -23,7 +23,7 @@ public:
   virtual Disassembler *disassembler() = 0;
 
   virtual Redirection *prepare_patch(address_t original, address_t replacement,
-      PreambleInfo *info_out, MessageSink *messages);
+      PreambleInfo *info_out);
 
   // Returns the ideal preamble size to try to make available. What actually
   // gets patched may be different, either because not enough preamble is
@@ -51,7 +51,7 @@ protected:
   static size_t write_relative_jump_32(address_t code, address_t dest);
 
   virtual Redirection *create_redirection(address_t original, address_t replacement,
-      PreambleInfo *info, MessageSink *messages) = 0;
+      PreambleInfo *info) = 0;
 };
 
 } // namespace conprx

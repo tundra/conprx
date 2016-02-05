@@ -4,6 +4,11 @@
 #include "sync/injectee.hh"
 #include "utils/types.hh"
 #include "io/stream.hh"
+#include "utils/log.hh"
+
+BEGIN_C_INCLUDES
+#include "utils/strbuf.h"
+END_C_INCLUDES
 
 using namespace conprx;
 using namespace tclib;
@@ -23,7 +28,7 @@ public:
 
   static bool dll_process_detach();
 
-  bool install_agent(MessageSink *messages);
+  bool install_agent();
 
   int connect(blob_t data_in, blob_t data_out);
 
@@ -39,13 +44,12 @@ private:
   static WindowsConsoleAgent *instance_;
 };
 
-class LoggingMessageSink : public MessageSink {
+// Log that streams messages onto an output stream before passing log handling
+// on to the enclosing log.
+class StreamingLog : public tclib::Log {
 public:
-  LoggingMessageSink(tclib::OutStream *out)
-    : out_(out) { }
-
-protected:
-  virtual void handle_message(utf8_t message);
+  StreamingLog(tclib::OutStream *out) : out_(out) { }
+  virtual bool record(log_entry_t *entry);
 
 private:
   tclib::OutStream *out_;
@@ -77,7 +81,7 @@ bool WindowsConsoleAgent::dll_process_detach() {
   return true;
 }
 
-bool WindowsConsoleAgent::install_agent(MessageSink *messages) {
+bool WindowsConsoleAgent::install_agent() {
   // The blacklist is one way to protect against hosing the system completely
   // if there's a bug, and a more fundamental one than the options since we
   // use the blacklist to ensure that you can change the options using the
@@ -102,7 +106,7 @@ bool WindowsConsoleAgent::install_agent(MessageSink *messages) {
   // safely through the guards above.
   LoggingConsole *logger = new LoggingConsole(NULL);
   Console *original = NULL;
-  if (!install(options, *logger, &original, messages))
+  if (!install(options, *logger, &original))
     return false;
   logger->set_delegate(original);
 
@@ -152,8 +156,9 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  LoggingMessageSink messages(*logout_);
-  if (!install_agent(&messages))
+  StreamingLog log(*logout_);
+  log.ensure_installed();
+  if (!install_agent())
     return cInstallationFailed;
 
   return cSuccess;
@@ -209,12 +214,19 @@ Options &Options::get() {
   return *options;
 }
 
-void LoggingMessageSink::handle_message(utf8_t message) {
-  uint32_t size = static_cast<uint32_t>(message.size);
+bool StreamingLog::record(log_entry_t *entry) {
+  string_buffer_t buf;
+  string_buffer_init(&buf);
+  string_buffer_printf(&buf, "%s:%i: %s", entry->file, entry->line,
+      entry->message.chars);
+  utf8_t line = string_buffer_flush(&buf);
+  uint32_t size = static_cast<uint32_t>(line.size);
   tclib::WriteIop size_write(out_, &size, sizeof(size));
   size_write.execute();
-  tclib::WriteIop data_write(out_, message.chars, size);
+  tclib::WriteIop data_write(out_, line.chars, size);
   data_write.execute();
+  out_->flush();
+  return propagate(entry);
 }
 
 bool APIENTRY DllMain(module_t module, dword_t reason, void *) {

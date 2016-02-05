@@ -30,24 +30,23 @@ TEST(binpatch, individual_steps) {
   if (IF_GCC(true, false) || IF_DEBUG(true, false))
     return;
   Platform &platform = Platform::get();
-  MessageSink messages;
-  ASSERT_TRUE(platform.ensure_initialized(&messages));
+  ASSERT_TRUE(platform.ensure_initialized());
 
   ASSERT_EQ(9, add(3, 5));
   PatchRequest patch(Code::upcast(add), Code::upcast(new_add));
   PatchSet patches(platform, Vector<PatchRequest>(&patch, 1));
 
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
-  ASSERT_TRUE(patches.prepare_apply(&messages));
+  ASSERT_TRUE(patches.prepare_apply());
   ASSERT_EQ(PatchSet::PREPARED, patches.status());
 
-  ASSERT_TRUE(patches.open_for_patching(&messages));
+  ASSERT_TRUE(patches.open_for_patching());
   ASSERT_EQ(PatchSet::OPEN, patches.status());
 
   patches.install_redirects();
   ASSERT_EQ(PatchSet::APPLIED_OPEN, patches.status());
 
-  ASSERT_TRUE(patches.close_after_patching(PatchSet::APPLIED, &messages));
+  ASSERT_TRUE(patches.close_after_patching(PatchSet::APPLIED));
   ASSERT_EQ(PatchSet::APPLIED, patches.status());
 
   ASSERT_EQ(10, add(3, 5));
@@ -55,13 +54,13 @@ TEST(binpatch, individual_steps) {
   int (*add_imposter)(int, int) = patch.get_imposter(add);
   ASSERT_EQ(9, add_imposter(3, 5));
 
-  ASSERT_TRUE(patches.open_for_patching(&messages));
+  ASSERT_TRUE(patches.open_for_patching());
   ASSERT_EQ(PatchSet::OPEN, patches.status());
 
   patches.revert_redirects();
   ASSERT_EQ(PatchSet::REVERTED_OPEN, patches.status());
 
-  ASSERT_TRUE(patches.close_after_patching(PatchSet::NOT_APPLIED, &messages));
+  ASSERT_TRUE(patches.close_after_patching(PatchSet::NOT_APPLIED));
   ASSERT_EQ(PatchSet::NOT_APPLIED, patches.status());
 
   ASSERT_EQ(9, add(3, 5));
@@ -69,8 +68,7 @@ TEST(binpatch, individual_steps) {
 
 TEST(binpatch, address_range) {
   Platform &platform = Platform::get();
-  MessageSink messages;
-  ASSERT_TRUE(platform.ensure_initialized(&messages));
+  ASSERT_TRUE(platform.ensure_initialized());
 
   PatchSet p0(platform, Vector<PatchRequest>());
   tclib::Blob r0 = p0.determine_address_range();
@@ -241,8 +239,7 @@ public:
   TestVirtualAllocator(behavior_t behavior) : behavior_(behavior) { }
   typedef platform_hash_map<address_arith_t, AllocRequest> AllocMap;
 
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
-      MessageSink *messages);
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size);
   virtual bool free_block(tclib::Blob block);
   AllocMap &allocs() { return allocs_; }
 private:
@@ -250,8 +247,7 @@ private:
   AllocMap allocs_;
 };
 
-tclib::Blob TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
-    MessageSink *messages) {
+tclib::Blob TestVirtualAllocator::alloc_executable(address_t addr, size_t size) {
   bool should_succeed = (behavior_ == ALWAYS_SUCCEED)
       || ((behavior_ == SUCCEED_AFTER_7) && (allocs_.size() >= 7));
   address_arith_t key = reinterpret_cast<address_arith_t>(addr);
@@ -278,13 +274,13 @@ TEST(binpatch, failing_unrestricted) {
   ASSERT_EQ(0, direct.allocs().size());
 
   // First allocation tries to grab virtual memory.
-  tclib::Blob block = alloc.alloc_executable(0, 0, 8, NULL);
+  tclib::Blob block = alloc.alloc_executable(0, 0, 8);
   ASSERT_TRUE(block.is_empty());
   ASSERT_EQ(1, direct.allocs().size());
   ASSERT_EQ(block_size, direct.allocs()[0].size);
 
   // If we failed the first time we don't try again, we just keep failing.
-  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8, NULL);
+  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8);
   ASSERT_TRUE(block2.is_empty());
   ASSERT_EQ(1, direct.allocs().size());
 }
@@ -299,12 +295,12 @@ TEST(binpatch, failing_restricted) {
 
   address_arith_t u30 = 1 << 30;
   address_t a30 = reinterpret_cast<address_t>(u30);
-  tclib::Blob block = alloc.alloc_executable(a30, 1 << 16, 8, NULL);
+  tclib::Blob block = alloc.alloc_executable(a30, 1 << 16, 8);
   ASSERT_TRUE(block.is_empty());
   ASSERT_EQ(ProximityAllocator::kAnchorCount, direct.allocs().size());
   ASSERT_EQ(block_size, direct.allocs()[u30].size);
 
-  tclib::Blob block2 = alloc.alloc_executable(a30, 1 << 16, 8, NULL);
+  tclib::Blob block2 = alloc.alloc_executable(a30, 1 << 16, 8);
   ASSERT_TRUE(block2.is_empty());
   ASSERT_EQ(ProximityAllocator::kAnchorCount, direct.allocs().size());
 }
@@ -319,13 +315,13 @@ TEST(binpatch, succeeding_unrestricted) {
   ASSERT_EQ(0, direct.allocs().size());
 
   // First allocation tries to grab virtual memory.
-  tclib::Blob block = alloc.alloc_executable(0, 0, 8, NULL);
+  tclib::Blob block = alloc.alloc_executable(0, 0, 8);
   ASSERT_EQ(alignment, block.size());
   ASSERT_EQ(1, direct.allocs().size());
   ASSERT_EQ(block_size, direct.allocs()[0].size);
 
   // If we failed the first time we don't try again, we just keep failing.
-  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8, NULL);
+  tclib::Blob block2 = alloc.alloc_executable(0, 0, 8);
   ASSERT_EQ(alignment, block2.size());
   ASSERT_EQ(1, direct.allocs().size());
 }
@@ -341,7 +337,7 @@ TEST(binpatch, succeeding_restricted) {
   address_arith_t u30 = 1 << 30;
   address_t a30 = reinterpret_cast<address_t>(u30);
   size_t dist = 1 << 24;
-  tclib::Blob block = alloc.alloc_executable(a30, dist, 8, NULL);
+  tclib::Blob block = alloc.alloc_executable(a30, dist, 8);
   ASSERT_EQ(alignment, block.size());
   ASSERT_EQ(8, direct.allocs().size());
   ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
@@ -349,7 +345,7 @@ TEST(binpatch, succeeding_restricted) {
   ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,
       reinterpret_cast<address_arith_t>(block.end())));
 
-  tclib::Blob block2 = alloc.alloc_executable(a30, dist, 8, NULL);
+  tclib::Blob block2 = alloc.alloc_executable(a30, dist, 8);
   ASSERT_EQ(alignment, block2.size());
   ASSERT_EQ(8, direct.allocs().size());
   ASSERT_TRUE(ProximityAllocator::is_within(u30, dist,

@@ -9,8 +9,7 @@
 using namespace conprx;
 
 Redirection *GenericX86::prepare_patch(address_t original, address_t replacement,
-    PreambleInfo *info_out,
-    MessageSink *messages) {
+    PreambleInfo *info_out) {
   // The length of this vector shouldn't matter since the disassembler reads
   // one byte at a time and stops as soon as we've seen enough. It doesn't
   // continue on to the end.
@@ -27,14 +26,14 @@ Redirection *GenericX86::prepare_patch(address_t original, address_t replacement
       // Failed to even resolve the instruction. Report an error depending on
       // the cause.
       if (info.status() == InstructionInfo::UNKNOWN) {
-        REPORT_MESSAGE(messages, "Instruction 0x%02x at offset %i is unknown",
-            info.instruction(), offset);
+        LOG_WARN("Instruction 0x%02x at offset %i is unknown", info.instruction(),
+            offset);
         return NULL;
       } else if (info.status() == InstructionInfo::INVALID) {
-        REPORT_MESSAGE(messages, "Instruction at offset %i was invalid", offset);
+        LOG_WARN("Instruction at offset %i was invalid", offset);
         return NULL;
       } else {
-        REPORT_MESSAGE(messages, "Disassembler failed to resolve byte 0x%02x at offset %i",
+        LOG_WARN("Disassembler failed to resolve byte 0x%02x at offset %i",
           code[offset], offset);
         return NULL;
       }
@@ -49,7 +48,7 @@ Redirection *GenericX86::prepare_patch(address_t original, address_t replacement
       break;
   }
   info_out->populate(offset, last_instr);
-  return create_redirection(original, replacement, info_out, messages);
+  return create_redirection(original, replacement, info_out);
 }
 
 void GenericX86::flush_instruction_cache(tclib::Blob memory) {

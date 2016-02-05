@@ -10,44 +10,41 @@ using namespace conprx;
 class WindowsMemoryManager : public MemoryManager {
 public:
   virtual bool open_for_writing(tclib::Blob region,
-      standalone_dword_t *old_perms, MessageSink *messages);
+      standalone_dword_t *old_perms);
   virtual bool close_for_writing(tclib::Blob region,
-      standalone_dword_t old_perms, MessageSink *messages);
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
-      MessageSink *messages);
+      standalone_dword_t old_perms);
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size);
   virtual bool free_block(tclib::Blob block);
 };
 
 bool WindowsMemoryManager::open_for_writing(tclib::Blob region,
-    standalone_dword_t *old_perms, MessageSink *messages) {
+    standalone_dword_t *old_perms) {
   dword_t temp_old_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), PAGE_EXECUTE_READWRITE,
       &temp_old_perms);
   if (!result) {
-    return REPORT_MESSAGE(messages, "VirtualProtect(PAGE_EXECUTE_READWRITE) failed: %i",
-        static_cast<int>(GetLastError()));
+    LOG_ERROR("VirtualProtect(PAGE_EXECUTE_READWRITE) failed: %i", GetLastError());
+    return false;
   }
   *old_perms = temp_old_perms;
   return true;
 }
 
 bool WindowsMemoryManager::close_for_writing(tclib::Blob region,
-    standalone_dword_t old_perms, MessageSink *messages) {
+    standalone_dword_t old_perms) {
   dword_t dummy_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), old_perms, &dummy_perms);
   if (!result) {
-    return REPORT_MESSAGE(messages, "VirtualProtect(%i) failed: %i", old_perms,
-        static_cast<int>(GetLastError()));
+    LOG_ERROR("VirtualProtect(%i) failed: %i", old_perms, GetLastError());
+    return false;
   }
   return true;
 }
 
-tclib::Blob WindowsMemoryManager::alloc_executable(address_t addr, size_t size,
-    MessageSink *messages) {
+tclib::Blob WindowsMemoryManager::alloc_executable(address_t addr, size_t size) {
   void *memory = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
   if (memory == NULL) {
-    REPORT_MESSAGE(messages, "VirtualAlloc failed: %i",
-        static_cast<int>(GetLastError()));
+    LOG_ERROR("VirtualAlloc failed: %i", GetLastError());
     return tclib::Blob();
   }
   return tclib::Blob(memory, size);

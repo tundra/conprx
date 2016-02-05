@@ -57,25 +57,6 @@ typedef uint32_t standalone_dword_t;
 
 #define REPORT_MESSAGE(sink, ...) (sink)->report(__FILE__, __LINE__, __VA_ARGS__)
 
-class MessageSink {
-public:
-  virtual ~MessageSink() { }
-
-  // Record that an error occurred and return false, such that you can always
-  // fail an operation by doing,
-  //
-  //   return REPORT_MESSAGE(messages, ...);
-  bool report(const char *file, int line, const char *fmt, ...);
-
-protected:
-  // Handle the given message appropriately for this sink. The message is owned
-  // by the caller so if you want to hang on to it you need to dup it
-  // explicitly.
-  //
-  // The default implementation logs the message.
-  virtual void handle_message(utf8_t message);
-};
-
 // Encapsulates state associated with redirecting a function. The main reason
 // for separating this into a class is such that there's a place to store
 // temporary data associated with redirecting and have it destroyed properly
@@ -127,7 +108,7 @@ public:
   ~PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  bool prepare_apply(Platform *platform, ProximityAllocator *alloc, MessageSink *messages);
+  bool prepare_apply(Platform *platform, ProximityAllocator *alloc);
 
   // Destructively install this request's redirect.
   void install_redirect();
@@ -222,7 +203,7 @@ class Platform {
 public:
   // Ensures that the platform object is fully initialized, if it hasn't been
   // already. Returns true on success.
-  bool ensure_initialized(MessageSink *messages);
+  bool ensure_initialized();
 
   MemoryManager &memory_manager() { return memman_; }
 
@@ -243,8 +224,7 @@ private:
 class VirtualAllocator {
 public:
   virtual ~VirtualAllocator() { }
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size,
-      MessageSink *messages) = 0;
+  virtual tclib::Blob alloc_executable(address_t addr, size_t size) = 0;
   // Frees a block that was returned from alloc_executable. Returns true iff
   // freeing succeeds.
   virtual bool free_block(tclib::Blob block) = 0;
@@ -280,8 +260,7 @@ public:
     // Attempt to make a region of the given size available within this block.
     // Returns true if a block of the given size can be allocated after this
     // call returns, false otherwise.
-    bool ensure_capacity(uint64_t size, ProximityAllocator *owner,
-        MessageSink *messages);
+    bool ensure_capacity(uint64_t size, ProximityAllocator *owner);
 
     // Returns a block from this allocator.
     tclib::Blob alloc(uint64_t size);
@@ -312,8 +291,7 @@ public:
   // otherwise an empty block. The distance must either be a power of 2 or 0
   // which means that there is no distance restriction, any memory is
   // acceptable. The distance must be a multiple of the allocator's block_size.
-  tclib::Blob alloc_executable(address_t addr, uint64_t distance, size_t size,
-      MessageSink *messages);
+  tclib::Blob alloc_executable(address_t addr, uint64_t distance, size_t size);
 
   // If we already have a block that works for the given address returns it.
   Block *find_existing_block(uint64_t addr, uint64_t distance, uint64_t size);
@@ -407,15 +385,15 @@ public:
   // Prepares to apply the patches. Preparing makes no code changes, it only
   // checks whether patching is possible and allocates the data needed to do
   // the patching. Returns true iff preparing succeeded.
-  bool prepare_apply(MessageSink *messages);
+  bool prepare_apply();
 
   // Attempts to set the permissions on the code we're going to patch. Returns
   // true iff this succeeds.
-  bool open_for_patching(MessageSink *messages);
+  bool open_for_patching();
 
   // Attempts to return the permissions on the code that has been patched to
   // the state it was before.
-  bool close_after_patching(Status success_status, MessageSink *messages);
+  bool close_after_patching(Status success_status);
 
   // Patches the redirect instructions into the original functions. It shouldn't
   // be possible for this to fail, any potential failure reasons should have
@@ -432,11 +410,11 @@ public:
 
   // Given a fresh patch set, runs through the sequence of operations that
   // causes the patches to be applied.
-  bool apply(MessageSink *messages);
+  bool apply();
 
   // Runs through the complete sequence of operations that restores the
   // originals to their initial state.
-  bool revert(MessageSink *messages);
+  bool revert();
 
   // Determines the lower and upper bound of the addresses to patch by scanning
   // over the requests and min/max'ing over the addresses. Note that this is
@@ -458,7 +436,7 @@ public:
 private:
   // Attempts to write all the locations we'll be patching. Returns false or
   // crashes if writing fails.
-  bool validate_open_for_patching(MessageSink *messages);
+  bool validate_open_for_patching();
 
   // The patch engine used to apply this patch set.
   Platform &platform_;
@@ -507,19 +485,17 @@ public:
 
   // If the manager needs any kind of initialization this call will ensure that
   // it has been initialized.
-  virtual bool ensure_initialized(MessageSink *messages);
+  virtual bool ensure_initialized();
 
   // Attempts to open the given memory region such that it can be written. If
   // successful the previous permissions should be stored in the given out
   // parameter.
-  virtual bool open_for_writing(tclib::Blob region, standalone_dword_t *old_perms,
-      MessageSink *messages) = 0;
+  virtual bool open_for_writing(tclib::Blob region, standalone_dword_t *old_perms) = 0;
 
   // Attempts to close the given memory region such that it can no longer be
   // written. The old_perms parameter contains the value that was stored by
   // open_for_writing.
-  virtual bool close_for_writing(tclib::Blob region, standalone_dword_t old_perms,
-      MessageSink *messages) = 0;
+  virtual bool close_for_writing(tclib::Blob region, standalone_dword_t old_perms) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to
   // the given address that we can jump between them. If memory can't be
@@ -570,7 +546,7 @@ public:
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
   virtual Redirection *prepare_patch(address_t original, address_t replacement,
-      PreambleInfo *info_out, MessageSink *messages) = 0;
+      PreambleInfo *info_out) = 0;
 
   // Fills the given memory with code that causes execution to halt.
   virtual void write_halt(tclib::Blob memory) = 0;

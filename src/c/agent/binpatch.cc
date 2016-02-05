@@ -12,31 +12,11 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace tclib;
 
-bool MemoryManager::ensure_initialized(MessageSink *messages) {
+bool MemoryManager::ensure_initialized() {
   return true;
 }
 
 MemoryManager::~MemoryManager() {
-}
-
-
-bool MessageSink::report(const char *file, int line, const char *fmt, ...) {
-  // Record the message in the sink.
-  string_buffer_t buf;
-  string_buffer_init(&buf);
-  string_buffer_printf(&buf, "%s:%i: ", file, line);
-  va_list argp;
-  va_start(argp, fmt);
-  string_buffer_vprintf(&buf, fmt, argp);
-  va_end(argp);
-  utf8_t result = string_buffer_flush(&buf);
-  handle_message(result);
-  string_buffer_dispose(&buf);
-  return false;
-}
-
-void MessageSink::handle_message(utf8_t message) {
-  WARN("Message: %s", message.chars);
 }
 
 PatchRequest::PatchRequest(address_t original, address_t replacement, const char *name)
@@ -61,10 +41,9 @@ PatchRequest::~PatchRequest() {
   delete redirection_;
 }
 
-bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc,
-    MessageSink *messages) {
+bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc) {
   platform_ = platform;
-  imposter_code_ = alloc->alloc_executable(0, 0, kImposterCodeStubSizeBytes, messages);
+  imposter_code_ = alloc->alloc_executable(0, 0, kImposterCodeStubSizeBytes);
   if (imposter_code_.is_empty())
     return false;
   // Determine the length of the preamble. This also determines whether the
@@ -73,7 +52,7 @@ bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc,
   PreambleInfo pinfo;
 
   Redirection *redir = platform->instruction_set().prepare_patch(original_,
-      replacement_, &pinfo, messages);
+      replacement_, &pinfo);
   if (redir == NULL)
     return false;
   redirection_ = redir;
@@ -108,7 +87,7 @@ PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   , status_(NOT_APPLIED)
   , old_perms_(0) { }
 
-bool PatchSet::prepare_apply(MessageSink *messages) {
+bool PatchSet::prepare_apply() {
   DEBUG("Preparing to apply patch set");
   if (requests().is_empty()) {
     // Trivially succeed if there are no patches to apply.
@@ -116,7 +95,7 @@ bool PatchSet::prepare_apply(MessageSink *messages) {
     return true;
   }
   for (size_t i = 0; i < requests().length(); i++) {
-    if (!requests()[i].prepare_apply(&platform_, alloc(), messages)) {
+    if (!requests()[i].prepare_apply(&platform_, alloc())) {
       status_ = FAILED;
       return false;
     }
@@ -158,17 +137,17 @@ tclib::Blob PatchSet::determine_patch_range() {
   }
 }
 
-bool PatchSet::open_for_patching(MessageSink *messages) {
+bool PatchSet::open_for_patching() {
   DEBUG("Opening original code for writing");
   // Try opening the region for writing.
   tclib::Blob region = determine_patch_range();
-  if (!memory_manager().open_for_writing(region, &old_perms_, messages)) {
+  if (!memory_manager().open_for_writing(region, &old_perms_)) {
     status_= FAILED;
     return false;
   }
   // Validate that writing works.
   DEBUG("Validating that code is writable");
-  if (validate_open_for_patching(messages)) {
+  if (validate_open_for_patching()) {
     status_ = OPEN;
     return true;
   } else {
@@ -177,7 +156,7 @@ bool PatchSet::open_for_patching(MessageSink *messages) {
   }
 }
 
-bool PatchSet::validate_open_for_patching(MessageSink *messages) {
+bool PatchSet::validate_open_for_patching() {
   for (size_t i = 0; i < requests().length(); i++) {
     // Try reading the each byte and then writing it back. This should not
     // have any effect but should fail if the memory is not writeable.
@@ -193,10 +172,10 @@ bool PatchSet::validate_open_for_patching(MessageSink *messages) {
   return true;
 }
 
-bool PatchSet::close_after_patching(Status success_status, MessageSink *messages) {
+bool PatchSet::close_after_patching(Status success_status) {
   DEBUG("Closing original code for writing");
   tclib::Blob region = determine_patch_range();
-  if (!memory_manager().close_for_writing(region, old_perms_, messages)) {
+  if (!memory_manager().close_for_writing(region, old_perms_)) {
     status_ = FAILED;
     return false;
   }
@@ -239,22 +218,22 @@ void PatchSet::revert_redirects() {
 }
 
 
-bool PatchSet::apply(MessageSink *messages) {
-  if (!prepare_apply(messages))
+bool PatchSet::apply() {
+  if (!prepare_apply())
     return false;
-  if (!open_for_patching(messages))
+  if (!open_for_patching())
     return false;
   install_redirects();
-  if (!close_after_patching(PatchSet::APPLIED, messages))
+  if (!close_after_patching(PatchSet::APPLIED))
     return false;
   return true;
 }
 
-bool PatchSet::revert(MessageSink *messages) {
-  if (!open_for_patching(messages))
+bool PatchSet::revert() {
+  if (!open_for_patching())
     return false;
   revert_redirects();
-  if (!close_after_patching(PatchSet::NOT_APPLIED, messages))
+  if (!close_after_patching(PatchSet::NOT_APPLIED))
     return false;
   return true;
 }
@@ -263,8 +242,8 @@ Platform::Platform(InstructionSet &inst, MemoryManager &memman)
   : inst_(inst)
   , memman_(memman) { }
 
-bool Platform::ensure_initialized(MessageSink *messages) {
-  return memory_manager().ensure_initialized(messages);
+bool Platform::ensure_initialized() {
+  return memory_manager().ensure_initialized();
 }
 
 // Returns the current platform.
@@ -353,8 +332,7 @@ bool ProximityAllocator::is_within(uint64_t base, uint64_t distance,
   return (min <= addr) && (addr < max);
 }
 
-bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocator *owner,
-    MessageSink *messages) {
+bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocator *owner) {
   if (!is_active_)
     // If this block is inactive we don't try ensuring again, we leave it dead.
     return false;
@@ -366,10 +344,10 @@ bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocato
   tclib::Blob block;
   if (is_restricted_) {
     block = owner->direct_->alloc_executable(reinterpret_cast<address_t>(limit_),
-        static_cast<size_t>(owner->block_size_), messages);
+        static_cast<size_t>(owner->block_size_));
   } else {
     block = owner->direct_->alloc_executable(0,
-        static_cast<size_t>(owner->block_size_), messages);
+        static_cast<size_t>(owner->block_size_));
   }
   if (block.is_empty()) {
     // We could get no memory so we deactivate this block such that we'll ignore
@@ -383,14 +361,14 @@ bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocato
 }
 
 tclib::Blob ProximityAllocator::alloc_executable(address_t raw_addr,
-    uint64_t distance, size_t raw_size, MessageSink *messages) {
+    uint64_t distance, size_t raw_size) {
   uint64_t size = align_uint64(alignment_, raw_size);
   CHECK_REL("alloc too big", size, <=, block_size_);
   if (distance == 0) {
     // There are no restrictions on this allocation so try to use the
     // unrestricted allocator.
     Block *unrestricted = get_or_create_unrestricted();
-    return unrestricted->ensure_capacity(size, this, messages)
+    return unrestricted->ensure_capacity(size, this)
       ? unrestricted->alloc(size)
       : tclib::Blob();
   }
@@ -403,7 +381,7 @@ tclib::Blob ProximityAllocator::alloc_executable(address_t raw_addr,
     uint32_t index = kAnchorOrder[ia];
     uint64_t anchor = get_anchor_from_address(addr, distance, index);
     Block *block = get_or_create_anchor(anchor);
-    if (block->ensure_capacity(size, this, messages) && block->can_provide(addr, distance, size))
+    if (block->ensure_capacity(size, this) && block->can_provide(addr, distance, size))
       return block->alloc(size);
   }
   return tclib::Blob();

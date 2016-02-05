@@ -3,6 +3,7 @@
 
 #include "agent/binpatch-x86.hh"
 #include "disass/disassembler-x86.hh"
+#include "utils/log.hh"
 #include "utils/types.hh"
 
 using namespace conprx;
@@ -18,7 +19,7 @@ public:
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kAbsoluteJump64Size; }
   virtual Redirection *create_redirection(address_t original, address_t replacement,
-      PreambleInfo *info, MessageSink *messages);
+      PreambleInfo *info);
 
   // Returns the singleton ia32 instance.
   static X86_64 &get();
@@ -56,11 +57,11 @@ size_t X86_64::write_absolute_jump_64(address_t code, address_t dest) {
 }
 
 Redirection *X86_64::create_redirection(address_t original, address_t replacement,
-    PreambleInfo *info, MessageSink *messages) {
+    PreambleInfo *info) {
   if (info->size() >= kAbsoluteJump64Size) {
     return new AbsoluteJump64Redirection();
   } else if (info->size() < kJmpSize) {
-    REPORT_MESSAGE(messages, "Not enough room to create redirection (0x%02x): %i",
+    LOG_WARN("Not enough room to create redirection (0x%02x): %i",
         info->last_instr(), info->size());
     return NULL;
   } else if (can_jump_relative_32(original, replacement)) {

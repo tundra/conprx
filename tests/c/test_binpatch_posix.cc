@@ -78,10 +78,9 @@ void SnippetHelper::test_patch(int32_t e, function_t f, int32_t a, int32_t b) {
   ASSERT_EQ(e, call_raw_snippet(a, b, snip));
   PatchRequest req(reinterpret_cast<address_t>(snip), reinterpret_cast<address_t>(intercept));
   PatchSet set(Platform::get(), Vector<PatchRequest>(&req, 1));
-  MessageSink messages;
-  ASSERT_TRUE(set.apply(&messages));
+  ASSERT_TRUE(set.apply());
   ASSERT_EQ(79, call_raw_snippet(a, b, snip));
-  ASSERT_TRUE(set.revert(&messages));
+  ASSERT_TRUE(set.revert());
   ASSERT_EQ(e, call_raw_snippet(a, b, snip));
 }
 
