@@ -7,8 +7,9 @@
 #include "utils/types.hh"
 
 using namespace conprx;
+using namespace tclib;
 
-Redirection *GenericX86::prepare_patch(address_t original, address_t replacement,
+pass_def_ref_t<Redirection> GenericX86::prepare_patch(address_t original, address_t replacement,
     PreambleInfo *info_out) {
   // The length of this vector shouldn't matter since the disassembler reads
   // one byte at a time and stops as soon as we've seen enough. It doesn't
@@ -28,14 +29,14 @@ Redirection *GenericX86::prepare_patch(address_t original, address_t replacement
       if (info.status() == InstructionInfo::UNKNOWN) {
         LOG_WARN("Instruction 0x%02x at offset %i is unknown", info.instruction(),
             offset);
-        return NULL;
+        return pass_def_ref_t<Redirection>::null();
       } else if (info.status() == InstructionInfo::INVALID) {
         LOG_WARN("Instruction at offset %i was invalid", offset);
-        return NULL;
+        return pass_def_ref_t<Redirection>::null();
       } else {
         LOG_WARN("Disassembler failed to resolve byte 0x%02x at offset %i",
           code[offset], offset);
-        return NULL;
+        return pass_def_ref_t<Redirection>::null();
       }
     }
     last_instr = info.instruction();

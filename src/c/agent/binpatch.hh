@@ -29,8 +29,9 @@
 #ifndef _BINPATCH
 #define _BINPATCH
 
-#include "c/stdvector.hh"
 #include "c/stdhashmap.hh"
+#include "c/stdvector.hh"
+#include "utils/alloc.hh"
 #include "utils/blob.hh"
 #include "utils/vector.hh"
 
@@ -61,7 +62,7 @@ typedef uint32_t standalone_dword_t;
 // for separating this into a class is such that there's a place to store
 // temporary data associated with redirecting and have it destroyed properly
 // when the patch request is destroyed.
-class Redirection {
+class Redirection : public tclib::DefaultDestructable {
 public:
   virtual ~Redirection() { }
 
@@ -175,7 +176,7 @@ private:
   size_t preamble_size_;
 
   // Object that keeps track of how to redirect this patch.
-  Redirection *redirection_;
+  tclib::def_ref_t<Redirection> redirection_;
 };
 
 // Size of the helper component of a patch stub.
@@ -545,8 +546,8 @@ public:
   // overwritten by the redirect. Returns true if successful, false if there is
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
-  virtual Redirection *prepare_patch(address_t original, address_t replacement,
-      PreambleInfo *info_out) = 0;
+  virtual tclib::pass_def_ref_t<Redirection> prepare_patch(address_t original,
+      address_t replacement, PreambleInfo *info_out) = 0;
 
   // Fills the given memory with code that causes execution to halt.
   virtual void write_halt(tclib::Blob memory) = 0;

@@ -25,8 +25,7 @@ PatchRequest::PatchRequest(address_t original, address_t replacement, const char
   , name_(name)
   , imposter_(NULL)
   , platform_(NULL)
-  , preamble_size_(0)
-  , redirection_(NULL) { }
+  , preamble_size_(0) { }
 
 PatchRequest::PatchRequest()
   : original_(NULL)
@@ -34,12 +33,9 @@ PatchRequest::PatchRequest()
   , name_(NULL)
   , imposter_(NULL)
   , platform_(NULL)
-  , preamble_size_(0)
-  , redirection_(NULL) { }
+  , preamble_size_(0) { }
 
-PatchRequest::~PatchRequest() {
-  delete redirection_;
-}
+PatchRequest::~PatchRequest() { }
 
 bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc) {
   platform_ = platform;
@@ -51,9 +47,9 @@ bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc) 
   DEBUG("Preparing %s", name_);
   PreambleInfo pinfo;
 
-  Redirection *redir = platform->instruction_set().prepare_patch(original_,
-      replacement_, &pinfo);
-  if (redir == NULL)
+  pass_def_ref_t<Redirection> redir = platform->instruction_set().prepare_patch(
+      original_, replacement_, &pinfo);
+  if (redir.is_null())
     return false;
   redirection_ = redir;
   size_t size = pinfo.size();
@@ -196,7 +192,7 @@ void PatchSet::install_redirects() {
 }
 
 void PatchRequest::install_redirect() {
-  CHECK_TRUE("no redirection", redirection_ != NULL);
+  CHECK_FALSE("no redirection", redirection_.is_null());
   // First clear the whole preamble to halt such that if there is any space left
   // over after writing the redirect it will be valid instructions but shouldn't
   // be useful to anyone.

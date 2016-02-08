@@ -6,14 +6,15 @@
 #include "utils/types.hh"
 
 using namespace conprx;
+using namespace tclib;
 
 class X86_32 : public GenericX86 {
 public:
   virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kJmpSize; }
-  virtual Redirection *create_redirection(address_t original, address_t replacement,
-      PreambleInfo *info, MessageSink *messages);
+  virtual pass_def_ref_t<Redirection> create_redirection(address_t original,
+      address_t replacement, PreambleInfo *info);
 
   // Returns the singleton ia32 instance.
   static X86_32 &get();
@@ -35,9 +36,9 @@ size_t X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
       request.original() + preamble_copy.size());
 }
 
-Redirection *X86_32::create_redirection(address_t original, address_t replacement,
-    PreambleInfo *info, MessageSink *messages) {
-  return new RelativeJump32Redirection();
+pass_def_ref_t<Redirection> X86_32::create_redirection(address_t original,
+    address_t replacement, PreambleInfo *info) {
+  return pass_def_ref_t<Redirection>(new (kDefaultAlloc) RelativeJump32Redirection());
 }
 
 bool X86_32::can_jump_relative_32(address_t from, address_t to) {

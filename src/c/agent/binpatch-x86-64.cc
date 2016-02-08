@@ -7,19 +7,21 @@
 #include "utils/types.hh"
 
 using namespace conprx;
+using namespace tclib;
 
 class X86_64 : public GenericX86 {
 public:
   class AbsoluteJump64Redirection : public Redirection {
   public:
+    virtual void default_destroy() { default_delete_concrete(this); }
     virtual size_t write_redirect(address_t code, address_t dest);
   };
 
   virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kAbsoluteJump64Size; }
-  virtual Redirection *create_redirection(address_t original, address_t replacement,
-      PreambleInfo *info);
+  virtual pass_def_ref_t<Redirection> create_redirection(address_t original,
+      address_t replacement, PreambleInfo *info);
 
   // Returns the singleton ia32 instance.
   static X86_64 &get();
@@ -56,18 +58,18 @@ size_t X86_64::write_absolute_jump_64(address_t code, address_t dest) {
   return kAbsoluteJump64Size;
 }
 
-Redirection *X86_64::create_redirection(address_t original, address_t replacement,
-    PreambleInfo *info) {
+pass_def_ref_t<Redirection> X86_64::create_redirection(address_t original,
+    address_t replacement, PreambleInfo *info) {
   if (info->size() >= kAbsoluteJump64Size) {
-    return new AbsoluteJump64Redirection();
+    return pass_def_ref_t<Redirection>(new (kDefaultAlloc) AbsoluteJump64Redirection());
   } else if (info->size() < kJmpSize) {
     LOG_WARN("Not enough room to create redirection (0x%02x): %i",
         info->last_instr(), info->size());
-    return NULL;
+    return pass_def_ref_t<Redirection>::null();
   } else if (can_jump_relative_32(original, replacement)) {
-    return new RelativeJump32Redirection();
+    return pass_def_ref_t<Redirection>(new (kDefaultAlloc) RelativeJump32Redirection());
   } else {
-    return NULL;
+    return pass_def_ref_t<Redirection>::null();
   }
 }
 
