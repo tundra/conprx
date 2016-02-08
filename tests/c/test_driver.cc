@@ -20,9 +20,14 @@ class DriverConnection;
 
 class DriverProxy {
 public:
-  DriverProxy(DriverConnection *connection) : connection_(connection) { }
+  DriverProxy(DriverConnection *connection)
+    : is_used_(false)
+    , connection_(connection) { }
   Variant echo(Variant value);
 private:
+  bool is_used_;
+  Variant send_unary(Variant selector, Variant arg);
+  Variant send(rpc::OutgoingRequest *req);
   DriverConnection *connection_;
   rpc::IncomingResponse response_;
 };
@@ -43,7 +48,12 @@ public:
   // Wait for the driver to terminate.
   bool join();
 
-  DriverProxy new_proxy() { return DriverProxy(this); }
+  void set_trace(bool value) { trace_ = value; }
+
+  // Returns a new proxy that can be used to perform a single call to the
+  // driver. The value returned by the call is only valid as long as the proxy
+  // is.
+  DriverProxy new_call() { return DriverProxy(this); }
 
   rpc::IncomingResponse send(rpc::OutgoingRequest *req);
 
@@ -53,16 +63,28 @@ private:
   ServerChannel *channel() { return *channel_;}
   def_ref_t<rpc::StreamServiceConnector> connector_;
   rpc::StreamServiceConnector *connector() { return *connector_; }
+  bool trace_;
   static utf8_t executable_path();
 };
 
-DriverConnection::DriverConnection() {
+DriverConnection::DriverConnection()
+  : trace_(false) {
   channel_ = ServerChannel::create();
 }
 
 Variant DriverProxy::echo(Variant value) {
-  rpc::OutgoingRequest req(Variant::null(), "echo", 1, &value);
-  response_ = connection_->send(&req);
+  return send_unary("echo", value);
+}
+
+Variant DriverProxy::send_unary(Variant selector, Variant arg) {
+  rpc::OutgoingRequest req(Variant::null(), selector, 1, &arg);
+  return send(&req);
+}
+
+Variant DriverProxy::send(rpc::OutgoingRequest *req) {
+  ASSERT_FALSE(is_used_);
+  is_used_ = true;
+  response_ = connection_->send(req);
   return response_->peek_value(Variant::null());
 }
 
@@ -114,10 +136,24 @@ bool DriverConnection::connect() {
 }
 
 rpc::IncomingResponse DriverConnection::send(rpc::OutgoingRequest *req) {
+  if (trace_) {
+    TextWriter subjw, selw, argsw;
+    subjw.write(req->subject());
+    selw.write(req->selector());
+    argsw.write(req->arguments());
+    LOG_INFO("%s->%s%s", *subjw, *selw, *argsw);
+  }
   rpc::IncomingResponse resp = connector()->socket()->send_request(req);
   bool keep_going = true;
   while (keep_going && !resp->is_settled())
     keep_going = connector()->input()->process_next_instruction(NULL);
+  if (trace_) {
+    if (resp->is_fulfilled()) {
+      TextWriter resw;
+      resw.write(resp->peek_value(Variant::null()));
+      LOG_INFO("<- %s", *resw);
+    }
+  }
   return resp;
 }
 
@@ -139,8 +175,17 @@ TEST(driver, simple) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverProxy proxy = driver.new_proxy();
-  ASSERT_EQ(5436, proxy.echo(5436).integer_value());
+  DriverProxy call0 = driver.new_call();
+  ASSERT_EQ(5436, call0.echo(5436).integer_value());
+
+  Arena arena;
+  DriverProxy call1 = driver.new_call();
+  Array arg1 = arena.new_array(0);
+  arg1.add(8);
+  arg1.add("foo");
+  arg1.add(Variant::yes());
+  Array res1 = call1.echo(arg1);
+  ASSERT_EQ(8, res1[0].integer_value());
 
   ASSERT_TRUE(driver.join());
 }
