@@ -5,20 +5,27 @@
 
 using namespace conprx;
 
-class WindowsConsole : public Console {
+// The fallback console is a console implementation that works on all platforms.
+// The implementation is just placeholders but they should be functional enough
+// that they can be used for testing.
+class FallbackConsole : public Console {
+public:
 #define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 };
 
-handle_t WindowsConsole::get_std_handle(dword_t handle) {
-  return GetStdHandle(handle);
+handle_t FallbackConsole::get_std_handle(dword_t n_std_handle) {
+  dword_t result = (-12 <= n_std_handle && n_std_handle <= -10)
+      ? n_std_handle + 18
+      : -1;
+  return reinterpret_cast<handle_t>(result);
 }
 
 Console *Console::native() {
   static Console *instance = NULL;
   if (instance == NULL)
-    instance = new WindowsConsole();
+    instance = new FallbackConsole();
   return instance;
 }

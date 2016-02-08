@@ -443,5 +443,7 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
 }
 
 #ifdef IS_MSVC
-#include "conapi-msvc.cc"
+#  include "conapi-msvc.cc"
+#else
+#  include "conapi-fallback.cc"
 #endif

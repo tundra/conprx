@@ -25,6 +25,7 @@ driver_main.add_object(get_dep_external("plankton", "src", "c", "library"))
 driver_main.add_object(get_dep_external("tclib", "src", "c", "sync", "library"))
 driver_main.add_object(get_dep_external("tclib", "src", "c", "async", "library"))
 driver_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
+driver_main.add_object(get_external("src", "objects"))
 
 test_library = get_group("library")
 

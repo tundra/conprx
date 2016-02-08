@@ -24,6 +24,7 @@ public:
     : is_used_(false)
     , connection_(connection) { }
   Variant echo(Variant value);
+  Variant get_std_handle(Variant n_std_handle);
 private:
   bool is_used_;
   Variant send_unary(Variant selector, Variant arg);
@@ -74,6 +75,10 @@ DriverConnection::DriverConnection()
 
 Variant DriverProxy::echo(Variant value) {
   return send_unary("echo", value);
+}
+
+Variant DriverProxy::get_std_handle(Variant n_std_handle) {
+  return send_unary("get_std_handle", n_std_handle);
 }
 
 Variant DriverProxy::send_unary(Variant selector, Variant arg) {
@@ -186,6 +191,23 @@ TEST(driver, simple) {
   arg1.add(Variant::yes());
   Array res1 = call1.echo(arg1);
   ASSERT_EQ(8, res1[0].integer_value());
+
+  ASSERT_TRUE(driver.join());
+}
+
+TEST(driver, get_std_handle) {
+  DriverConnection driver;
+  ASSERT_TRUE(driver.start());
+  ASSERT_TRUE(driver.connect());
+
+  DriverProxy gsh10 = driver.new_call();
+  ASSERT_TRUE(gsh10.get_std_handle(-10).is_integer());
+
+  DriverProxy gsh11 = driver.new_call();
+  ASSERT_TRUE(gsh11.get_std_handle(-11).is_integer());
+
+  DriverProxy gsh12 = driver.new_call();
+  ASSERT_EQ(-1, gsh12.get_std_handle(1000).integer_value());
 
   ASSERT_TRUE(driver.join());
 }
