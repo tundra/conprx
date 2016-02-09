@@ -1,11 +1,13 @@
 //- Copyright 2016 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "async/promise-inl.hh"
+#include "driver.hh"
 #include "io/iop.hh"
+#include "marshal-inl.hh"
 #include "rpc.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
-#include "async/promise-inl.hh"
 #include "test.hh"
 
 BEGIN_C_INCLUDES
@@ -15,6 +17,7 @@ END_C_INCLUDES
 
 using namespace tclib;
 using namespace plankton;
+using namespace conprx;
 
 class DriverConnection;
 
@@ -24,13 +27,17 @@ public:
     : is_used_(false)
     , connection_(connection) { }
   Variant echo(Variant value);
-  Variant get_std_handle(Variant n_std_handle);
+  Variant is_handle(Variant value);
+  Handle get_std_handle(Variant n_std_handle);
+  Factory *factory() { return &arena_; }
 private:
   bool is_used_;
   Variant send_unary(Variant selector, Variant arg);
   Variant send(rpc::OutgoingRequest *req);
+  Handle unwrap_handle(Variant value);
   DriverConnection *connection_;
   rpc::IncomingResponse response_;
+  Arena arena_;
 };
 
 // Manages a driver instance.
@@ -77,8 +84,17 @@ Variant DriverProxy::echo(Variant value) {
   return send_unary("echo", value);
 }
 
-Variant DriverProxy::get_std_handle(Variant n_std_handle) {
-  return send_unary("get_std_handle", n_std_handle);
+Variant DriverProxy::is_handle(Variant value) {
+  return send_unary("is_handle", value);
+}
+
+Handle DriverProxy::get_std_handle(Variant n_std_handle) {
+  return unwrap_handle(send_unary("get_std_handle", n_std_handle));
+}
+
+Handle DriverProxy::unwrap_handle(Variant value) {
+  Handle *result = value.native_as(Handle::seed_type());
+  return (result == NULL) ? Handle::invalid() : *result;
 }
 
 Variant DriverProxy::send_unary(Variant selector, Variant arg) {
@@ -135,6 +151,7 @@ bool DriverConnection::connect() {
     return false;
   connector_ = new (kDefaultAlloc) rpc::StreamServiceConnector(channel()->in(),
       channel()->out());
+  connector_->set_default_type_registry(ConsoleProxy::registry());
   if (!connector()->init(empty_callback()))
     return false;
   return true;
@@ -192,6 +209,18 @@ TEST(driver, simple) {
   Array res1 = call1.echo(arg1);
   ASSERT_EQ(8, res1[0].integer_value());
 
+  DriverProxy call2 = driver.new_call();
+  Handle out(54234);
+  Handle *in = call2.echo(out.to_seed(call2.factory())).native_as(Handle::seed_type());
+  ASSERT_TRUE(in != NULL);
+  ASSERT_EQ(54234, in->id());
+
+  DriverProxy call3 = driver.new_call();
+  ASSERT_TRUE(call3.is_handle(out.to_seed(call3.factory())) == Variant::yes());
+
+  DriverProxy call4 = driver.new_call();
+  ASSERT_TRUE(call4.is_handle(100) == Variant::no());
+
   ASSERT_TRUE(driver.join());
 }
 
@@ -201,13 +230,16 @@ TEST(driver, get_std_handle) {
   ASSERT_TRUE(driver.connect());
 
   DriverProxy gsh10 = driver.new_call();
-  ASSERT_TRUE(gsh10.get_std_handle(-10).is_integer());
+  ASSERT_TRUE(gsh10.get_std_handle(-10).is_valid());
 
   DriverProxy gsh11 = driver.new_call();
-  ASSERT_TRUE(gsh11.get_std_handle(-11).is_integer());
+  ASSERT_TRUE(gsh11.get_std_handle(-11).is_valid());
 
   DriverProxy gsh12 = driver.new_call();
-  ASSERT_EQ(-1, gsh12.get_std_handle(1000).integer_value());
+  ASSERT_TRUE(gsh12.get_std_handle(-12).is_valid());
+
+  DriverProxy gsh1000 = driver.new_call();
+  ASSERT_FALSE(gsh1000.get_std_handle(1000).is_valid());
 
   ASSERT_TRUE(driver.join());
 }

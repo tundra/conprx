@@ -2,10 +2,12 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "driver.hh"
+
+#include "agent/conapi.hh"
+#include "marshal-inl.hh"
+#include "rpc.hh"
 #include "socket.hh"
 #include "sync/pipe.hh"
-#include "rpc.hh"
-#include "agent/conapi.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
@@ -16,13 +18,14 @@ using namespace plankton;
 using namespace tclib;
 
 #define FOR_EACH_DRIVER_FUNCTION(F)                                            \
-  F(echo)
+  F(echo)                                                                      \
+  F(is_handle)
 
 class ConsoleDriver : public rpc::Service {
 public:
   ConsoleDriver(conprx::Console *console);
 #define __DECL_DRIVER_BY_NAME__(name)                                          \
-  void name(rpc::RequestArguments args, ResponseCallback callback);
+  void name(rpc::RequestData &data, ResponseCallback callback);
   FOR_EACH_DRIVER_FUNCTION(__DECL_DRIVER_BY_NAME__)
 #define __DECL_DRIVER_FUNCTION__(Name, name, MINOR, SIG) __DECL_DRIVER_BY_NAME__(name)
   FOR_EACH_CONAPI_FUNCTION(__DECL_DRIVER_FUNCTION__)
@@ -32,6 +35,8 @@ public:
   conprx::Console *console() { return console_; }
 
 private:
+  static Seed wrap_handle(handle_t handle, Factory *factory);
+
   conprx::Console *console_;
 };
 
@@ -47,15 +52,26 @@ ConsoleDriver::ConsoleDriver(conprx::Console *console)
 #undef __REG_DRIVER_BY_NAME
 }
 
-void ConsoleDriver::echo(rpc::RequestArguments args, ResponseCallback callback) {
-  callback(rpc::OutgoingResponse::success(args[0]));
+void ConsoleDriver::echo(rpc::RequestData &data, ResponseCallback callback) {
+  callback(rpc::OutgoingResponse::success(data[0]));
 }
 
-void ConsoleDriver::get_std_handle(rpc::RequestArguments value, ResponseCallback callback) {
-  dword_t n_std_handle = static_cast<dword_t>(value[0].integer_value());
-  handle_t handle = console()->get_std_handle(n_std_handle);
-  callback(rpc::OutgoingResponse::success(reinterpret_cast<int64_t>(handle)));
+void ConsoleDriver::is_handle(rpc::RequestData &data, ResponseCallback callback) {
+  conprx::Handle *handle = data[0].native_as(conprx::Handle::seed_type());
+  callback(rpc::OutgoingResponse::success(Variant::boolean(handle != NULL)));
 }
+
+void ConsoleDriver::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
+  dword_t n_std_handle = static_cast<dword_t>(data[0].integer_value());
+  handle_t handle = console()->get_std_handle(n_std_handle);
+  callback(rpc::OutgoingResponse::success(wrap_handle(handle, data.factory())));
+}
+
+Seed ConsoleDriver::wrap_handle(handle_t raw_handle, Factory *factory) {
+  conprx::Handle handle(raw_handle);
+  return handle.to_seed(factory);
+}
+
 
 class ConsoleDriverMain {
 public:
@@ -109,6 +125,7 @@ bool ConsoleDriverMain::open_connection() {
 
 bool ConsoleDriverMain::run() {
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
+  connector.set_default_type_registry(conprx::ConsoleProxy::registry());
   conprx::Console *console = conprx::Console::native();
   ConsoleDriver driver(console);
   if (!connector.init(driver.handler()))
