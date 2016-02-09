@@ -52,7 +52,7 @@ void ConsoleDriver::echo(rpc::RequestArguments args, ResponseCallback callback) 
 }
 
 void ConsoleDriver::get_std_handle(rpc::RequestArguments value, ResponseCallback callback) {
-  dword_t n_std_handle = value[0].integer_value();
+  dword_t n_std_handle = static_cast<dword_t>(value[0].integer_value());
   handle_t handle = console()->get_std_handle(n_std_handle);
   callback(rpc::OutgoingResponse::success(reinterpret_cast<int64_t>(handle)));
 }
