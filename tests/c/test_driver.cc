@@ -28,11 +28,16 @@ public:
     , connection_(connection) { }
   Variant echo(Variant value);
   Variant is_handle(Variant value);
-  Handle get_std_handle(Variant n_std_handle);
+  Handle get_std_handle(int64_t n_std_handle);
+  Variant write_console_a(Handle console_output, const char *string,
+      int64_t chars_to_write);
+  String get_console_title_a(int64_t bufsize);
+  Variant set_console_title_a(const char *string);
   Factory *factory() { return &arena_; }
 private:
   bool is_used_;
   Variant send_unary(Variant selector, Variant arg);
+  Variant send_ternary(Variant selector, Variant arg0, Variant arg1, Variant arg2);
   Variant send(rpc::OutgoingRequest *req);
   Handle unwrap_handle(Variant value);
   DriverConnection *connection_;
@@ -88,8 +93,22 @@ Variant DriverProxy::is_handle(Variant value) {
   return send_unary("is_handle", value);
 }
 
-Handle DriverProxy::get_std_handle(Variant n_std_handle) {
+Handle DriverProxy::get_std_handle(int64_t n_std_handle) {
   return unwrap_handle(send_unary("get_std_handle", n_std_handle));
+}
+
+Variant DriverProxy::write_console_a(Handle console_output, const char *string,
+    int64_t chars_to_write) {
+  return send_ternary("write_console_a", factory()->new_native(&console_output),
+      string, chars_to_write);
+}
+
+String DriverProxy::get_console_title_a(int64_t bufsize) {
+  return send_unary("get_console_title_a", bufsize);
+}
+
+Variant DriverProxy::set_console_title_a(const char *string) {
+  return send_unary("set_console_title_a", string);
 }
 
 Handle DriverProxy::unwrap_handle(Variant value) {
@@ -99,6 +118,13 @@ Handle DriverProxy::unwrap_handle(Variant value) {
 
 Variant DriverProxy::send_unary(Variant selector, Variant arg) {
   rpc::OutgoingRequest req(Variant::null(), selector, 1, &arg);
+  return send(&req);
+}
+
+Variant DriverProxy::send_ternary(Variant selector, Variant arg0, Variant arg1,
+    Variant arg2) {
+  Variant argv[3] = {arg0, arg1, arg2};
+  rpc::OutgoingRequest req(Variant::null(), selector, 3, argv);
   return send(&req);
 }
 
@@ -174,6 +200,10 @@ rpc::IncomingResponse DriverConnection::send(rpc::OutgoingRequest *req) {
       TextWriter resw;
       resw.write(resp->peek_value(Variant::null()));
       LOG_INFO("<- %s", *resw);
+    } else if (resp->is_rejected()) {
+      TextWriter resw;
+      resw.write(resp->peek_error(Variant::null()));
+      LOG_INFO("<! %s", *resw);
     }
   }
   return resp;
@@ -183,7 +213,9 @@ bool DriverConnection::join() {
   if (!channel()->close())
     return false;
   ProcessWaitIop wait(&process_, o0());
-  return wait.execute();
+  if (!wait.execute())
+    return false;
+  return process_.exit_code().peek_value(1) == 0;
 }
 
 utf8_t DriverConnection::executable_path() {
@@ -211,12 +243,12 @@ TEST(driver, simple) {
 
   DriverProxy call2 = driver.new_call();
   Handle out(54234);
-  Handle *in = call2.echo(out.to_seed(call2.factory())).native_as(Handle::seed_type());
+  Handle *in = call2.echo(call2.factory()->new_native(&out)).native_as(Handle::seed_type());
   ASSERT_TRUE(in != NULL);
   ASSERT_EQ(54234, in->id());
 
   DriverProxy call3 = driver.new_call();
-  ASSERT_TRUE(call3.is_handle(out.to_seed(call3.factory())) == Variant::yes());
+  ASSERT_TRUE(call3.is_handle(call3.factory()->new_native(&out)) == Variant::yes());
 
   DriverProxy call4 = driver.new_call();
   ASSERT_TRUE(call4.is_handle(100) == Variant::no());
@@ -240,6 +272,26 @@ TEST(driver, get_std_handle) {
 
   DriverProxy gsh1000 = driver.new_call();
   ASSERT_FALSE(gsh1000.get_std_handle(1000).is_valid());
+
+  ASSERT_TRUE(driver.join());
+}
+
+TEST(driver, get_console_title) {
+  DriverConnection driver;
+  driver.set_trace(true);
+  ASSERT_TRUE(driver.start());
+  ASSERT_TRUE(driver.connect());
+
+  DriverProxy gettit0 = driver.new_call();
+  String tit0 = gettit0.get_console_title_a(1024);
+  ASSERT_TRUE(tit0.is_string());
+
+  DriverProxy settit0 = driver.new_call();
+  ASSERT_TRUE(settit0.set_console_title_a("Looky here!") == Variant::yes());
+
+  DriverProxy gettit1 = driver.new_call();
+  String tit1 = gettit1.get_console_title_a(1024);
+  ASSERT_C_STREQ("Looky here!", tit1.string_chars());
 
   ASSERT_TRUE(driver.join());
 }

@@ -10,10 +10,7 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-SeedType<Handle> Handle::kSeedType("conprx.Handle",
-    Handle::new_instance,
-    new_callback(&Handle::init),
-    new_callback(&Handle::to_seed));
+DefaultSeedType<Handle> Handle::kSeedType("conprx.Handle");
 
 Handle *Handle::new_instance(Variant header, Factory *factory) {
   return new (factory) Handle();
@@ -35,6 +32,24 @@ TypeRegistry *ConsoleProxy::registry() {
   if (instance == NULL) {
     instance = new TypeRegistry();
     instance->register_type(Handle::seed_type());
+    instance->register_type(ConsoleError::seed_type());
   }
   return instance;
+}
+
+DefaultSeedType<ConsoleError> ConsoleError::kSeedType("conprx.ConsoleError");
+
+ConsoleError *ConsoleError::new_instance(Variant header, Factory *factory) {
+  return new (factory) ConsoleError();
+}
+
+Variant ConsoleError::to_seed(Factory *factory) {
+  Seed result = factory->new_seed(seed_type());
+  result.set_field("last_error", last_error_);
+  return result;
+}
+
+void ConsoleError::init(Seed payload, Factory *factory) {
+  Variant last_error = payload.get_field("last_error");
+  last_error_ = last_error.is_integer() ? last_error.integer_value() : -1;
 }

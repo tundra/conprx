@@ -87,6 +87,9 @@ namespace conprx {
 //  CamelName                   underscore_name                 (Or, Dr) sigSignature
 #define FOR_EACH_CONAPI_FUNCTION(F)                                                                    \
   F(GetStdHandle,               get_std_handle,                 (X,  X), sigDWordToHandle)             \
+  F(WriteConsoleA,              write_console_a,                (X,  X), sigWriteConsoleA)             \
+  F(GetConsoleTitleA,           get_console_title_a,            (X,  X), sigStrToDWord)                \
+  F(SetConsoleTitleA,           set_console_title_a,            (X,  X), sigAnsiCStrToBool)            \
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                               \
   FOR_EACH_CONAPI_FUNCTION(F)                                                                          \
@@ -97,7 +100,6 @@ namespace conprx {
   F(GetConsoleMode,             get_console_mode,               (X,  _), sigGetConsoleMode)            \
   F(GetConsoleOutputCP,         get_console_output_cp,          (X,  _), sigVoidToUInt)                \
   F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X,  _), sigGetConsoleScreenBufferInfo)\
-  F(GetConsoleTitleA,           get_console_title_a,            (X,  _), sigStrToDWord)                \
   F(GetConsoleTitleW,           get_console_title_w,            (X,  _), sigWideStrToDWord)            \
   F(GetConsoleWindow,           get_console_window,             (X,  _), sigVoidToHWnd)                \
   F(ReadConsoleA,               read_console_a,                 (X,  _), sigReadConsoleA)              \
@@ -107,9 +109,7 @@ namespace conprx {
   F(SetConsoleCursorInfo,       set_console_cursor_info,        (X,  _), sigSetConsoleCursorInfo)      \
   F(SetConsoleCursorPosition,   set_console_cursor_position,    (X,  _), sigSetConsoleCursorPosition)  \
   F(SetConsoleMode,             set_console_mode,               (X,  _), sigSetConsoleMode)            \
-  F(SetConsoleTitleA,           set_console_title_a,            (X,  _), sigAnsiCStrToBool)            \
   F(SetConsoleTitleW,           set_console_title_w,            (X,  _), sigWideCStrToBool)            \
-  F(WriteConsoleA,              write_console_a,                (X,  _), sigWriteConsoleA)             \
   F(WriteConsoleW,              write_console_w,                (X,  _), sigWriteConsoleW)             \
   F(WriteConsoleOutputA,        write_console_output_a,         (X,  _), sigWriteConsoleOutputA)       \
   F(WriteConsoleOutputW,        write_console_output_w,         (X,  _), sigWriteConsoleOutputW)
@@ -119,7 +119,7 @@ namespace conprx {
 
 // A container that holds the various definitions used by the other console
 // types.
-class Console {
+class Console : public tclib::DefaultDestructable {
 public:
   virtual ~Console();
 
@@ -142,13 +142,16 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
+  dword_t get_last_error();
+
   // A description of a console function.
   struct FunctionInfo {
     cstr_t name;
     int key;
   };
 
-  static Console *native();
+  // Creates and returns a new instance of the native console.
+  static tclib::pass_def_ref_t<Console> new_native();
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();
@@ -160,6 +163,7 @@ public:
 class LoggingConsole : public Console {
 public:
   LoggingConsole(Console *delegate) : delegate_(delegate) { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   void set_delegate(Console *delegate) { delegate_ = delegate; }
 

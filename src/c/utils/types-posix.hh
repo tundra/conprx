@@ -9,7 +9,7 @@
 typedef void *handle_t;
 typedef handle_t hwnd_t;
 typedef void *module_t;
-typedef long dword_t;
+typedef unsigned long dword_t;
 typedef bool bool_t;
 typedef int16_t short_t;
 typedef uint16_t ushort_t;

@@ -42,18 +42,38 @@ public:
 
   int64_t id() { return id_; }
 
-  // Returns a seed representing this handle, allocated using the given factory.
-  plankton::Variant to_seed(plankton::Factory *factory);
+  void *ptr() { return reinterpret_cast<void*>(id_); }
 
 private:
+  template <typename T> friend class plankton::DefaultSeedType;
+
+  plankton::Variant to_seed(plankton::Factory *factory);
   static Handle *new_instance(plankton::Variant header, plankton::Factory *factory);
   void init(plankton::Seed payload, plankton::Factory *factory);
 
   // This must match the invalid handle value from windows.
   static const int64_t kInvalidHandleValue = -1;
 
-  static plankton::SeedType<Handle> kSeedType;
+  static plankton::DefaultSeedType<Handle> kSeedType;
   int64_t id_;
+};
+
+// An object that indicates a problem interacting with the console api.
+class ConsoleError {
+public:
+  ConsoleError() : last_error_(0) { }
+  ConsoleError(int64_t last_error) : last_error_(last_error) { }
+
+  static plankton::SeedType<ConsoleError> *seed_type() { return &kSeedType; }
+
+private:
+  template <typename T> friend class plankton::DefaultSeedType;
+
+  static ConsoleError *new_instance(plankton::Variant header, plankton::Factory *factory);
+  plankton::Variant to_seed(plankton::Factory *factory);
+  void init(plankton::Seed payload, plankton::Factory *factory);
+  static plankton::DefaultSeedType<ConsoleError> kSeedType;
+  int64_t last_error_;
 };
 
 } // namespace conprx

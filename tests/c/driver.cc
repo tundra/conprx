@@ -12,6 +12,7 @@
 BEGIN_C_INCLUDES
 #include "utils/log.h"
 #include "utils/string-inl.h"
+#include "utils/lifetime.h"
 END_C_INCLUDES
 
 using namespace plankton;
@@ -35,7 +36,10 @@ public:
   conprx::Console *console() { return console_; }
 
 private:
-  static Seed wrap_handle(handle_t handle, Factory *factory);
+  Native new_console_error(Factory *factory);
+
+  static Native wrap_handle(handle_t handle, Factory *factory);
+  static dword_t to_dword(Variant value);
 
   conprx::Console *console_;
 };
@@ -62,16 +66,63 @@ void ConsoleDriver::is_handle(rpc::RequestData &data, ResponseCallback callback)
 }
 
 void ConsoleDriver::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
-  dword_t n_std_handle = static_cast<dword_t>(data[0].integer_value());
+  dword_t n_std_handle = to_dword(data[0]);
   handle_t handle = console()->get_std_handle(n_std_handle);
   callback(rpc::OutgoingResponse::success(wrap_handle(handle, data.factory())));
 }
 
-Seed ConsoleDriver::wrap_handle(handle_t raw_handle, Factory *factory) {
-  conprx::Handle handle(raw_handle);
-  return handle.to_seed(factory);
+void ConsoleDriver::write_console_a(rpc::RequestData &data, ResponseCallback callback) {
+  handle_t output = data[0].native_as(conprx::Handle::seed_type())->ptr();
+  const char *buffer = data[1].string_chars();
+  dword_t chars_to_write = to_dword(data[2]);
+  dword_t chars_written = 0;
+  if (console()->write_console_a(output, buffer, chars_to_write, &chars_written,
+      NULL)) {
+    callback(rpc::OutgoingResponse::success(chars_written));
+  } else {
+    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+  }
 }
 
+void ConsoleDriver::get_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
+  dword_t chars_to_read = to_dword(data[0]);
+  ansi_char_t *buf = new ansi_char_t[chars_to_read];
+  dword_t len = console()->get_console_title_a(buf, chars_to_read);
+  if (len == 0) {
+    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+  } else {
+    String result = data.factory()->new_string(buf, static_cast<uint32_t>(len));
+    callback(rpc::OutgoingResponse::success(result));
+  }
+}
+
+void ConsoleDriver::set_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
+  const char *new_title = data[0].string_chars();
+  if (console()->set_console_title_a(new_title)) {
+    callback(rpc::OutgoingResponse::success(Variant::yes()));
+  } else {
+    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+  }
+}
+
+Native ConsoleDriver::wrap_handle(handle_t raw_handle, Factory *factory) {
+  conprx::Handle *handle = new (factory) conprx::Handle(raw_handle);
+  return factory->new_native(handle);
+}
+
+Native ConsoleDriver::new_console_error(Factory *factory) {
+  dword_t last_error = console()->get_last_error();
+  conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
+  return factory->new_native(error);
+}
+
+dword_t ConsoleDriver::to_dword(Variant value) {
+  CHECK_TRUE("not integer", value.is_integer());
+  int64_t int_val = value.integer_value();
+  long long_val = static_cast<long>(int_val);
+  CHECK_EQ("dword out of bounds", long_val, int_val);
+  return static_cast<dword_t>(long_val);
+}
 
 class ConsoleDriverMain {
 public:
@@ -87,7 +138,10 @@ public:
   bool run();
 
   // Main entry-point.
-  int main(int argc, const char **argv);
+  bool inner_main(int argc, const char **argv);
+
+  // Sets up allocators, crash handling, etc, before calling the inner main.
+  static int outer_main(int argc, const char **argv);
 
 private:
   CommandLineReader reader_;
@@ -126,8 +180,8 @@ bool ConsoleDriverMain::open_connection() {
 bool ConsoleDriverMain::run() {
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(conprx::ConsoleProxy::registry());
-  conprx::Console *console = conprx::Console::native();
-  ConsoleDriver driver(console);
+  def_ref_t<conprx::Console> console = conprx::Console::new_native();
+  ConsoleDriver driver(*console);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();
@@ -135,13 +189,33 @@ bool ConsoleDriverMain::run() {
   return result;
 }
 
-int ConsoleDriverMain::main(int argc, const char **argv) {
-  if (parse_args(argc, argv) && open_connection() && run())
+bool ConsoleDriverMain::inner_main(int argc, const char **argv) {
+  return parse_args(argc, argv) && open_connection() && run();
+}
+
+int ConsoleDriverMain::outer_main(int argc, const char **argv) {
+  limited_allocator_t limiter;
+  limited_allocator_install(&limiter, 100 * 1024 * 1024);
+  fingerprinting_allocator_t fingerprinter;
+  fingerprinting_allocator_install(&fingerprinter);
+  install_crash_handler();
+
+  bool result;
+  {
+    ConsoleDriverMain main;
+    result = main.inner_main(argc, argv);
+  }
+  if (!result)
+    return 1;
+
+  if (fingerprinting_allocator_uninstall(&fingerprinter)
+      && limited_allocator_uninstall(&limiter)) {
     return 0;
-  return 1;
+  } else {
+    return 1;
+  }
 }
 
 int main(int argc, const char *argv[]) {
-  ConsoleDriverMain main;
-  return main.main(argc, argv);
+  return ConsoleDriverMain::outer_main(argc, argv);
 }

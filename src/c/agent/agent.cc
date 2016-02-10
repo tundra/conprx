@@ -14,6 +14,7 @@ using namespace conprx;
 class OriginalConsole : public Console {
 public:
   OriginalConsole(Vector<PatchRequest*> patches) : patches_(patches) { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
 #define __EMIT_TRAMPOLINE_DECL__(Name, name, FLAGS, SIG)                       \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_DECL__)
