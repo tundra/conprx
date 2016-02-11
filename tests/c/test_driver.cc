@@ -61,7 +61,7 @@ public:
   // Wait for the driver to terminate.
   bool join();
 
-  void set_trace(bool value) { trace_ = value; }
+  ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
   // Returns a new proxy that can be used to perform a single call to the
   // driver. The value returned by the call is only valid as long as the proxy
@@ -278,6 +278,7 @@ TEST(driver, get_std_handle) {
 
 TEST(driver, get_console_title) {
   DriverConnection driver;
+  driver.set_trace(true);
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
