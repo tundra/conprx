@@ -10,7 +10,7 @@ class WindowsConsole : public Console {
 public:
   virtual void default_destroy() { default_delete_concrete(this); }
 
-#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
+#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
