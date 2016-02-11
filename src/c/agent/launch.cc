@@ -28,7 +28,6 @@ bool Launcher::start(utf8_t command, size_t argc, utf8_t *argv, utf8_t agent_dll
   if (!start_monitor())
     return false;
 
-  HEST("host: starting process %s", command.chars);
   if (!process_.start(command, argc, argv)) {
     LOG_ERROR("Failed to start %s.", command.chars);
     return false;

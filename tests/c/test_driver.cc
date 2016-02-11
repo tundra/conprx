@@ -278,7 +278,6 @@ TEST(driver, get_std_handle) {
 
 TEST(driver, get_console_title) {
   DriverConnection driver;
-  driver.set_trace(true);
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
