@@ -17,10 +17,10 @@ void use(T t) { }
 
 TEST(conapi, functypes) {
 #ifdef IS_MSVC
-#define __EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG)                          \
-  Console::name##_t name = Name;                                               \
-  use(name);
-  FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
-#undef __EMIT_ASSIGN__
+#  define __EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG)                        \
+   Console::name##_t name = Name;                                              \
+   use(name);
+   FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
+#  undef __EMIT_ASSIGN__
 #endif
 }
