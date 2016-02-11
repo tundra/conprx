@@ -9,6 +9,7 @@
 #include "sync/pipe.hh"
 #include "sync/process.hh"
 #include "test.hh"
+#include "agent/conapi.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -21,25 +22,44 @@ using namespace conprx;
 
 class DriverConnection;
 
-class DriverProxy {
+class DriverRequest {
 public:
-  DriverProxy(DriverConnection *connection)
+  DriverRequest(DriverConnection *connection)
     : is_used_(false)
     , connection_(connection) { }
-  Variant echo(Variant value);
-  Variant is_handle(Variant value);
-  Handle get_std_handle(int64_t n_std_handle);
-  Variant write_console_a(Handle console_output, const char *string,
-      int64_t chars_to_write);
-  String get_console_title_a(int64_t bufsize);
-  Variant set_console_title_a(const char *string);
+
+#define __DECL_PROXY_METHOD__(name, SIG, ARGS)                                 \
+  Variant name SIG;
+  FOR_EACH_REMOTE_MESSAGE(__DECL_PROXY_METHOD__)
+#undef __DECL_PROXY_METHOD__
+
+#define __DECL_PROXY_METHOD__(Name, name, FLAGS, SIG, PSIG)                    \
+  Variant name PSIG(GET_SIG_PARAMS);
+  FOR_EACH_CONAPI_FUNCTION(__DECL_PROXY_METHOD__)
+#undef __DECL_PROXY_METHOD__
+
   Factory *factory() { return &arena_; }
+
+  // Returns the resulting value of this request, assuming it succeeded. If it
+  // is not yet resolved or failed this will fail.
+  const Variant &operator*();
+
+  // Returns the error resulting from this request, assuming it failed and
+  // failing if it didn't.
+  const Variant &error();
+
+  // Returns a pointer to the value of this request, assuming it succeeded. If
+  // not, same as *.
+  const Variant *operator->() { return &this->operator*(); }
+
+  bool is_rejected() { return response_->is_rejected(); }
+
 private:
+  Variant send(Variant selector, Variant arg0);
+  Variant send(Variant selector, Variant arg0, Variant arg1, Variant arg2);
+  Variant send_request(rpc::OutgoingRequest *req);
+
   bool is_used_;
-  Variant send_unary(Variant selector, Variant arg);
-  Variant send_ternary(Variant selector, Variant arg0, Variant arg1, Variant arg2);
-  Variant send(rpc::OutgoingRequest *req);
-  Handle unwrap_handle(Variant value);
   DriverConnection *connection_;
   rpc::IncomingResponse response_;
   Arena arena_;
@@ -63,10 +83,30 @@ public:
 
   ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
-  // Returns a new proxy that can be used to perform a single call to the
-  // driver. The value returned by the call is only valid as long as the proxy
-  // is.
-  DriverProxy new_call() { return DriverProxy(this); }
+  // Returns a new request object that can be used to perform a single call to
+  // the driver. The value returned by the call is only valid as long as the
+  // request is.
+  DriverRequest new_request() { return DriverRequest(this); }
+
+  // Shorthands for requests that don't need the request object before sending
+  // the message.
+#define __DECL_PROXY_METHOD__(name, SIG, ARGS)                                 \
+  DriverRequest name SIG {                                                     \
+    DriverRequest req(this);                                                   \
+    req.name ARGS;                                                             \
+    return req;                                                                \
+  }
+  FOR_EACH_REMOTE_MESSAGE(__DECL_PROXY_METHOD__)
+#undef __DECL_PROXY_METHOD__
+
+#define __DECL_PROXY_METHOD__(Name, name, FLAGS, SIG, PSIG)                    \
+  DriverRequest name PSIG(GET_SIG_PARAMS) {                                    \
+    DriverRequest req(this);                                                   \
+    req.name PSIG(GET_SIG_ARGS);                                               \
+    return req;                                                                \
+  }
+  FOR_EACH_CONAPI_FUNCTION(__DECL_PROXY_METHOD__)
+#undef __DECL_PROXY_METHOD__
 
   rpc::IncomingResponse send(rpc::OutgoingRequest *req);
 
@@ -85,50 +125,61 @@ DriverConnection::DriverConnection()
   channel_ = ServerChannel::create();
 }
 
-Variant DriverProxy::echo(Variant value) {
-  return send_unary("echo", value);
+Variant DriverRequest::echo(Variant value) {
+  return send("echo", value);
 }
 
-Variant DriverProxy::is_handle(Variant value) {
-  return send_unary("is_handle", value);
+Variant DriverRequest::is_handle(Variant value) {
+  return send("is_handle", value);
 }
 
-Handle DriverProxy::get_std_handle(int64_t n_std_handle) {
-  return unwrap_handle(send_unary("get_std_handle", n_std_handle));
+Variant DriverRequest::raise_error(int64_t last_error) {
+  return send("raise_error", last_error);
 }
 
-Variant DriverProxy::write_console_a(Handle console_output, const char *string,
+Variant DriverRequest::get_std_handle(int64_t n_std_handle) {
+  return send("get_std_handle", n_std_handle);
+}
+
+Variant DriverRequest::write_console_a(Handle console_output, const char *string,
     int64_t chars_to_write) {
-  return send_ternary("write_console_a", factory()->new_native(&console_output),
+  return send("write_console_a", factory()->new_native(&console_output),
       string, chars_to_write);
 }
 
-String DriverProxy::get_console_title_a(int64_t bufsize) {
-  return send_unary("get_console_title_a", bufsize);
+Variant DriverRequest::get_console_title_a(int64_t bufsize) {
+  return send("get_console_title_a", bufsize);
 }
 
-Variant DriverProxy::set_console_title_a(const char *string) {
-  return send_unary("set_console_title_a", string);
+Variant DriverRequest::set_console_title_a(const char *string) {
+  return send("set_console_title_a", string);
 }
 
-Handle DriverProxy::unwrap_handle(Variant value) {
-  Handle *result = value.native_as(Handle::seed_type());
-  return (result == NULL) ? Handle::invalid() : *result;
+const Variant &DriverRequest::operator*() {
+  ASSERT_TRUE(response_->is_settled());
+  ASSERT_TRUE(response_->is_fulfilled());
+  return response_->peek_value(Variant::null());
 }
 
-Variant DriverProxy::send_unary(Variant selector, Variant arg) {
+const Variant &DriverRequest::error() {
+  ASSERT_TRUE(response_->is_settled());
+  ASSERT_TRUE(response_->is_rejected());
+  return response_->peek_error(Variant::null());
+}
+
+Variant DriverRequest::send(Variant selector, Variant arg) {
   rpc::OutgoingRequest req(Variant::null(), selector, 1, &arg);
-  return send(&req);
+  return send_request(&req);
 }
 
-Variant DriverProxy::send_ternary(Variant selector, Variant arg0, Variant arg1,
+Variant DriverRequest::send(Variant selector, Variant arg0, Variant arg1,
     Variant arg2) {
   Variant argv[3] = {arg0, arg1, arg2};
   rpc::OutgoingRequest req(Variant::null(), selector, 3, argv);
-  return send(&req);
+  return send_request(&req);
 }
 
-Variant DriverProxy::send(rpc::OutgoingRequest *req) {
+Variant DriverRequest::send_request(rpc::OutgoingRequest *req) {
   ASSERT_FALSE(is_used_);
   is_used_ = true;
   response_ = connection_->send(req);
@@ -229,11 +280,11 @@ TEST(driver, simple) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverProxy call0 = driver.new_call();
-  ASSERT_EQ(5436, call0.echo(5436).integer_value());
+  DriverRequest echo0 = driver.echo(5436);
+  ASSERT_EQ(5436, echo0->integer_value());
 
   Arena arena;
-  DriverProxy call1 = driver.new_call();
+  DriverRequest call1 = driver.new_request();
   Array arg1 = arena.new_array(0);
   arg1.add(8);
   arg1.add("foo");
@@ -241,17 +292,17 @@ TEST(driver, simple) {
   Array res1 = call1.echo(arg1);
   ASSERT_EQ(8, res1[0].integer_value());
 
-  DriverProxy call2 = driver.new_call();
+  DriverRequest call2 = driver.new_request();
   Handle out(54234);
   Handle *in = call2.echo(call2.factory()->new_native(&out)).native_as(Handle::seed_type());
   ASSERT_TRUE(in != NULL);
   ASSERT_EQ(54234, in->id());
 
-  DriverProxy call3 = driver.new_call();
+  DriverRequest call3 = driver.new_request();
   ASSERT_TRUE(call3.is_handle(call3.factory()->new_native(&out)) == Variant::yes());
 
-  DriverProxy call4 = driver.new_call();
-  ASSERT_TRUE(call4.is_handle(100) == Variant::no());
+  DriverRequest call4 = driver.is_handle(100);
+  ASSERT_TRUE(*call4 == Variant::no());
 
   ASSERT_TRUE(driver.join());
 }
@@ -261,17 +312,17 @@ TEST(driver, get_std_handle) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverProxy gsh10 = driver.new_call();
-  ASSERT_TRUE(gsh10.get_std_handle(-10).is_valid());
+  DriverRequest gsh10 = driver.new_request();
+  ASSERT_TRUE(gsh10.get_std_handle(-10).native_as<Handle>()->is_valid());
 
-  DriverProxy gsh11 = driver.new_call();
-  ASSERT_TRUE(gsh11.get_std_handle(-11).is_valid());
+  DriverRequest gsh11 = driver.new_request();
+  ASSERT_TRUE(gsh11.get_std_handle(-11).native_as<Handle>()->is_valid());
 
-  DriverProxy gsh12 = driver.new_call();
-  ASSERT_TRUE(gsh12.get_std_handle(-12).is_valid());
+  DriverRequest gsh12 = driver.new_request();
+  ASSERT_TRUE(gsh12.get_std_handle(-12).native_as<Handle>()->is_valid());
 
-  DriverProxy gsh1000 = driver.new_call();
-  ASSERT_FALSE(gsh1000.get_std_handle(1000).is_valid());
+  DriverRequest gsh1000 = driver.new_request();
+  ASSERT_FALSE(gsh1000.get_std_handle(1000).native_as<Handle>()->is_valid());
 
   ASSERT_TRUE(driver.join());
 }
@@ -281,16 +332,26 @@ TEST(driver, get_console_title) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverProxy gettit0 = driver.new_call();
-  String tit0 = gettit0.get_console_title_a(1024);
-  ASSERT_TRUE(tit0.is_string());
+  DriverRequest tit0 = driver.get_console_title_a(1024);
+  ASSERT_TRUE(tit0->is_string());
 
-  DriverProxy settit0 = driver.new_call();
-  ASSERT_TRUE(settit0.set_console_title_a("Looky here!") == Variant::yes());
+  DriverRequest settit0 = driver.set_console_title_a("Looky here!");
+  ASSERT_TRUE(*settit0 == Variant::yes());
 
-  DriverProxy gettit1 = driver.new_call();
-  String tit1 = gettit1.get_console_title_a(1024);
-  ASSERT_C_STREQ("Looky here!", tit1.string_chars());
+  DriverRequest tit1 = driver.get_console_title_a(1024);
+  ASSERT_C_STREQ("Looky here!", tit1->string_chars());
+
+  ASSERT_TRUE(driver.join());
+}
+
+TEST(driver, errors) {
+  DriverConnection driver;
+  ASSERT_TRUE(driver.start());
+  ASSERT_TRUE(driver.connect());
+
+  DriverRequest err = driver.raise_error(1090);
+  ASSERT_TRUE(err.is_rejected());
+  ASSERT_EQ(1090, err.error().native_as<ConsoleError>()->last_error());
 
   ASSERT_TRUE(driver.join());
 }

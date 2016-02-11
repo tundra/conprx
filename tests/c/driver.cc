@@ -18,17 +18,13 @@ END_C_INCLUDES
 using namespace plankton;
 using namespace tclib;
 
-#define FOR_EACH_DRIVER_FUNCTION(F)                                            \
-  F(echo)                                                                      \
-  F(is_handle)
-
 class ConsoleDriver : public rpc::Service {
 public:
   ConsoleDriver(conprx::Console *console);
-#define __DECL_DRIVER_BY_NAME__(name)                                          \
+#define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
   void name(rpc::RequestData &data, ResponseCallback callback);
-  FOR_EACH_DRIVER_FUNCTION(__DECL_DRIVER_BY_NAME__)
-#define __DECL_DRIVER_FUNCTION__(Name, name, MINOR, SIG) __DECL_DRIVER_BY_NAME__(name)
+  FOR_EACH_REMOTE_MESSAGE(__DECL_DRIVER_BY_NAME__)
+#define __DECL_DRIVER_FUNCTION__(Name, name, MINOR, SIG, PSIG) __DECL_DRIVER_BY_NAME__(name, , )
   FOR_EACH_CONAPI_FUNCTION(__DECL_DRIVER_FUNCTION__)
 #undef __DECL_DRIVER_FUNCTION__
 #undef __DECL_DRIVER_BY_NAME__
@@ -46,11 +42,11 @@ private:
 
 ConsoleDriver::ConsoleDriver(conprx::Console *console)
   : console_(console) {
-#define __REG_DRIVER_BY_NAME__(name)                                           \
+#define __REG_DRIVER_BY_NAME__(name, SIG, ARGS)                                \
   register_method(#name, new_callback(&ConsoleDriver::name, this));
-  FOR_EACH_DRIVER_FUNCTION(__REG_DRIVER_BY_NAME__)
-#define __REG_DRIVER_FUNCTION__(Name, name, MINOR, SIG)                        \
-  mfDr MINOR (__REG_DRIVER_BY_NAME__(name), )
+  FOR_EACH_REMOTE_MESSAGE(__REG_DRIVER_BY_NAME__)
+#define __REG_DRIVER_FUNCTION__(Name, name, MINOR, SIG, PSIG)                  \
+  __REG_DRIVER_BY_NAME__(name, , )
   FOR_EACH_CONAPI_FUNCTION(__REG_DRIVER_FUNCTION__)
 #undef __REG_DRIVER_FUNCTION__
 #undef __REG_DRIVER_BY_NAME
@@ -63,6 +59,13 @@ void ConsoleDriver::echo(rpc::RequestData &data, ResponseCallback callback) {
 void ConsoleDriver::is_handle(rpc::RequestData &data, ResponseCallback callback) {
   conprx::Handle *handle = data[0].native_as(conprx::Handle::seed_type());
   callback(rpc::OutgoingResponse::success(Variant::boolean(handle != NULL)));
+}
+
+void ConsoleDriver::raise_error(rpc::RequestData &data, ResponseCallback callback) {
+  int64_t last_error = data[0].integer_value();
+  Factory *factory = data.factory();
+  conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
+  callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
 }
 
 void ConsoleDriver::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {

@@ -10,6 +10,13 @@
 
 namespace conprx {
 
+// These are the extra messages understood by the console driver that don't
+// correspond directly to console functions.
+#define FOR_EACH_REMOTE_MESSAGE(F)                                             \
+  F(echo,               (Variant value),        (value))                       \
+  F(is_handle,          (Variant value),        (value))                       \
+  F(raise_error,        (int64_t last_error),   (last_error))
+
 // Utilities that don't fit anywhere else.
 class ConsoleProxy {
 public:
@@ -65,6 +72,8 @@ public:
   ConsoleError(int64_t last_error) : last_error_(last_error) { }
 
   static plankton::SeedType<ConsoleError> *seed_type() { return &kSeedType; }
+
+  int64_t last_error() { return last_error_; }
 
 private:
   template <typename T> friend class plankton::DefaultSeedType;

@@ -78,44 +78,50 @@ namespace conprx {
      coord_t buffer_coord, small_rect_t *write_region),                        \
     (console_output, buffer, buffer_size, buffer_coord, write_region))
 
+#define psigDWordToHandle(F) F(Variant, (int64_t n_std_handle), (n_std_handle))
+#define psigWriteConsoleA(F) F(Variant,                                        \
+    (Handle console_output, const char *string, int64_t chars_to_write),       \
+    (console_output, string, chars_to_write))
+#define psigDWordToStr(F) F(Variant, (int64_t bufsize), (bufsize))
+#define psigAnsiCStrToVariant(F) F(Variant, (const char* string), (string))
+
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
 // The flags are,
 //
 //   - _Or_, create a stub for calling the original function.
 //
-//  CamelName                   underscore_name                 (Or, Dr) sigSignature
-#define FOR_EACH_CONAPI_FUNCTION(F)                                                                    \
-  F(GetStdHandle,               get_std_handle,                 (X,  X), sigDWordToHandle)             \
-  F(WriteConsoleA,              write_console_a,                (X,  X), sigWriteConsoleA)             \
-  F(GetConsoleTitleA,           get_console_title_a,            (X,  X), sigStrToDWord)                \
-  F(SetConsoleTitleA,           set_console_title_a,            (X,  X), sigAnsiCStrToBool)            \
+//  CamelName                   underscore_name                 (Or) sigSignature                   psigProxySignature
+#define FOR_EACH_CONAPI_FUNCTION(F)                                                                                        \
+  F(GetStdHandle,               get_std_handle,                 (X), sigDWordToHandle,              psigDWordToHandle)     \
+  F(WriteConsoleA,              write_console_a,                (X), sigWriteConsoleA,              psigWriteConsoleA)     \
+  F(GetConsoleTitleA,           get_console_title_a,            (X), sigStrToDWord,                 psigDWordToStr)        \
+  F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool,             psigAnsiCStrToVariant) \
 
-#define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                               \
-  FOR_EACH_CONAPI_FUNCTION(F)                                                                          \
-  F(AllocConsole,               alloc_console,                  (X,  _), sigVoidToBool)                \
-  F(FreeConsole,                free_console,                   (X,  _), sigVoidToBool)                \
-  F(GetConsoleCP,               get_console_cp,                 (X,  _), sigVoidToUInt)                \
-  F(GetConsoleCursorInfo,       get_console_cursor_info,        (X,  _), sigGetConsoleCursorInfo)      \
-  F(GetConsoleMode,             get_console_mode,               (X,  _), sigGetConsoleMode)            \
-  F(GetConsoleOutputCP,         get_console_output_cp,          (X,  _), sigVoidToUInt)                \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X,  _), sigGetConsoleScreenBufferInfo)\
-  F(GetConsoleTitleW,           get_console_title_w,            (X,  _), sigWideStrToDWord)            \
-  F(GetConsoleWindow,           get_console_window,             (X,  _), sigVoidToHWnd)                \
-  F(ReadConsoleA,               read_console_a,                 (X,  _), sigReadConsoleA)              \
-  F(ReadConsoleW,               read_console_w,                 (X,  _), sigReadConsoleW)              \
-  F(ReadConsoleOutputA,         read_console_output_a,          (X,  _), sigReadConsoleOutputA)        \
-  F(ReadConsoleOutputW,         read_console_output_w,          (X,  _), sigReadConsoleOutputW)        \
-  F(SetConsoleCursorInfo,       set_console_cursor_info,        (X,  _), sigSetConsoleCursorInfo)      \
-  F(SetConsoleCursorPosition,   set_console_cursor_position,    (X,  _), sigSetConsoleCursorPosition)  \
-  F(SetConsoleMode,             set_console_mode,               (X,  _), sigSetConsoleMode)            \
-  F(SetConsoleTitleW,           set_console_title_w,            (X,  _), sigWideCStrToBool)            \
-  F(WriteConsoleW,              write_console_w,                (X,  _), sigWriteConsoleW)             \
-  F(WriteConsoleOutputA,        write_console_output_a,         (X,  _), sigWriteConsoleOutputA)       \
-  F(WriteConsoleOutputW,        write_console_output_w,         (X,  _), sigWriteConsoleOutputW)
+#define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
+  FOR_EACH_CONAPI_FUNCTION(F)                                                                                              \
+  F(AllocConsole,               alloc_console,                  (X), sigVoidToBool,                 _)                     \
+  F(FreeConsole,                free_console,                   (X), sigVoidToBool,                 _)                     \
+  F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 _)                     \
+  F(GetConsoleCursorInfo,       get_console_cursor_info,        (X), sigGetConsoleCursorInfo,       _)                     \
+  F(GetConsoleMode,             get_console_mode,               (X), sigGetConsoleMode,             _)                     \
+  F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 _)                     \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X), sigGetConsoleScreenBufferInfo, _)                     \
+  F(GetConsoleTitleW,           get_console_title_w,            (X), sigWideStrToDWord,             _)                     \
+  F(GetConsoleWindow,           get_console_window,             (X), sigVoidToHWnd,                 _)                     \
+  F(ReadConsoleA,               read_console_a,                 (X), sigReadConsoleA,               _)                     \
+  F(ReadConsoleW,               read_console_w,                 (X), sigReadConsoleW,               _)                     \
+  F(ReadConsoleOutputA,         read_console_output_a,          (X), sigReadConsoleOutputA,         _)                     \
+  F(ReadConsoleOutputW,         read_console_output_w,          (X), sigReadConsoleOutputW,         _)                     \
+  F(SetConsoleCursorInfo,       set_console_cursor_info,        (X), sigSetConsoleCursorInfo,       _)                     \
+  F(SetConsoleCursorPosition,   set_console_cursor_position,    (X), sigSetConsoleCursorPosition,   _)                     \
+  F(SetConsoleMode,             set_console_mode,               (X), sigSetConsoleMode,             _)                     \
+  F(SetConsoleTitleW,           set_console_title_w,            (X), sigWideCStrToBool,             _)                     \
+  F(WriteConsoleW,              write_console_w,                (X), sigWriteConsoleW,              _)                     \
+  F(WriteConsoleOutputA,        write_console_output_a,         (X), sigWriteConsoleOutputA,        _)                     \
+  F(WriteConsoleOutputW,        write_console_output_w,         (X), sigWriteConsoleOutputW,        _)
 
-#define mfOr(OR, DR) OR
-#define mfDr(OR, DR) DR
+#define mfOr(OR) OR
 
 // A container that holds the various definitions used by the other console
 // types.
@@ -124,20 +130,20 @@ public:
   virtual ~Console();
 
   // The types of the naked console functions.
-#define __DECLARE_CONAPI_FUNCTION__(Name, name, FLAGS, SIG)                    \
+#define __DECLARE_CONAPI_FUNCTION__(Name, name, FLAGS, SIG, PSIG)              \
   typedef SIG(GET_SIG_RET) (WINAPI *name##_t)SIG(GET_SIG_PARAMS);
   FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
 #undef __DECLARE_CONAPI_FUNCTION__
 
   enum key_t {
-#define __DECLARE_CONAPI_KEY__(Name, name, FLAGS, SIG)                         \
+#define __DECLARE_CONAPI_KEY__(Name, name, FLAGS, SIG, PSIG)                   \
     name##_key,
     FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_KEY__)
 #undef __DECLARE_CONAPI_KEY__
     kFunctionCount
   };
 
-#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
+#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS) = 0;
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
@@ -174,7 +180,7 @@ public:
   // Sends the given complete log message.
   void emit_message(plankton::Variant message);
 
-#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG)                      \
+#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
