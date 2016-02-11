@@ -1,10 +1,11 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#include "sync/injectee.hh"
-#include "utils/types.hh"
 #include "io/stream.hh"
+#include "socket.hh"
+#include "sync/injectee.hh"
 #include "utils/log.hh"
+#include "utils/types.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/strbuf.h"
@@ -48,11 +49,11 @@ private:
 // on to the enclosing log.
 class StreamingLog : public tclib::Log {
 public:
-  StreamingLog(tclib::OutStream *out) : out_(out) { }
+  StreamingLog(plankton::OutputSocket *out) : out_(out) { }
   virtual bool record(log_entry_t *entry);
 
 private:
-  tclib::OutStream *out_;
+  plankton::OutputSocket *out_;
 };
 
 WindowsConsoleAgent *WindowsConsoleAgent::instance_ = NULL;
@@ -156,7 +157,10 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  StreamingLog log(*logout_);
+  plankton::OutputSocket socket(*logout_);
+  socket.init();
+
+  StreamingLog log(&socket);
   log.ensure_installed();
   if (!install_agent())
     return cInstallationFailed;
@@ -215,17 +219,13 @@ Options &Options::get() {
 }
 
 bool StreamingLog::record(log_entry_t *entry) {
-  string_buffer_t buf;
-  string_buffer_init(&buf);
-  string_buffer_printf(&buf, "%s:%i: %s", entry->file, entry->line,
-      entry->message.chars);
-  utf8_t line = string_buffer_flush(&buf);
-  uint32_t size = static_cast<uint32_t>(line.size);
-  tclib::WriteIop size_write(out_, &size, sizeof(size));
-  size_write.execute();
-  tclib::WriteIop data_write(out_, line.chars, size);
-  data_write.execute();
-  out_->flush();
+  plankton::Arena arena;
+  plankton::Seed seed = arena.new_seed();
+  seed.set_header("conprx.LogEntry");
+  seed.set_field("file", entry->file);
+  seed.set_field("line", entry->line);
+  seed.set_field("message", entry->message.chars);
+  out_->send_value(seed);
   return propagate(entry);
 }
 

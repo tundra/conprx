@@ -8,6 +8,7 @@ filenames = [
   "test_binpatch.cc",
   "test_conapi.cc",
   "test_vector.cc",
+  "driver-manager.cc",
 ]
 
 # Compile a single test file, ensuring that the include paths are hooked up
@@ -55,6 +56,8 @@ agent = get_external("src", "c", "agent", "agent")
 
 # Add targets to run the test cases.
 for filename in filenames:
+  if not filename.startswith("test_"):
+    continue
   test_case = test.get_exec_test_case(filename)
   test_case.set_runner(test_main)
   stripped_test_case_name = re.match(r"test_(\w+).c", filename).group(1)
