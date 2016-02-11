@@ -283,9 +283,8 @@ TEST(driver, simple) {
   DriverRequest echo0 = driver.echo(5436);
   ASSERT_EQ(5436, echo0->integer_value());
 
-  Arena arena;
   DriverRequest call1 = driver.new_request();
-  Array arg1 = arena.new_array(0);
+  Array arg1 = call1.factory()->new_array(0);
   arg1.add(8);
   arg1.add("foo");
   arg1.add(Variant::yes());
@@ -312,17 +311,17 @@ TEST(driver, get_std_handle) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverRequest gsh10 = driver.new_request();
-  ASSERT_TRUE(gsh10.get_std_handle(-10).native_as<Handle>()->is_valid());
+  DriverRequest gsh10 = driver.get_std_handle(-10);
+  ASSERT_TRUE(gsh10->native_as<Handle>()->is_valid());
 
-  DriverRequest gsh11 = driver.new_request();
-  ASSERT_TRUE(gsh11.get_std_handle(-11).native_as<Handle>()->is_valid());
+  DriverRequest gsh11 = driver.get_std_handle(-11);
+  ASSERT_TRUE(gsh11->native_as<Handle>()->is_valid());
 
-  DriverRequest gsh12 = driver.new_request();
-  ASSERT_TRUE(gsh12.get_std_handle(-12).native_as<Handle>()->is_valid());
+  DriverRequest gsh12 = driver.get_std_handle(-12);
+  ASSERT_TRUE(gsh12->native_as<Handle>()->is_valid());
 
-  DriverRequest gsh1000 = driver.new_request();
-  ASSERT_FALSE(gsh1000.get_std_handle(1000).native_as<Handle>()->is_valid());
+  DriverRequest gsh1000 = driver.get_std_handle(1000);
+  ASSERT_FALSE(gsh1000->native_as<Handle>()->is_valid());
 
   ASSERT_TRUE(driver.join());
 }

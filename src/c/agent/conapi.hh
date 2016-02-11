@@ -78,12 +78,12 @@ namespace conprx {
      coord_t buffer_coord, small_rect_t *write_region),                        \
     (console_output, buffer, buffer_size, buffer_coord, write_region))
 
-#define psigDWordToHandle(F) F(Variant, (int64_t n_std_handle), (n_std_handle))
-#define psigWriteConsoleA(F) F(Variant,                                        \
+#define psigDWordToHandle(F) F(_, (int64_t n_std_handle), (n_std_handle))
+#define psigWriteConsoleA(F) F(_,                                              \
     (Handle console_output, const char *string, int64_t chars_to_write),       \
     (console_output, string, chars_to_write))
-#define psigDWordToStr(F) F(Variant, (int64_t bufsize), (bufsize))
-#define psigAnsiCStrToVariant(F) F(Variant, (const char* string), (string))
+#define psigDWordToStr(F) F(_, (int64_t bufsize), (bufsize))
+#define psigAnsiCStrToVariant(F) F(_, (const char* string), (string))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
