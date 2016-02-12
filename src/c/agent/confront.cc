@@ -3,7 +3,8 @@
 
 /// Shared console api implementation.
 
-#include "console-frontend.hh"
+#include "confront.hh"
+
 #include "utils/string.hh"
 #include "plankton-inl.hh"
 
@@ -443,7 +444,7 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
 }
 
 #ifdef IS_MSVC
-#  include "conapi-msvc.cc"
+#  include "confront-msvc.cc"
 #else
-#  include "conapi-fallback.cc"
+#  include "confront-fallback.cc"
 #endif

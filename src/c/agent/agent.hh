@@ -70,7 +70,7 @@
 /// we may need to disable it by setting registry values.
 
 #include "binpatch.hh"
-#include "console-frontend.hh"
+#include "confront.hh"
 #include "utils/types.hh"
 #include "io/stream.hh"
 

@@ -3,7 +3,7 @@
 
 /// Console api implementation specific to the windows platform.
 
-#include "console-frontend.hh"
+#include "confront.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"

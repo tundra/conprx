@@ -3,7 +3,7 @@
 
 #include "driver.hh"
 
-#include "agent/console-frontend.hh"
+#include "agent/confront.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
 #include "socket.hh"

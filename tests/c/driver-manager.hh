@@ -7,9 +7,9 @@
 #ifndef _CONPRX_DRIVER_MANAGER_HH
 #define _CONPRX_DRIVER_MANAGER_HH
 
+#include "agent/confront.hh"
 #include "c/stdc.h"
 
-#include "agent/console-frontend.hh"
 #include "async/promise-inl.hh"
 #include "driver.hh"
 #include "io/iop.hh"

@@ -3,7 +3,7 @@
 
 #include "agent.hh"
 #include "binpatch.hh"
-#include "console-frontend.hh"
+#include "confront.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
