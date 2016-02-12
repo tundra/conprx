@@ -1,7 +1,7 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#include "../../src/c/agent/console-frontend.hh"
+#include "agent/console-frontend.hh"
 #include "test/asserts.hh"
 #include "test/unittest.hh"
 
