@@ -70,7 +70,7 @@
 /// we may need to disable it by setting registry values.
 
 #include "binpatch.hh"
-#include "conapi.hh"
+#include "console-frontend.hh"
 #include "utils/types.hh"
 #include "io/stream.hh"
 
@@ -91,7 +91,7 @@ public:
   // Install the given console instead of the built-in one. Returns true on
   // success. If this succeeds the output parameter will hold another console
   // which can be called to get the original console behavior.
-  static bool install(Options &options, Console &console, Console **original_out);
+  static bool install(Options &options, ConsoleFrontend &console, ConsoleFrontend **original_out);
 
   static const int32_t kConnectDataMagic = 0xFABACAEA;
 
@@ -116,8 +116,8 @@ private:
 #undef __EMIT_DELEGATE_BRIDGE__
 
   // The console object currently being delegated to.
-  static Console *delegate_;
-  static Console &delegate() { return *delegate_; }
+  static ConsoleFrontend *delegate_;
+  static ConsoleFrontend &delegate() { return *delegate_; }
 };
 
 // Expands the given macro for each boolean option. The arguments are:

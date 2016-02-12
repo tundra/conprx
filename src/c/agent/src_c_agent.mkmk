@@ -11,7 +11,7 @@ def build_object(filename):
 agent_files = [
   "agent.cc",
   "binpatch.cc",
-  "conapi.cc",
+  "console-frontend.cc",
 ]
 
 utils = get_external("src", "c", "utils", "objects")

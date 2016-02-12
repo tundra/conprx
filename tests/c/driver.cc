@@ -3,7 +3,7 @@
 
 #include "driver.hh"
 
-#include "agent/conapi.hh"
+#include "agent/console-frontend.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
 #include "socket.hh"
@@ -18,9 +18,11 @@ END_C_INCLUDES
 using namespace plankton;
 using namespace tclib;
 
-class ConsoleDriver : public rpc::Service {
+// A service wrapping a console frontend.
+class ConsoleFrontendService : public rpc::Service {
 public:
-  ConsoleDriver(conprx::Console *console);
+  ConsoleFrontendService(conprx::ConsoleFrontend *console);
+
 #define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
   void name(rpc::RequestData &data, ResponseCallback callback);
   FOR_EACH_REMOTE_MESSAGE(__DECL_DRIVER_BY_NAME__)
@@ -29,21 +31,23 @@ public:
 #undef __DECL_DRIVER_FUNCTION__
 #undef __DECL_DRIVER_BY_NAME__
 
-  conprx::Console *console() { return console_; }
+  // Returns the frontend we delegate everything to.
+  conprx::ConsoleFrontend *frontend() { return frontend_; }
 
 private:
+  // Captures the last error and wraps it in a console error.
   Native new_console_error(Factory *factory);
 
   static Native wrap_handle(handle_t handle, Factory *factory);
   static dword_t to_dword(Variant value);
 
-  conprx::Console *console_;
+  conprx::ConsoleFrontend *frontend_;
 };
 
-ConsoleDriver::ConsoleDriver(conprx::Console *console)
-  : console_(console) {
+ConsoleFrontendService::ConsoleFrontendService(conprx::ConsoleFrontend *console)
+  : frontend_(console) {
 #define __REG_DRIVER_BY_NAME__(name, SIG, ARGS)                                \
-  register_method(#name, new_callback(&ConsoleDriver::name, this));
+  register_method(#name, new_callback(&ConsoleFrontendService::name, this));
   FOR_EACH_REMOTE_MESSAGE(__REG_DRIVER_BY_NAME__)
 #define __REG_DRIVER_FUNCTION__(Name, name, MINOR, SIG, PSIG)                  \
   __REG_DRIVER_BY_NAME__(name, , )
@@ -52,34 +56,34 @@ ConsoleDriver::ConsoleDriver(conprx::Console *console)
 #undef __REG_DRIVER_BY_NAME
 }
 
-void ConsoleDriver::echo(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::echo(rpc::RequestData &data, ResponseCallback callback) {
   callback(rpc::OutgoingResponse::success(data[0]));
 }
 
-void ConsoleDriver::is_handle(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::is_handle(rpc::RequestData &data, ResponseCallback callback) {
   conprx::Handle *handle = data[0].native_as(conprx::Handle::seed_type());
   callback(rpc::OutgoingResponse::success(Variant::boolean(handle != NULL)));
 }
 
-void ConsoleDriver::raise_error(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::raise_error(rpc::RequestData &data, ResponseCallback callback) {
   int64_t last_error = data[0].integer_value();
   Factory *factory = data.factory();
   conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
 }
 
-void ConsoleDriver::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
   dword_t n_std_handle = to_dword(data[0]);
-  handle_t handle = console()->get_std_handle(n_std_handle);
+  handle_t handle = frontend()->get_std_handle(n_std_handle);
   callback(rpc::OutgoingResponse::success(wrap_handle(handle, data.factory())));
 }
 
-void ConsoleDriver::write_console_a(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::write_console_a(rpc::RequestData &data, ResponseCallback callback) {
   handle_t output = data[0].native_as(conprx::Handle::seed_type())->ptr();
   const char *buffer = data[1].string_chars();
   dword_t chars_to_write = to_dword(data[2]);
   dword_t chars_written = 0;
-  if (console()->write_console_a(output, buffer, chars_to_write, &chars_written,
+  if (frontend()->write_console_a(output, buffer, chars_to_write, &chars_written,
       NULL)) {
     callback(rpc::OutgoingResponse::success(chars_written));
   } else {
@@ -87,10 +91,10 @@ void ConsoleDriver::write_console_a(rpc::RequestData &data, ResponseCallback cal
   }
 }
 
-void ConsoleDriver::get_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::get_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
   dword_t chars_to_read = to_dword(data[0]);
   ansi_char_t *buf = new ansi_char_t[chars_to_read];
-  dword_t len = console()->get_console_title_a(buf, chars_to_read);
+  dword_t len = frontend()->get_console_title_a(buf, chars_to_read);
   if (len == 0) {
     callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
   } else {
@@ -99,27 +103,27 @@ void ConsoleDriver::get_console_title_a(rpc::RequestData &data, ResponseCallback
   }
 }
 
-void ConsoleDriver::set_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::set_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
   const char *new_title = data[0].string_chars();
-  if (console()->set_console_title_a(new_title)) {
+  if (frontend()->set_console_title_a(new_title)) {
     callback(rpc::OutgoingResponse::success(Variant::yes()));
   } else {
     callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
   }
 }
 
-Native ConsoleDriver::wrap_handle(handle_t raw_handle, Factory *factory) {
+Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
   conprx::Handle *handle = new (factory) conprx::Handle(raw_handle);
   return factory->new_native(handle);
 }
 
-Native ConsoleDriver::new_console_error(Factory *factory) {
-  dword_t last_error = console()->get_last_error();
+Native ConsoleFrontendService::new_console_error(Factory *factory) {
+  dword_t last_error = frontend()->get_last_error();
   conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
   return factory->new_native(error);
 }
 
-dword_t ConsoleDriver::to_dword(Variant value) {
+dword_t ConsoleFrontendService::to_dword(Variant value) {
   CHECK_TRUE("not integer", value.is_integer());
   int64_t int_val = value.integer_value();
   long long_val = static_cast<long>(int_val);
@@ -127,6 +131,7 @@ dword_t ConsoleDriver::to_dword(Variant value) {
   return static_cast<dword_t>(long_val);
 }
 
+// Holds the state for the console driver.
 class ConsoleDriverMain {
 public:
   ConsoleDriverMain();
@@ -149,12 +154,14 @@ public:
 private:
   CommandLineReader reader_;
   utf8_t channel_name_;
+  bool use_agent_;
   def_ref_t<ClientChannel> channel_;
   ClientChannel *channel() { return *channel_; }
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
-  : channel_name_(string_empty()) { }
+  : channel_name_(string_empty())
+  , use_agent_(false) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
   CommandLine *cmdline = reader_.parse(argc - 1, argv + 1);
@@ -170,6 +177,7 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
     return false;
   }
   channel_name_ = new_c_string(channel);
+  use_agent_ = cmdline->option("use-agent", Variant::no()).bool_value();
   return true;
 }
 
@@ -183,8 +191,8 @@ bool ConsoleDriverMain::open_connection() {
 bool ConsoleDriverMain::run() {
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(conprx::ConsoleProxy::registry());
-  def_ref_t<conprx::Console> console = conprx::Console::new_native();
-  ConsoleDriver driver(*console);
+  def_ref_t<conprx::ConsoleFrontend> console = conprx::ConsoleFrontend::new_native(use_agent_);
+  ConsoleFrontendService driver(*console);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();

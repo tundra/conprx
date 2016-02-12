@@ -1,9 +1,9 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "../../src/c/agent/console-frontend.hh"
 #include "test/asserts.hh"
 #include "test/unittest.hh"
-#include "agent/conapi.hh"
 
 using namespace conprx;
 
@@ -18,7 +18,7 @@ void use(T t) { }
 TEST(conapi, functypes) {
 #ifdef IS_MSVC
 #  define __EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG)                        \
-   Console::name##_t name = Name;                                              \
+   ConsoleFrontend::name##_t name = Name;                                      \
    use(name);
    FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
 #  undef __EMIT_ASSIGN__

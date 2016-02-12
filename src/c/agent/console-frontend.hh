@@ -1,10 +1,15 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-/// Declarations of the console api.
+/// A console frontend is a virtualized windows console api. It implements the
+/// same functions, as virtual methods, and one implementation just calls
+/// through to the actual windows console api. But using a frontend allows the
+/// implementation to be swapped out for testing and such that we can run the
+/// code on other platforms than windows for development convenience and, again,
+/// testing.
 
-#ifndef _CONAPI
-#define _CONAPI
+#ifndef _AGENT_CONSOLE_FRONTEND_HH
+#define _AGENT_CONSOLE_FRONTEND_HH
 
 #include "agent/binpatch.hh"
 #include "conapi-types.hh"
@@ -125,9 +130,9 @@ namespace conprx {
 
 // A container that holds the various definitions used by the other console
 // types.
-class Console : public tclib::DefaultDestructable {
+class ConsoleFrontend : public tclib::DefaultDestructable {
 public:
-  virtual ~Console();
+  virtual ~ConsoleFrontend();
 
   // The types of the naked console functions.
 #define __DECLARE_CONAPI_FUNCTION__(Name, name, FLAGS, SIG, PSIG)              \
@@ -156,8 +161,13 @@ public:
     int key;
   };
 
-  // Creates and returns a new instance of the native console.
-  static tclib::pass_def_ref_t<Console> new_native();
+  // Creates and returns a new instance of the native console frontend. The
+  // assume_agent_used flags indicates whether the frontend we'll return should
+  // assume there's an agent installed. This is for testing only -- a process
+  // should not have to be aware of whether there's an agent installed -- but
+  // because injection only really works on windows we need this flag for the
+  // other platforms.
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_native(bool assume_agent_used);
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();
@@ -166,12 +176,12 @@ public:
 
 // A console implementation that logs all interaction before forwarding it to
 // a given delegate.
-class LoggingConsole : public Console {
+class LoggingConsole : public ConsoleFrontend {
 public:
-  LoggingConsole(Console *delegate) : delegate_(delegate) { }
+  LoggingConsole(ConsoleFrontend *delegate) : delegate_(delegate) { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
-  void set_delegate(Console *delegate) { delegate_ = delegate; }
+  void set_delegate(ConsoleFrontend *delegate) { delegate_ = delegate; }
 
   // TODO: replace with a proper delegate when the console interface is the full
   //   set of methods.
@@ -186,9 +196,9 @@ public:
 #undef __DECLARE_CONAPI_METHOD__
 
 private:
-  Console *delegate_;
+  ConsoleFrontend *delegate_;
 };
 
 } // conprx
 
-#endif // _CONAPI
+#endif // _AGENT_CONSOLE_FRONTEND_HH

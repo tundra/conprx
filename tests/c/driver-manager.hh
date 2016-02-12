@@ -9,7 +9,7 @@
 
 #include "c/stdc.h"
 
-#include "agent/conapi.hh"
+#include "agent/console-frontend.hh"
 #include "async/promise-inl.hh"
 #include "driver.hh"
 #include "io/iop.hh"
@@ -99,6 +99,9 @@ public:
   // through this manager.
   ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
+  // Set whether to install the console agent in the driver.
+  void set_install_agent(bool value) { install_agent_ = value; }
+
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
   // request is.
@@ -133,6 +136,7 @@ private:
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
   bool trace_;
+  bool install_agent_;
   static utf8_t executable_path();
 };
 

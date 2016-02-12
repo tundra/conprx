@@ -106,7 +106,7 @@ bool WindowsConsoleAgent::install_agent() {
   // Okay at this point we can start with the actual work since we've made it
   // safely through the guards above.
   LoggingConsole *logger = new LoggingConsole(NULL);
-  Console *original = NULL;
+  ConsoleFrontend *original = NULL;
   if (!install(options, *logger, &original))
     return false;
   logger->set_delegate(original);

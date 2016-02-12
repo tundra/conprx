@@ -15,7 +15,8 @@ using namespace plankton;
 using namespace tclib;
 
 DriverManager::DriverManager()
-  : trace_(false) {
+  : trace_(false)
+  , install_agent_(false) {
   channel_ = ServerChannel::create();
 }
 
@@ -113,6 +114,7 @@ bool DriverManager::start() {
   utf8_t exec = executable_path();
   CommandLineBuilder builder;
   builder.add_option("channel", channel()->name().chars);
+  builder.add_option("use-agent", Variant::boolean(install_agent_));
   utf8_t args = builder.flush();
   return process_.start(exec, 1, &args);
 }

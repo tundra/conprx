@@ -4,10 +4,12 @@
 import re
 
 filenames = [
-  "test_driver.cc",
+  "test_agent.cc",
   "test_binpatch.cc",
   "test_conapi.cc",
+  "test_driver.cc",
   "test_vector.cc",
+  "driver-shared.cc",
   "driver-manager.cc",
 ]
 
@@ -21,7 +23,7 @@ def compile_test_file(source):
   return source.get_object()
 
 driver_common = get_group("driver-common")
-driver_common.add_member(compile_test_file(c.get_source_file("driver-utils.cc")))
+driver_common.add_member(compile_test_file(c.get_source_file("driver-shared.cc")))
 
 driver_main = c.get_executable("driver")
 driver_main.add_object(driver_common)

@@ -3,7 +3,7 @@
 
 /// Shared console api implementation.
 
-#include "conapi.hh"
+#include "console-frontend.hh"
 #include "utils/string.hh"
 #include "plankton-inl.hh"
 
@@ -14,17 +14,17 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace plankton;
 
-Console::~Console() { }
+ConsoleFrontend::~ConsoleFrontend() { }
 
-static Console::FunctionInfo function_info[Console::kFunctionCount + 1] = {
-#define __DECLARE_INFO__(Name, name, ...) {TEXT(#Name), Console::name##_key} ,
+static ConsoleFrontend::FunctionInfo function_info[ConsoleFrontend::kFunctionCount + 1] = {
+#define __DECLARE_INFO__(Name, name, ...) {TEXT(#Name), ConsoleFrontend::name##_key} ,
     FOR_EACH_CONAPI_FUNCTION(__DECLARE_INFO__)
 #undef __DECLARE_INFO__
     {NULL, 0}
 };
 
-Vector<Console::FunctionInfo> Console::functions() {
-  return Vector<FunctionInfo>(function_info, Console::kFunctionCount);
+Vector<ConsoleFrontend::FunctionInfo> ConsoleFrontend::functions() {
+  return Vector<FunctionInfo>(function_info, ConsoleFrontend::kFunctionCount);
 }
 
 // --- L o g g i n g ---

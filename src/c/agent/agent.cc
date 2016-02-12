@@ -3,7 +3,7 @@
 
 #include "agent.hh"
 #include "binpatch.hh"
-#include "conapi.hh"
+#include "console-frontend.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
@@ -11,7 +11,7 @@ END_C_INCLUDES
 
 using namespace conprx;
 
-class OriginalConsole : public Console {
+class OriginalConsole : public ConsoleFrontend {
 public:
   OriginalConsole(Vector<PatchRequest*> patches) : patches_(patches) { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
@@ -25,16 +25,16 @@ private:
 
 #define __EMIT_TRAMPOLINE_IMPL__(Name, name, FLAGS, SIG, PSIG)                 \
   SIG(GET_SIG_RET) OriginalConsole::name SIG(GET_SIG_PARAMS) {                 \
-    PatchRequest *patch = patches_[Console::name##_key];                       \
-    Console::name##_t imposter = patch->get_imposter<Console::name##_t>();     \
+    PatchRequest *patch = patches_[ConsoleFrontend::name##_key];               \
+    ConsoleFrontend::name##_t imposter = patch->get_imposter<ConsoleFrontend::name##_t>(); \
     return imposter SIG(GET_SIG_ARGS);                                         \
   }
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 #undef __EMIT_TRAMPOLINE_IMPL__
 
-Console *ConsoleAgent::delegate_ = NULL;
+ConsoleFrontend *ConsoleAgent::delegate_ = NULL;
 
-bool ConsoleAgent::install(Options &options, Console &delegate, Console **original_out) {
+bool ConsoleAgent::install(Options &options, ConsoleFrontend &delegate, ConsoleFrontend **original_out) {
   LOG_DEBUG("Installing agent");
   delegate_ = &delegate;
 
@@ -47,20 +47,20 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
   LOG_DEBUG("Creating patch requests");
   // Identify the set of functions we're going to patch. Some of them may not
   // be available in which case we'll just not try to patch them.
-  Vector<Console::FunctionInfo> functions = Console::functions();
+  Vector<ConsoleFrontend::FunctionInfo> functions = ConsoleFrontend::functions();
   // An array of all the requests that could be constructed, in a contiguous
   // range.
   PatchRequest *packed_requests = new PatchRequest[functions.length()];
   // An array where the key'th entry holds a pointer to patch the function
   // with the given key. Some of these may be NULL, the rest will point into
   // the packed request array.
-  PatchRequest **key_to_request = new PatchRequest*[Console::kFunctionCount];
-  for (size_t i = 0; i < Console::kFunctionCount; i++)
+  PatchRequest **key_to_request = new PatchRequest*[ConsoleFrontend::kFunctionCount];
+  for (size_t i = 0; i < ConsoleFrontend::kFunctionCount; i++)
     key_to_request[i] = NULL;
   // The current offset within the packed requests.
   size_t packed_offset = 0;
   for (size_t i = 0; i < functions.length(); i++) {
-    Console::FunctionInfo &info = functions[i];
+    ConsoleFrontend::FunctionInfo &info = functions[i];
     address_t original = get_console_function_address(info.name);
     address_t bridge = get_delegate_bridge(info.key);
     if (original == NULL || bridge == NULL) {
@@ -80,7 +80,7 @@ bool ConsoleAgent::install(Options &options, Console &delegate, Console **origin
     return false;
 
   *original_out = new OriginalConsole(Vector<PatchRequest*>(key_to_request,
-      Console::kFunctionCount));
+      ConsoleFrontend::kFunctionCount));
 
   LOG_DEBUG("Successfully installed agent");
   return true;
@@ -98,8 +98,8 @@ FOR_EACH_CONAPI_FUNCTION(__EMIT_BRIDGE__)
 address_t ConsoleAgent::get_delegate_bridge(int key) {
   switch (key) {
 #define __EMIT_CASE__(Name, name, ...)                                         \
-    case Console::name##_key: {                                                \
-      Console::name##_t result = ConsoleAgent::name##_bridge;                  \
+    case ConsoleFrontend::name##_key: {                                        \
+      ConsoleFrontend::name##_t result = ConsoleAgent::name##_bridge;          \
       return Code::upcast(result);                                             \
     }
   FOR_EACH_CONAPI_FUNCTION(__EMIT_CASE__)

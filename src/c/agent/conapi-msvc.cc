@@ -6,7 +6,7 @@
 using namespace conprx;
 using namespace tclib;
 
-class WindowsConsole : public Console {
+class WindowsConsoleFrontend : public ConsoleFrontend {
 public:
   virtual void default_destroy() { default_delete_concrete(this); }
 
@@ -16,27 +16,28 @@ public:
 #undef __DECLARE_CONAPI_METHOD__
 };
 
-handle_t WindowsConsole::get_std_handle(dword_t handle) {
+handle_t WindowsConsoleFrontend::get_std_handle(dword_t handle) {
   return GetStdHandle(handle);
 }
 
-bool_t WindowsConsole::write_console_a(handle_t console_output, const void *buffer,
+bool_t WindowsConsoleFrontend::write_console_a(handle_t console_output, const void *buffer,
     dword_t chars_to_write, dword_t *chars_written, void *reserved) {
   return WriteConsoleA(console_output, buffer, chars_to_write, chars_written, reserved);
 }
 
-dword_t WindowsConsole::get_console_title_a(str_t str, dword_t n) {
+dword_t WindowsConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
   return GetConsoleTitleA(str, n);
 }
 
-bool_t WindowsConsole::set_console_title_a(ansi_cstr_t str) {
+bool_t WindowsConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return SetConsoleTitleA(str);
 }
 
-dword_t Console::get_last_error() {
+dword_t ConsoleFrontend::get_last_error() {
   return GetLastError();
 }
 
-pass_def_ref_t<Console> Console::new_native() {
-  return pass_def_ref_t<Console>(new (kDefaultAlloc) WindowsConsole());
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(bool assume_agent_used) {
+  UNLESS_ALLOW_DEVUTILS(CHECK_FALSE("use agent set", assume_agent_used));
+  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) WindowsConsoleFrontend());
 }

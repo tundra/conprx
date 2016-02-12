@@ -3,7 +3,7 @@
 
 /// Windows-specific implementation of binary patching.
 
-#include "conapi.hh"
+#include "console-frontend.hh"
 
 using namespace conprx;
 
