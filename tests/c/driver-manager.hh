@@ -21,6 +21,8 @@
 
 namespace conprx {
 
+// Using-declarations within headers is suspect for subtle reasons (google it
+// for details) so just use the stuff we need.
 using plankton::Variant;
 using plankton::Factory;
 using plankton::Arena;
