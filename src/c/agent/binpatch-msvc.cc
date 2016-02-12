@@ -3,7 +3,7 @@
 
 /// Windows-specific implementation of binary patching.
 
-#include "console-frontend.hh"
+#include "confront.hh"
 
 using namespace conprx;
 
