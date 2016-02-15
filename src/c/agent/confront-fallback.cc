@@ -17,7 +17,7 @@ using namespace tclib;
 // that they can be used for testing.
 class FallbackConsoleFrontend : public ConsoleFrontend {
 public:
-  FallbackConsoleFrontend();
+  FallbackConsoleFrontend(ClientChannel *fake_agent);
   ~FallbackConsoleFrontend();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
@@ -28,10 +28,12 @@ public:
 
 private:
   utf8_t title_;
+  ClientChannel *fake_agent_;
 };
 
-FallbackConsoleFrontend::FallbackConsoleFrontend()
-  : title_(string_empty()) {
+FallbackConsoleFrontend::FallbackConsoleFrontend(ClientChannel *fake_agent)
+  : title_(string_empty())
+  , fake_agent_(fake_agent) {
   title_ = string_default_dup(new_c_string("(fallback console default title)"));
 }
 
@@ -73,6 +75,6 @@ dword_t ConsoleFrontend::get_last_error() {
   return 0xFABACAEA;
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(bool assume_agent_used) {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) FallbackConsoleFrontend());
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(ClientChannel *fake_agent) {
+  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) FallbackConsoleFrontend(fake_agent));
 }

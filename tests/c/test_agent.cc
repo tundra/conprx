@@ -15,6 +15,7 @@ using namespace conprx;
 
 TEST(agent, simple) {
   DriverManager driver;
+  ASSERT_TRUE(driver.enable_agent());
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 

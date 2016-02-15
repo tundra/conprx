@@ -3,6 +3,7 @@
 
 #include "driver.hh"
 
+#include "agent/agent.hh"
 #include "agent/confront.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
@@ -15,13 +16,14 @@ BEGIN_C_INCLUDES
 #include "utils/lifetime.h"
 END_C_INCLUDES
 
+using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
 // A service wrapping a console frontend.
 class ConsoleFrontendService : public rpc::Service {
 public:
-  ConsoleFrontendService(conprx::ConsoleFrontend *console);
+  ConsoleFrontendService(ConsoleFrontend *console);
 
 #define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
   void name(rpc::RequestData &data, ResponseCallback callback);
@@ -32,7 +34,7 @@ public:
 #undef __DECL_DRIVER_BY_NAME__
 
   // Returns the frontend we delegate everything to.
-  conprx::ConsoleFrontend *frontend() { return frontend_; }
+  ConsoleFrontend *frontend() { return frontend_; }
 
 private:
   // Captures the last error and wraps it in a console error.
@@ -41,10 +43,10 @@ private:
   static Native wrap_handle(handle_t handle, Factory *factory);
   static dword_t to_dword(Variant value);
 
-  conprx::ConsoleFrontend *frontend_;
+  ConsoleFrontend *frontend_;
 };
 
-ConsoleFrontendService::ConsoleFrontendService(conprx::ConsoleFrontend *console)
+ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *console)
   : frontend_(console) {
 #define __REG_DRIVER_BY_NAME__(name, SIG, ARGS)                                \
   register_method(#name, new_callback(&ConsoleFrontendService::name, this));
@@ -61,14 +63,14 @@ void ConsoleFrontendService::echo(rpc::RequestData &data, ResponseCallback callb
 }
 
 void ConsoleFrontendService::is_handle(rpc::RequestData &data, ResponseCallback callback) {
-  conprx::Handle *handle = data[0].native_as(conprx::Handle::seed_type());
+  Handle *handle = data[0].native_as<Handle>();
   callback(rpc::OutgoingResponse::success(Variant::boolean(handle != NULL)));
 }
 
 void ConsoleFrontendService::raise_error(rpc::RequestData &data, ResponseCallback callback) {
   int64_t last_error = data[0].integer_value();
   Factory *factory = data.factory();
-  conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
+  ConsoleError *error = new (factory) ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
 }
 
@@ -79,7 +81,7 @@ void ConsoleFrontendService::get_std_handle(rpc::RequestData &data, ResponseCall
 }
 
 void ConsoleFrontendService::write_console_a(rpc::RequestData &data, ResponseCallback callback) {
-  handle_t output = data[0].native_as(conprx::Handle::seed_type())->ptr();
+  handle_t output = data[0].native_as<Handle>()->ptr();
   const char *buffer = data[1].string_chars();
   dword_t chars_to_write = to_dword(data[2]);
   dword_t chars_written = 0;
@@ -113,13 +115,13 @@ void ConsoleFrontendService::set_console_title_a(rpc::RequestData &data, Respons
 }
 
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
-  conprx::Handle *handle = new (factory) conprx::Handle(raw_handle);
+  Handle *handle = new (factory) Handle(raw_handle);
   return factory->new_native(handle);
 }
 
 Native ConsoleFrontendService::new_console_error(Factory *factory) {
   dword_t last_error = frontend()->get_last_error();
-  conprx::ConsoleError *error = new (factory) conprx::ConsoleError(last_error);
+  ConsoleError *error = new (factory) ConsoleError(last_error);
   return factory->new_native(error);
 }
 
@@ -130,6 +132,13 @@ dword_t ConsoleFrontendService::to_dword(Variant value) {
   CHECK_EQ("dword out of bounds", long_val, int_val);
   return static_cast<dword_t>(long_val);
 }
+
+class FakeConsoleAgent : public ConsoleAgent {
+public:
+  FakeConsoleAgent() : ConsoleAgent() { }
+  virtual void default_destroy() { default_delete_concrete(this); }
+  virtual bool install_agent() { return true; }
+};
 
 // Holds the state for the console driver.
 class ConsoleDriverMain {
@@ -145,6 +154,8 @@ public:
   // Runs the driver service.
   bool run();
 
+  bool install_fake_agent();
+
   // Main entry-point.
   bool inner_main(int argc, const char **argv);
 
@@ -153,15 +164,26 @@ public:
 
 private:
   CommandLineReader reader_;
+
+  // The channel through which the client communicates with this driver.
   utf8_t channel_name_;
-  bool use_agent_;
   def_ref_t<ClientChannel> channel_;
   ClientChannel *channel() { return *channel_; }
+
+  // If we're faking an agent this is the channel the fake agent will be using.
+  // This is only for testing.
+  utf8_t fake_agent_channel_name_;
+  def_ref_t<ClientChannel> fake_agent_channel_;
+  // Returns the fake agent channel or NULL if there is none.
+  ClientChannel *fake_agent_channel() { return *fake_agent_channel_; }
+  bool has_fake_agent_channel() { return !string_is_empty(fake_agent_channel_name_); }
+  def_ref_t<ConsoleAgent> fake_agent_;
+  ConsoleAgent *fake_agent() { return *fake_agent_; }
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
   : channel_name_(string_empty())
-  , use_agent_(false) { }
+  , fake_agent_channel_name_(string_empty()) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
   CommandLine *cmdline = reader_.parse(argc - 1, argv + 1);
@@ -171,32 +193,55 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
         error->offender());
     return false;
   }
-  const char *channel = cmdline->option("channel", Variant::null()).string_chars();
+  const char *channel = cmdline->option("channel").string_chars();
   if (channel == NULL) {
     LOG_ERROR("No channel name specified");
     return false;
   }
   channel_name_ = new_c_string(channel);
-  use_agent_ = cmdline->option("use-agent", Variant::no()).bool_value();
+  const char *fake_agent_channel = cmdline->option("fake-agent-channel").string_chars();
+  if (fake_agent_channel != NULL)
+    fake_agent_channel_name_ = new_c_string(fake_agent_channel);
   return true;
 }
 
 bool ConsoleDriverMain::open_connection() {
+  if (has_fake_agent_channel()) {
+    fake_agent_channel_ = ClientChannel::create();
+    if (!fake_agent_channel()->open(fake_agent_channel_name_))
+      return false;
+    fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
+  }
   channel_ = ClientChannel::create();
   if (!channel()->open(channel_name_))
     return false;
   return true;
 }
 
+bool ConsoleDriverMain::install_fake_agent() {
+  if (!has_fake_agent_channel())
+    return false;
+  return fake_agent()->install_agent_shared(fake_agent_channel()->in(),
+      fake_agent_channel()->out());
+}
+
 bool ConsoleDriverMain::run() {
+  // First install the fake agent so it's available further down.
+  if (!install_fake_agent())
+    return false;
+
+  INFO("Driver is active [" kIgnoreInfoMarker "]");
+  // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
-  connector.set_default_type_registry(conprx::ConsoleProxy::registry());
-  def_ref_t<conprx::ConsoleFrontend> console = conprx::ConsoleFrontend::new_native(use_agent_);
+  connector.set_default_type_registry(ConsoleProxy::registry());
+  def_ref_t<ConsoleFrontend> console = ConsoleFrontend::new_native(fake_agent_channel());
   ConsoleFrontendService driver(*console);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();
   channel()->out()->close();
+  if (has_fake_agent_channel())
+    fake_agent_channel()->out()->close();
   return result;
 }
 

@@ -71,12 +71,26 @@
 
 #include "binpatch.hh"
 #include "confront.hh"
-#include "utils/types.hh"
 #include "io/stream.hh"
+#include "rpc.hh"
+#include "utils/log.hh"
+#include "utils/types.hh"
 
 namespace conprx {
 
 class Options;
+
+// Log that streams messages onto an output stream before passing log handling
+// on to the enclosing log.
+class StreamingLog : public tclib::Log {
+public:
+  StreamingLog() : out_(NULL) { }
+  virtual bool record(log_entry_t *entry);
+  void set_destination(plankton::OutputSocket *out) { out_ = out; }
+
+private:
+  plankton::OutputSocket *out_;
+};
 
 // The block of data passed through to the agent's dll connector.
 typedef struct {
@@ -86,8 +100,10 @@ typedef struct {
 } connect_data_t;
 
 // Controls the injection of the console agent.
-class ConsoleAgent {
+class ConsoleAgent : public tclib::DefaultDestructable {
 public:
+  virtual ~ConsoleAgent() { }
+
   // Install the given console instead of the built-in one. Returns true on
   // success. If this succeeds the output parameter will hold another console
   // which can be called to get the original console behavior.
@@ -102,7 +118,17 @@ public:
   static const int cFailedToDuplicateLogout = 0x11150000;
   static const int cSuccess = 0x0;
 
+  bool install_agent_shared(tclib::InStream *owner_in, tclib::OutStream *owner_out);
+
+  virtual bool install_agent() = 0;
+
 private:
+  tclib::def_ref_t<plankton::rpc::StreamServiceConnector> owner_;
+  plankton::rpc::StreamServiceConnector *owner() { return *owner_; }
+
+  StreamingLog *log() { return &log_; }
+  StreamingLog log_;
+
   // Returns the address of the console function with the given name.
   static address_t get_console_function_address(cstr_t name);
 
@@ -116,8 +142,7 @@ private:
 #undef __EMIT_DELEGATE_BRIDGE__
 
   // The console object currently being delegated to.
-  static ConsoleFrontend *delegate_;
-  static ConsoleFrontend &delegate() { return *delegate_; }
+  static ConsoleFrontend &delegate() { return *static_cast<ConsoleFrontend*>(NULL); }
 };
 
 // Expands the given macro for each boolean option. The arguments are:

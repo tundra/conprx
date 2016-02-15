@@ -13,9 +13,10 @@
 
 #include "agent/binpatch.hh"
 #include "conapi-types.hh"
+#include "plankton-inl.hh"
+#include "sync/pipe.hh"
 #include "utils/types.hh"
 #include "utils/vector.hh"
-#include "plankton-inl.hh"
 
 namespace conprx {
 
@@ -167,7 +168,7 @@ public:
   // should not have to be aware of whether there's an agent installed -- but
   // because injection only really works on windows we need this flag for the
   // other platforms.
-  static tclib::pass_def_ref_t<ConsoleFrontend> new_native(bool assume_agent_used);
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_native(tclib::ClientChannel *fake_agent);
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();

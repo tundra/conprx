@@ -45,17 +45,6 @@ private:
   static WindowsConsoleAgent *instance_;
 };
 
-// Log that streams messages onto an output stream before passing log handling
-// on to the enclosing log.
-class StreamingLog : public tclib::Log {
-public:
-  StreamingLog(plankton::OutputSocket *out) : out_(out) { }
-  virtual bool record(log_entry_t *entry);
-
-private:
-  plankton::OutputSocket *out_;
-};
-
 WindowsConsoleAgent *WindowsConsoleAgent::instance_ = NULL;
 
 cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
@@ -157,15 +146,7 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  plankton::OutputSocket socket(*logout_);
-  socket.init();
-
-  StreamingLog log(&socket);
-  log.ensure_installed();
-  if (!install_agent())
-    return cInstallationFailed;
-
-  return cSuccess;
+  return install_agent_shared() ? cSuccess : cInstallationFailed;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {
@@ -216,17 +197,6 @@ Options &Options::get() {
   if (options == NULL)
     options = new WindowsOptions();
   return *options;
-}
-
-bool StreamingLog::record(log_entry_t *entry) {
-  plankton::Arena arena;
-  plankton::Seed seed = arena.new_seed();
-  seed.set_header("conprx.LogEntry");
-  seed.set_field("file", entry->file);
-  seed.set_field("line", entry->line);
-  seed.set_field("message", entry->message.chars);
-  out_->send_value(seed);
-  return propagate(entry);
 }
 
 bool APIENTRY DllMain(module_t module, dword_t reason, void *) {

@@ -4,12 +4,11 @@
 #include "agent.hh"
 #include "binpatch.hh"
 #include "confront.hh"
-
-BEGIN_C_INCLUDES
-#include "utils/log.h"
-END_C_INCLUDES
+#include "utils/log.hh"
 
 using namespace conprx;
+using namespace plankton;
+using namespace tclib;
 
 class OriginalConsole : public ConsoleFrontend {
 public:
@@ -32,12 +31,33 @@ private:
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 #undef __EMIT_TRAMPOLINE_IMPL__
 
-ConsoleFrontend *ConsoleAgent::delegate_ = NULL;
+bool StreamingLog::record(log_entry_t *entry) {
+  plankton::Arena arena;
+  plankton::Seed seed = arena.new_seed();
+  seed.set_header("conprx.LogEntry");
+  seed.set_field("file", entry->file);
+  seed.set_field("line", entry->line);
+  seed.set_field("message", entry->message.chars);
+  out_->send_value(seed);
+  return propagate(entry);
+}
+
+bool ConsoleAgent::install_agent_shared(tclib::InStream *agent_in,
+    tclib::OutStream *agent_out) {
+  owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
+  if (!owner()->init(empty_callback()))
+    return false;
+
+  log()->set_destination(owner()->output());
+  log()->ensure_installed();
+  if (!install_agent())
+    return false;
+
+  return true;
+}
 
 bool ConsoleAgent::install(Options &options, ConsoleFrontend &delegate, ConsoleFrontend **original_out) {
   LOG_DEBUG("Installing agent");
-  delegate_ = &delegate;
-
   // Get and initialize the platform.
   LOG_DEBUG("Initializing platform");
   Platform &platform = Platform::get();

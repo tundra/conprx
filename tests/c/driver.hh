@@ -10,6 +10,9 @@
 
 namespace conprx {
 
+// Marker that, if it occurs in an info log message the message is ignored.
+#define kIgnoreInfoMarker "54a1e215-655d-449f-9496-f094a70b221d"
+
 // These are the extra messages understood by the console driver that don't
 // correspond directly to console functions.
 #define FOR_EACH_REMOTE_MESSAGE(F)                                             \

@@ -99,8 +99,9 @@ public:
   // through this manager.
   ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
-  // Set whether to install the console agent in the driver.
-  void set_install_agent(bool value) { install_agent_ = value; }
+  // Notify this manager that it should install the console agent. Once enabled
+  // this can't be disabled.
+  bool enable_agent();
 
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
@@ -130,13 +131,29 @@ public:
   IncomingResponse send(OutgoingRequest *req);
 
 private:
+  // Cross-platform (but only used on non-msvc) implementation of enabling the
+  // agent that also works when dll injection doesn't exist. For testing only!
+  bool enable_agent_fake();
+
+  // Msvc-only implementation of enabling the agent that uses dll injection.
+  bool enable_agent_dll_inject();
+
   tclib::NativeProcess process_;
+
+  // The channel through which we control the driver.
   tclib::def_ref_t<tclib::ServerChannel> channel_;
   tclib::ServerChannel *channel() { return *channel_;}
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
+
+  // If there is a fake agent, this is our connection to it.
+  tclib::def_ref_t<tclib::ServerChannel> fake_agent_channel_;
+  tclib::ServerChannel *fake_agent_channel() { return *fake_agent_channel_; }
+  tclib::def_ref_t<StreamServiceConnector> fake_agent_;
+  StreamServiceConnector *fake_agent() { return *fake_agent_; }
+  bool has_fake_agent() { return !fake_agent_channel_.is_null(); }
+
   bool trace_;
-  bool install_agent_;
   static utf8_t executable_path();
 };
 

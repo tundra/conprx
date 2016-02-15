@@ -15,9 +15,17 @@ using namespace plankton;
 using namespace tclib;
 
 DriverManager::DriverManager()
-  : trace_(false)
-  , install_agent_(false) {
+  : trace_(false) {
   channel_ = ServerChannel::create();
+}
+
+bool DriverManager::enable_agent() {
+  return enable_agent_fake();
+}
+
+bool DriverManager::enable_agent_fake() {
+  fake_agent_channel_ = ServerChannel::create();
+  return true;
 }
 
 Variant DriverRequest::echo(Variant value) {
@@ -109,19 +117,31 @@ void CommandLineBuilder::add_option(Variant key, Variant value) {
 }
 
 bool DriverManager::start() {
-  if (!channel()->create(NativePipe::pfDefault))
-    return false;
-  utf8_t exec = executable_path();
   CommandLineBuilder builder;
+  if (!channel()->allocate())
+    return false;
   builder.add_option("channel", channel()->name().chars);
-  builder.add_option("use-agent", Variant::boolean(install_agent_));
+  if (has_fake_agent()) {
+    if (!fake_agent_channel()->allocate())
+      return false;
+    builder.add_option("fake-agent-channel", fake_agent_channel()->name().chars);
+  }
   utf8_t args = builder.flush();
+  utf8_t exec = executable_path();
   return process_.start(exec, 1, &args);
 }
 
 bool DriverManager::connect() {
+  if (has_fake_agent() && !fake_agent_channel()->open())
+    return false;
   if (!channel()->open())
     return false;
+  if (has_fake_agent()) {
+    fake_agent_ = new (kDefaultAlloc) StreamServiceConnector(fake_agent_channel()->in(),
+        fake_agent_channel()->out());
+    if (!fake_agent()->init(empty_callback()))
+      return false;
+  }
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
   connector_->set_default_type_registry(ConsoleProxy::registry());
@@ -158,6 +178,8 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
 
 bool DriverManager::join() {
   if (!channel()->close())
+    return false;
+  if (has_fake_agent() && !fake_agent_channel()->close())
     return false;
   ProcessWaitIop wait(&process_, o0());
   if (!wait.execute())
