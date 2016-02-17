@@ -5,6 +5,7 @@
 
 #include "test.hh"
 
+
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
 #include "utils/strbuf.h"
@@ -14,8 +15,27 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
+DriverManagerService::DriverManagerService(DriverManager *manager)
+  : manager_(manager) {
+  register_method("log", new_callback(&DriverManagerService::on_log, this));
+  register_method("is_ready", new_callback(&DriverManagerService::on_is_ready, this));
+}
+
+void DriverManagerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
+  TextWriter writer;
+  writer.write(data[0]);
+  HEST("AGENT LOG: %s", *writer);
+  resp(rpc::OutgoingResponse::success(Variant::null()));
+}
+
+void DriverManagerService::on_is_ready(rpc::RequestData& data, ResponseCallback resp) {
+  manager()->mark_agent_ready();
+  resp(rpc::OutgoingResponse::success(Variant::null()));
+}
+
 DriverManager::DriverManager()
-  : trace_(false) {
+  : agent_is_ready_(false)
+  , trace_(false) {
   channel_ = ServerChannel::create();
 }
 
@@ -26,6 +46,11 @@ bool DriverManager::enable_agent() {
 bool DriverManager::enable_agent_fake() {
   fake_agent_channel_ = ServerChannel::create();
   return true;
+}
+
+void *DriverManager::run_agent_monitor() {
+  address_arith_t result = fake_agent()->process_all_messages();
+  return reinterpret_cast<void*>(result);
 }
 
 Variant DriverRequest::echo(Variant value) {
@@ -137,9 +162,14 @@ bool DriverManager::connect() {
   if (!channel()->open())
     return false;
   if (has_fake_agent()) {
+    service_ = new (kDefaultAlloc) DriverManagerService(this);
     fake_agent_ = new (kDefaultAlloc) StreamServiceConnector(fake_agent_channel()->in(),
         fake_agent_channel()->out());
-    if (!fake_agent()->init(empty_callback()))
+    if (!fake_agent()->init(service()->handler()))
+      return false;
+    agent_monitor_.set_callback(new_callback(&DriverManager::run_agent_monitor,
+        this));
+    if (!agent_monitor_.start())
       return false;
   }
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
@@ -179,12 +209,17 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
 bool DriverManager::join() {
   if (!channel()->close())
     return false;
-  if (has_fake_agent() && !fake_agent_channel()->close())
-    return false;
+  if (has_fake_agent()) {
+    agent_monitor_.join();
+    if (!fake_agent_channel()->close())
+      return false;
+  }
   ProcessWaitIop wait(&process_, o0());
   if (!wait.execute())
     return false;
-  return process_.exit_code().peek_value(1) == 0;
+  if (process_.exit_code().peek_value(1) != 0)
+    return false;
+  return true;
 }
 
 utf8_t DriverManager::executable_path() {

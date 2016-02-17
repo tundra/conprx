@@ -37,7 +37,6 @@ dword_t ConsoleFrontend::get_last_error() {
   return GetLastError();
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(bool assume_agent_used) {
-  UNLESS_ALLOW_DEVUTILS(CHECK_FALSE("use agent set", assume_agent_used));
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(tclib::ClientChannel *fake_agent) {
   return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) WindowsConsoleFrontend());
 }

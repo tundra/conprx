@@ -18,6 +18,7 @@ using namespace tclib;
 class WindowsConsoleAgent : public ConsoleAgent {
 public:
   WindowsConsoleAgent();
+  virtual void default_destroy() { default_delete_concrete(this); }
 
   // Returns true iff the current process is hardcoded blacklisted. Returns true
   // if this process should not be patched under any circumstances, no matter
@@ -146,7 +147,7 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  return install_agent_shared() ? cSuccess : cInstallationFailed;
+  return install_agent_shared(NULL, NULL) ? cSuccess : cInstallationFailed;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {

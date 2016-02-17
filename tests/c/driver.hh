@@ -8,10 +8,11 @@
 
 #include "plankton-inl.hh"
 
-namespace conprx {
+BEGIN_C_INCLUDES
+#include "utils/string.h"
+END_C_INCLUDES
 
-// Marker that, if it occurs in an info log message the message is ignored.
-#define kIgnoreInfoMarker "54a1e215-655d-449f-9496-f094a70b221d"
+namespace conprx {
 
 // These are the extra messages understood by the console driver that don't
 // correspond directly to console functions.

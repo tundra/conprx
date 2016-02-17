@@ -78,7 +78,28 @@
 
 namespace conprx {
 
+using plankton::rpc::StreamServiceConnector;
+
 class Options;
+
+class LogEntry {
+public:
+  LogEntry();
+  LogEntry(log_entry_t *entry) : entry_(*entry) { }
+  void init(utf8_t file, uint32_t line, utf8_t message);
+
+  // The seed type for handles.
+  static plankton::SeedType<LogEntry> *seed_type() { return &kSeedType; }
+
+private:
+  log_entry_t entry_;
+
+  template <typename T> friend class plankton::DefaultSeedType;
+  static LogEntry *new_instance(plankton::Variant header, plankton::Factory *factory);
+  plankton::Variant to_seed(plankton::Factory *factory);
+  void init(plankton::Seed payload, plankton::Factory *factory);
+  static plankton::DefaultSeedType<LogEntry> kSeedType;
+};
 
 // Log that streams messages onto an output stream before passing log handling
 // on to the enclosing log.
@@ -86,10 +107,10 @@ class StreamingLog : public tclib::Log {
 public:
   StreamingLog() : out_(NULL) { }
   virtual bool record(log_entry_t *entry);
-  void set_destination(plankton::OutputSocket *out) { out_ = out; }
+  void set_destination(StreamServiceConnector *out) { out_ = out; }
 
 private:
-  plankton::OutputSocket *out_;
+  StreamServiceConnector *out_;
 };
 
 // The block of data passed through to the agent's dll connector.
@@ -120,11 +141,15 @@ public:
 
   bool install_agent_shared(tclib::InStream *owner_in, tclib::OutStream *owner_out);
 
+  void uninstall_agent_shared();
+
   virtual bool install_agent() = 0;
 
+  bool send_is_ready();
+
 private:
-  tclib::def_ref_t<plankton::rpc::StreamServiceConnector> owner_;
-  plankton::rpc::StreamServiceConnector *owner() { return *owner_; }
+  tclib::def_ref_t<StreamServiceConnector> owner_;
+  StreamServiceConnector *owner() { return *owner_; }
 
   StreamingLog *log() { return &log_; }
   StreamingLog log_;

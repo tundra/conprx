@@ -8,7 +8,6 @@
 #define _CONPRX_DRIVER_MANAGER_HH
 
 #include "agent/confront.hh"
-#include "c/stdc.h"
 
 #include "async/promise-inl.hh"
 #include "driver.hh"
@@ -18,6 +17,7 @@
 #include "rpc.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
+#include "sync/thread.hh"
 
 namespace conprx {
 
@@ -80,6 +80,23 @@ private:
   Arena arena_;
 };
 
+class DriverManagerService : public plankton::rpc::Service, public tclib::DefaultDestructable {
+public:
+  DriverManagerService(DriverManager *manager);
+  virtual ~DriverManagerService() { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
+private:
+  // Handles logs entries logged by the agent.
+  void on_log(plankton::rpc::RequestData&, ResponseCallback);
+
+  // Called when the agent has completed its setup.
+  void on_is_ready(plankton::rpc::RequestData&, ResponseCallback);
+
+  DriverManager *manager_;
+  DriverManager *manager() { return manager_; }
+};
+
 // A manager that manages the lifetime of the driver, including starting it up,
 // and allows communication with it.
 class DriverManager {
@@ -130,6 +147,10 @@ public:
 
   IncomingResponse send(OutgoingRequest *req);
 
+  void mark_agent_ready() { agent_is_ready_ = true; }
+
+  bool agent_is_ready() { return agent_is_ready_; }
+
 private:
   // Cross-platform (but only used on non-msvc) implementation of enabling the
   // agent that also works when dll injection doesn't exist. For testing only!
@@ -138,7 +159,11 @@ private:
   // Msvc-only implementation of enabling the agent that uses dll injection.
   bool enable_agent_dll_inject();
 
+  // Main entry-point for the agent monitor thread.
+  void *run_agent_monitor();
+
   tclib::NativeProcess process_;
+  bool agent_is_ready_;
 
   // The channel through which we control the driver.
   tclib::def_ref_t<tclib::ServerChannel> channel_;
@@ -152,6 +177,10 @@ private:
   tclib::def_ref_t<StreamServiceConnector> fake_agent_;
   StreamServiceConnector *fake_agent() { return *fake_agent_; }
   bool has_fake_agent() { return !fake_agent_channel_.is_null(); }
+  tclib::def_ref_t<DriverManagerService> service_;
+  DriverManagerService *service() { return *service_; }
+
+  tclib::NativeThread agent_monitor_;
 
   bool trace_;
   static utf8_t executable_path();

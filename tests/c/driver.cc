@@ -220,7 +220,8 @@ bool ConsoleDriverMain::open_connection() {
 
 bool ConsoleDriverMain::install_fake_agent() {
   if (!has_fake_agent_channel())
-    return false;
+    // There is no fake agent so this trivially succeeds.
+    return true;
   return fake_agent()->install_agent_shared(fake_agent_channel()->in(),
       fake_agent_channel()->out());
 }
@@ -230,7 +231,6 @@ bool ConsoleDriverMain::run() {
   if (!install_fake_agent())
     return false;
 
-  INFO("Driver is active [" kIgnoreInfoMarker "]");
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleProxy::registry());

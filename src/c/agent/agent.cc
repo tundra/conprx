@@ -4,7 +4,13 @@
 #include "agent.hh"
 #include "binpatch.hh"
 #include "confront.hh"
+#include "marshal-inl.hh"
 #include "utils/log.hh"
+#include "async/promise-inl.hh"
+
+BEGIN_C_INCLUDES
+#include "utils/string-inl.h"
+END_C_INCLUDES
 
 using namespace conprx;
 using namespace plankton;
@@ -31,14 +37,44 @@ private:
 FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_IMPL__)
 #undef __EMIT_TRAMPOLINE_IMPL__
 
+LogEntry::LogEntry() {
+  log_entry_default_init(&entry_, llInfo, NULL, 0, string_empty(), string_empty());
+}
+
+DefaultSeedType<LogEntry> LogEntry::kSeedType("conprx.LogEntry");
+
+LogEntry *LogEntry::new_instance(Variant header, Factory *factory) {
+  return new (factory) LogEntry();
+}
+
+Variant LogEntry::to_seed(Factory *factory) {
+  Seed seed = factory->new_seed(seed_type());
+  seed.set_field("level", entry_.level);
+  seed.set_field("file", entry_.file);
+  seed.set_field("line", entry_.line);
+  seed.set_field("message", entry_.message.chars);
+  seed.set_field("timestamp", entry_.timestamp.chars);
+  return seed;
+}
+
+void LogEntry::init(plankton::Seed payload, plankton::Factory *factory) {
+  log_level_t level = static_cast<log_level_t>(payload.get_field("level").integer_value());
+  const char *file = payload.get_field("file").string_chars();
+  uint32_t line = static_cast<uint32_t>(payload.get_field("line").integer_value());
+  const char *message = payload.get_field("message").string_chars();
+  const char *timestamp = payload.get_field("timestamp").string_chars();
+  log_entry_default_init(&entry_, level, file, line, new_c_string(message),
+      new_c_string(timestamp));
+}
+
 bool StreamingLog::record(log_entry_t *entry) {
-  plankton::Arena arena;
-  plankton::Seed seed = arena.new_seed();
-  seed.set_header("conprx.LogEntry");
-  seed.set_field("file", entry->file);
-  seed.set_field("line", entry->line);
-  seed.set_field("message", entry->message.chars);
-  out_->send_value(seed);
+  rpc::OutgoingRequest req(Variant::null(), "log");
+  LogEntry entry_data(entry);
+  Native entry_var = req.factory()->new_native(&entry_data);
+  req.set_arguments(1, &entry_var);
+  rpc::IncomingResponse resp = out_->socket()->send_request(&req);
+  while (!resp->is_settled())
+    out_->input()->process_next_instruction(NULL);
   return propagate(entry);
 }
 
@@ -47,12 +83,19 @@ bool ConsoleAgent::install_agent_shared(tclib::InStream *agent_in,
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
   if (!owner()->init(empty_callback()))
     return false;
-
-  log()->set_destination(owner()->output());
+  log()->set_destination(owner());
   log()->ensure_installed();
   if (!install_agent())
     return false;
+  send_is_ready();
+  return true;
+}
 
+bool ConsoleAgent::send_is_ready() {
+  rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
+  rpc::IncomingResponse resp = owner()->socket()->send_request(&req);
+  while (!resp->is_settled())
+    owner()->input()->process_next_instruction(NULL);
   return true;
 }
 
