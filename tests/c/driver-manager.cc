@@ -24,7 +24,7 @@ DriverManagerService::DriverManagerService(DriverManager *manager)
 void DriverManagerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
   TextWriter writer;
   writer.write(data[0]);
-  HEST("AGENT LOG: %s", *writer);
+  INFO("AGENT LOG: %s", *writer);
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
 
