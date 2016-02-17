@@ -133,11 +133,13 @@ dword_t ConsoleFrontendService::to_dword(Variant value) {
   return static_cast<dword_t>(long_val);
 }
 
+// An implementation of the console agent that doesn't do any actual patching.
+// Used for testing only.
 class FakeConsoleAgent : public ConsoleAgent {
 public:
-  FakeConsoleAgent() : ConsoleAgent() { }
+  FakeConsoleAgent() { }
   virtual void default_destroy() { default_delete_concrete(this); }
-  virtual bool install_agent() { return true; }
+  virtual bool install_agent_platform() { return true; }
 };
 
 // Holds the state for the console driver.
@@ -222,7 +224,7 @@ bool ConsoleDriverMain::install_fake_agent() {
   if (!has_fake_agent_channel())
     // There is no fake agent so this trivially succeeds.
     return true;
-  return fake_agent()->install_agent_shared(fake_agent_channel()->in(),
+  return fake_agent()->install_agent(fake_agent_channel()->in(),
       fake_agent_channel()->out());
 }
 

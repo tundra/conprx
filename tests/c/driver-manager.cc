@@ -217,9 +217,7 @@ bool DriverManager::join() {
   ProcessWaitIop wait(&process_, o0());
   if (!wait.execute())
     return false;
-  if (process_.exit_code().peek_value(1) != 0)
-    return false;
-  return true;
+  return process_.exit_code().peek_value(1) == 0;
 }
 
 utf8_t DriverManager::executable_path() {

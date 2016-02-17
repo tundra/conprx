@@ -80,6 +80,7 @@ private:
   Arena arena_;
 };
 
+// The service the driver will call back to when it wants to access the manager.
 class DriverManagerService : public plankton::rpc::Service, public tclib::DefaultDestructable {
 public:
   DriverManagerService(DriverManager *manager);
@@ -147,8 +148,10 @@ public:
 
   IncomingResponse send(OutgoingRequest *req);
 
+  // Notifies this manager that the agent has reported ready.
   void mark_agent_ready() { agent_is_ready_ = true; }
 
+  // Has the agent reported that it's ready?
   bool agent_is_ready() { return agent_is_ready_; }
 
 private:

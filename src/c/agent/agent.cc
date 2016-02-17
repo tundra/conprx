@@ -78,14 +78,14 @@ bool StreamingLog::record(log_entry_t *entry) {
   return propagate(entry);
 }
 
-bool ConsoleAgent::install_agent_shared(tclib::InStream *agent_in,
+bool ConsoleAgent::install_agent(tclib::InStream *agent_in,
     tclib::OutStream *agent_out) {
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
   if (!owner()->init(empty_callback()))
     return false;
   log()->set_destination(owner());
   log()->ensure_installed();
-  if (!install_agent())
+  if (!install_agent_platform())
     return false;
   send_is_ready();
   return true;

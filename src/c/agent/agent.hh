@@ -139,15 +139,18 @@ public:
   static const int cFailedToDuplicateLogout = 0x11150000;
   static const int cSuccess = 0x0;
 
-  bool install_agent_shared(tclib::InStream *owner_in, tclib::OutStream *owner_out);
+  // Install this agent.
+  bool install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
 
-  void uninstall_agent_shared();
-
-  virtual bool install_agent() = 0;
-
-  bool send_is_ready();
+protected:
+  // Perform the platform-specific part of the agent installation.
+  virtual bool install_agent_platform() = 0;
 
 private:
+  // Send the is-ready message to the owner.
+  bool send_is_ready();
+
+  // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
   StreamServiceConnector *owner() { return *owner_; }
 

@@ -30,7 +30,7 @@ public:
 
   static bool dll_process_detach();
 
-  bool install_agent();
+  virtual bool install_agent_platform();
 
   int connect(blob_t data_in, blob_t data_out);
 
