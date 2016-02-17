@@ -72,7 +72,7 @@ bool WindowsConsoleAgent::dll_process_detach() {
   return true;
 }
 
-bool WindowsConsoleAgent::install_agent() {
+bool WindowsConsoleAgent::install_agent_platform() {
   // The blacklist is one way to protect against hosing the system completely
   // if there's a bug, and a more fundamental one than the options since we
   // use the blacklist to ensure that you can change the options using the
@@ -147,7 +147,7 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
     return cFailedToDuplicateLogout + GetLastError();
   logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  return install_agent_shared(NULL, NULL) ? cSuccess : cInstallationFailed;
+  return install_agent(NULL, NULL) ? cSuccess : cInstallationFailed;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {
