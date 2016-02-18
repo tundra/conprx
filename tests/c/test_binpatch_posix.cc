@@ -58,8 +58,8 @@ int32_t SnippetHelper::call_snippet(function_t f, int32_t a, int32_t b) {
 
 #define BEGIN_SNIPPET asm volatile("push 0xDEC0DED\n\t"
 #define END_SNIPPET ); return 0;
-#define NOP(_) "nop\n\t"
-#define NOPS(...) FOR_EACH_VA_ARG(NOP, __VA_ARGS__)
+#define NOP(A, B) "nop\n\t"
+#define NOPS(...) FOR_EACH_VA_ARG(NOP, _, __VA_ARGS__)
 
 static int32_t add_short(int32_t a, int32_t b) {
   BEGIN_SNIPPET
