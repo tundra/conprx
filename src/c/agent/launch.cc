@@ -28,7 +28,7 @@ void AgentOwnerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
 }
 
 void AgentOwnerService::on_is_ready(rpc::RequestData& data, ResponseCallback resp) {
-  launcher()->agent_is_ready_.lower();
+  launcher()->agent_is_ready_ = true;
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
 
@@ -68,8 +68,8 @@ bool InjectingLauncher::complete_connect_to_agent() {
 
 bool Launcher::initialize() {
   CHECK_EQ("launch interaction out of order", lsConstructed, state_);
-  if (!agent_is_ready_.initialize())
-    return false;
+  // There's actually nothing to do here at the moment but that's likely to
+  // change so leave it in.
   state_ = lsInitialized;
   return true;
 }
@@ -87,27 +87,36 @@ bool Launcher::start(utf8_t command, size_t argc, utf8_t *argv) {
   }
 
   if (use_agent()) {
-    // Start connecting but don't block.
-    if (!start_connect_to_agent())
-      return false;
-
-    // Start the agent service and try to connect it to the running agent.
-    tclib::InStream *oin = owner_in();
-    CHECK_FALSE("no owner in", oin == NULL);
-    tclib::OutStream *oout = owner_out();
-    CHECK_FALSE("no owner out", oout == NULL);
-    agent_ = new (kDefaultAlloc) StreamServiceConnector(oin, oout);
-    if (!agent()->init(service()->handler()))
-      return false;
-
-    // Wait for the agent to finish connecting.
-    if (!complete_connect_to_agent())
-      return false;
+    // If we're using the agent connect it; this will also take care of resuming
+    // the process.
+    connect_agent();
   } else {
+    // There is no agent so we resume the process manually.
     ensure_process_resumed();
   }
 
   state_ = lsStarted;
+  return true;
+}
+
+bool Launcher::connect_agent() {
+  // Start connecting but don't block.
+  if (!start_connect_to_agent())
+    return false;
+
+  // Start the agent service and try to connect it to the running agent.
+  tclib::InStream *oin = owner_in();
+  CHECK_FALSE("no owner in", oin == NULL);
+  tclib::OutStream *oout = owner_out();
+  CHECK_FALSE("no owner out", oout == NULL);
+  agent_ = new (kDefaultAlloc) StreamServiceConnector(oin, oout);
+  if (!agent()->init(service()->handler()))
+    return false;
+
+  // Wait for the agent to finish connecting.
+  if (!complete_connect_to_agent())
+    return false;
+
   return true;
 }
 
@@ -117,16 +126,20 @@ bool Launcher::ensure_process_resumed() {
   return !NativeProcess::kCanSuspendResume || process_.resume();
 }
 
-bool Launcher::connect() {
+bool Launcher::connect_service() {
   CHECK_EQ("launch interaction out of order", lsStarted, state_);
-  if (use_agent() && !agent_is_ready_.pass())
-    return false;
+  if (use_agent()) {
+    while (!agent_is_ready_) {
+      if (!agent()->input()->process_next_instruction(NULL))
+        return false;
+    }
+  }
   state_ = lsConnected;
   return true;
 }
 
 bool Launcher::process_messages() {
-  CHECK_REL("launch interaction out of order", lsStarted, <=, state_);
+  CHECK_EQ("launch interaction out of order", lsConnected, state_);
   return agent()->process_all_messages();
 }
 

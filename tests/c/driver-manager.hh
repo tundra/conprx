@@ -81,12 +81,18 @@ private:
   Arena arena_;
 };
 
+// A launcher that knows how to start the driver and communicate with the fake
+// launcher that the driver supports. It can't be used for anything other than
+// testing.
 class FakeAgentLauncher : public Launcher {
 public:
   FakeAgentLauncher();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
-  bool initialize();
+  // Allocate the underlying channel.
+  bool allocate();
+
+  virtual bool connect_service();
 
   tclib::ServerChannel *agent_channel() { return *agent_channel_; }
 
@@ -94,7 +100,8 @@ protected:
   virtual tclib::InStream *owner_in() { return agent_channel()->in(); }
   virtual tclib::OutStream *owner_out() { return agent_channel()->out(); }
   virtual bool start_connect_to_agent();
-  virtual bool complete_connect_to_agent();
+  virtual bool complete_connect_to_agent() { return true; }
+  virtual bool use_agent() { return true; }
   virtual bool join(int *exit_code_out);
 
 private:
@@ -105,6 +112,8 @@ private:
   tclib::NativeThread agent_monitor_;
 };
 
+// Launcher that knows how to launch the driver with no agent. Useful for
+// testing the plain driver.
 class NoAgentLauncher : public Launcher {
 public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }

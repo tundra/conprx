@@ -131,7 +131,7 @@ bool DriverManager::start() {
     launcher_ = new (kDefaultAlloc) NoAgentLauncher();
   } else if (use_fake_agent()) {
     FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
-    if (!launcher->initialize())
+    if (!launcher->allocate())
       return false;
     builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
     launcher_ = launcher;
@@ -146,14 +146,14 @@ bool DriverManager::start() {
 }
 
 bool DriverManager::connect() {
+  if (!launcher()->connect_service())
+    return false;
   if (!channel()->open())
     return false;
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
   connector_->set_default_type_registry(ConsoleProxy::registry());
-  if (!connector()->init(empty_callback()))
-    return false;
-  return launcher()->connect();
+  return connector()->init(empty_callback());
 }
 
 IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
@@ -199,7 +199,7 @@ FakeAgentLauncher::FakeAgentLauncher() {
   agent_channel_ = ServerChannel::create();
 }
 
-bool FakeAgentLauncher::initialize() {
+bool FakeAgentLauncher::allocate() {
   return agent_channel()->allocate();
 }
 
@@ -207,7 +207,9 @@ bool FakeAgentLauncher::start_connect_to_agent() {
   return ensure_process_resumed() && agent_channel()->open();
 }
 
-bool FakeAgentLauncher::complete_connect_to_agent() {
+bool FakeAgentLauncher::connect_service() {
+  if (!Launcher::connect_service())
+    return false;
   agent_monitor_.set_callback(new_callback(&FakeAgentLauncher::run_agent_monitor,
       this));
   return agent_monitor_.start();

@@ -45,13 +45,16 @@ public:
 
   // Initialize this launcher's resources but don't actually launch anything.
   // Won't block.
-  bool initialize();
+  virtual bool initialize();
 
-  // Start the process running.
+  // Start the process running and wait for it to be brought up, but don't
+  // connect the agent owner service.
   bool start(utf8_t command, size_t argc, utf8_t *argv);
 
-  // Wait for the agent to report back.
-  bool connect();
+  // Connect the agent owner service and wait for the agent to report back that
+  // it's ready. Subtypes can override this to perform additional work before
+  // and/or after.
+  virtual bool connect_service();
 
   // Run the agent owner service.
   bool process_messages();
@@ -65,12 +68,17 @@ protected:
   virtual bool prepare_start() { return true; }
 
   // Override to perform any configuration of the process immediately after it
-  // has been launched, before it's resumed.
+  // has been launched before the agent owner service has been started.
   virtual bool start_connect_to_agent() { return true; }
 
-  virtual bool use_agent() { return true; }
-
+  // Override to perform any configuration of the process after the agent owner
+  // service has been started.
   virtual bool complete_connect_to_agent() { return true; }
+
+  // Return true if this launcher intends to launch the agent. If it does it
+  // must implement start_connect_to_agent and complete_connect_to_agent such
+  // that one of them resumes the process using ensure_process_resumed.
+  virtual bool use_agent() = 0;
 
   // Must be called by the concrete implementation at the time appropriate to
   // them to resume the child process if it has been started suspended.
@@ -90,10 +98,13 @@ private:
     lsConnected = 3
   };
 
+  // Does the work of connecting the agent.
+  bool connect_agent();
+
   friend class AgentOwnerService;
   tclib::NativeProcess process_;
 
-  tclib::Drawbridge agent_is_ready_;
+  bool agent_is_ready_;
   State state_;
 
   tclib::def_ref_t<StreamServiceConnector> agent_;
@@ -102,6 +113,7 @@ private:
   AgentOwnerService *service() { return &service_; }
 };
 
+// A launcher that works by injecting the agent as a dll into the process.
 class InjectingLauncher : public Launcher {
 public:
   InjectingLauncher(utf8_t agent_dll)
@@ -113,6 +125,7 @@ protected:
   virtual bool prepare_start();
   virtual bool start_connect_to_agent();
   virtual bool complete_connect_to_agent();
+  virtual bool use_agent() { return true; }
   virtual tclib::InStream *owner_in() { return up_.in(); }
   virtual tclib::OutStream *owner_out() { return down_.out(); }
 
