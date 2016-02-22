@@ -11,9 +11,9 @@
 #include "sync/pipe.hh"
 
 BEGIN_C_INCLUDES
+#include "utils/lifetime.h"
 #include "utils/log.h"
 #include "utils/string-inl.h"
-#include "utils/lifetime.h"
 END_C_INCLUDES
 
 using namespace conprx;
@@ -213,6 +213,8 @@ bool ConsoleDriverMain::open_connection() {
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
       return false;
     fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
+    if (!install_fake_agent())
+      return false;
   }
   channel_ = ClientChannel::create();
   if (!channel()->open(channel_name_))
@@ -229,10 +231,6 @@ bool ConsoleDriverMain::install_fake_agent() {
 }
 
 bool ConsoleDriverMain::run() {
-  // First install the fake agent so it's available further down.
-  if (!install_fake_agent())
-    return false;
-
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleProxy::registry());

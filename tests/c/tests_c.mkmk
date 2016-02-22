@@ -50,6 +50,7 @@ test_main.add_object(get_dep_external("tclib", "src", "c", "test", "log-fail"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "async", "library"))
 test_main.add_object(get_external("src", "objects"))
+test_main.add_object(get_external("src", "c", "agent", "server"))
 test_main.add_object(driver_common)
 test_main.add_dependency(driver_main)
 

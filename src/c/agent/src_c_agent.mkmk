@@ -29,14 +29,18 @@ agent.add_object(objects)
 agent.add_object(utils)
 agent.add_object(disass)
 
+server = get_group("server")
+server.add_member(build_object("launch.cc"))
+server.add_member(objects)
+
 host_files = [
   "host.cc",
-  "launch.cc",
 ]
 
 host = c.get_executable("host")
 host.add_object(utils)
 host.add_object(disass)
+host.add_object(server)
 for filename in host_files:
   host.add_object(build_object(filename))
 

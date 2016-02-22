@@ -117,7 +117,8 @@ private:
 typedef struct {
   int32_t magic;
   standalone_dword_t parent_process_id;
-  tclib::naked_file_handle_t parent_logout_handle;
+  tclib::naked_file_handle_t owner_in_handle;
+  tclib::naked_file_handle_t owner_out_handle;
 } connect_data_t;
 
 // Controls the injection of the console agent.
@@ -136,7 +137,8 @@ public:
   static const int cInvalidConnectDataMagic = 0x11120000;
   static const int cInstallationFailed = 0x11130000;
   static const int cFailedToOpenParentProcess = 0x11140000;
-  static const int cFailedToDuplicateLogout = 0x11150000;
+  static const int cFailedToDuplicateOwnerIn = 0x11150000;
+  static const int cFailedToDuplicateOwnerOut = 0x11160000;
   static const int cSuccess = 0x0;
 
   // Install this agent.

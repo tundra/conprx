@@ -37,7 +37,10 @@ public:
   static WindowsConsoleAgent *get() { return instance_; }
 
 private:
-  def_ref_t<OutStream> logout_;
+  def_ref_t<OutStream> owner_in_;
+  OutStream *owner_in() { return *owner_in_; }
+  def_ref_t<InStream> owner_out_;
+  InStream *owner_out() { return *owner_out_; }
 
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
@@ -141,13 +144,20 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
       connect_data->parent_process_id);
   if (parent_process == NULL)
     return cFailedToOpenParentProcess + GetLastError();
-  handle_t logout_handle = INVALID_HANDLE_VALUE;
-  if (!DuplicateHandle(parent_process, connect_data->parent_logout_handle,
-      GetCurrentProcess(), &logout_handle, GENERIC_WRITE, false, 0))
-    return cFailedToDuplicateLogout + GetLastError();
-  logout_ = tclib::InOutStream::from_raw_handle(logout_handle);
 
-  return install_agent(NULL, NULL) ? cSuccess : cInstallationFailed;
+  handle_t owner_in_handle = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(parent_process, connect_data->owner_in_handle,
+      GetCurrentProcess(), &owner_in_handle, GENERIC_WRITE, false, 0))
+    return cFailedToDuplicateOwnerIn + GetLastError();
+  owner_in_ = tclib::InOutStream::from_raw_handle(owner_in_handle);
+
+  handle_t owner_out_handle = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(parent_process, connect_data->owner_out_handle,
+      GetCurrentProcess(), &owner_out_handle, GENERIC_READ, false, 0))
+    return cFailedToDuplicateOwnerOut + GetLastError();
+  owner_out_ = tclib::InOutStream::from_raw_handle(owner_out_handle);
+
+  return install_agent(owner_out(), owner_in()) ? cSuccess : cInstallationFailed;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {

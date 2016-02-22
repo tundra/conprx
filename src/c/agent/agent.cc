@@ -94,8 +94,12 @@ bool ConsoleAgent::install_agent(tclib::InStream *agent_in,
 bool ConsoleAgent::send_is_ready() {
   rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
   rpc::IncomingResponse resp = owner()->socket()->send_request(&req);
-  while (!resp->is_settled())
-    owner()->input()->process_next_instruction(NULL);
+  while (!resp->is_settled()) {
+    if (!owner()->input()->process_next_instruction(NULL)) {
+      WARN("Owner not ready");
+      return false;
+    }
+  }
   return true;
 }
 

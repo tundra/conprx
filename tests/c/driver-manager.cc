@@ -15,41 +15,22 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-DriverManagerService::DriverManagerService(DriverManager *manager)
-  : manager_(manager) {
-  register_method("log", new_callback(&DriverManagerService::on_log, this));
-  register_method("is_ready", new_callback(&DriverManagerService::on_is_ready, this));
-}
-
-void DriverManagerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
-  TextWriter writer;
-  writer.write(data[0]);
-  INFO("AGENT LOG: %s", *writer);
-  resp(rpc::OutgoingResponse::success(Variant::null()));
-}
-
-void DriverManagerService::on_is_ready(rpc::RequestData& data, ResponseCallback resp) {
-  manager()->mark_agent_ready();
-  resp(rpc::OutgoingResponse::success(Variant::null()));
-}
-
 DriverManager::DriverManager()
-  : agent_is_ready_(false)
-  , trace_(false) {
+  : trace_(false)
+  , use_agent_(false)
+  , use_fake_agent_(false) {
   channel_ = ServerChannel::create();
 }
 
-bool DriverManager::enable_agent() {
-  return enable_agent_fake();
-}
-
-bool DriverManager::enable_agent_fake() {
-  fake_agent_channel_ = ServerChannel::create();
+bool DriverManager::enable_agent(bool use_fake) {
+  UNLESS_MSVC(CHECK_TRUE("only fake agent", use_fake));
+  use_agent_ = true;
+  use_fake_agent_ = use_fake;
   return true;
 }
 
-void *DriverManager::run_agent_monitor() {
-  address_arith_t result = fake_agent()->process_all_messages();
+void *FakeAgentLauncher::run_agent_monitor() {
+  address_arith_t result = process_messages();
   return reinterpret_cast<void*>(result);
 }
 
@@ -146,38 +127,33 @@ bool DriverManager::start() {
   if (!channel()->allocate())
     return false;
   builder.add_option("channel", channel()->name().chars);
-  if (has_fake_agent()) {
-    if (!fake_agent_channel()->allocate())
+  if (!use_agent()) {
+    launcher_ = new (kDefaultAlloc) NoAgentLauncher();
+  } else if (use_fake_agent()) {
+    FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
+    if (!launcher->initialize())
       return false;
-    builder.add_option("fake-agent-channel", fake_agent_channel()->name().chars);
+    builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
+    launcher_ = launcher;
+  } else {
+    launcher_ = new (kDefaultAlloc) InjectingLauncher(string_empty());
   }
+  if (!launcher()->initialize())
+    return false;
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
-  return process_.start(exec, 1, &args);
+  return launcher()->start(exec, 1, &args);
 }
 
 bool DriverManager::connect() {
-  if (has_fake_agent() && !fake_agent_channel()->open())
-    return false;
   if (!channel()->open())
     return false;
-  if (has_fake_agent()) {
-    service_ = new (kDefaultAlloc) DriverManagerService(this);
-    fake_agent_ = new (kDefaultAlloc) StreamServiceConnector(fake_agent_channel()->in(),
-        fake_agent_channel()->out());
-    if (!fake_agent()->init(service()->handler()))
-      return false;
-    agent_monitor_.set_callback(new_callback(&DriverManager::run_agent_monitor,
-        this));
-    if (!agent_monitor_.start())
-      return false;
-  }
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
   connector_->set_default_type_registry(ConsoleProxy::registry());
   if (!connector()->init(empty_callback()))
     return false;
-  return true;
+  return launcher()->connect();
 }
 
 IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
@@ -209,19 +185,40 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
 bool DriverManager::join() {
   if (!channel()->close())
     return false;
-  if (has_fake_agent()) {
-    agent_monitor_.join();
-    if (!fake_agent_channel()->close())
-      return false;
-  }
-  ProcessWaitIop wait(&process_, o0());
-  if (!wait.execute())
-    return false;
-  return process_.exit_code().peek_value(1) == 0;
+  int exit_code = 0;
+  return launcher()->join(&exit_code) && (exit_code == 0);
 }
 
 utf8_t DriverManager::executable_path() {
   const char *result = getenv("DRIVER");
   ASSERT_TRUE(result != NULL);
   return new_c_string(result);
+}
+
+FakeAgentLauncher::FakeAgentLauncher() {
+  agent_channel_ = ServerChannel::create();
+}
+
+bool FakeAgentLauncher::initialize() {
+  return agent_channel()->allocate();
+}
+
+bool FakeAgentLauncher::start_connect_to_agent() {
+  return ensure_process_resumed() && agent_channel()->open();
+}
+
+bool FakeAgentLauncher::complete_connect_to_agent() {
+  agent_monitor_.set_callback(new_callback(&FakeAgentLauncher::run_agent_monitor,
+      this));
+  return agent_monitor_.start();
+}
+
+bool FakeAgentLauncher::join(int *exit_code_out) {
+  agent_monitor_.join();
+  return Launcher::join(exit_code_out);
+}
+
+bool NoAgentLauncher::start_connect_to_agent() {
+  UNREACHABLE("NoAgentLauncher::start_connect_to_agent");
+  return false;
 }

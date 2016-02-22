@@ -26,8 +26,8 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < new_argc; i++)
     new_argv[i] = new_c_string(argv[skip_count + i]);
 
-  Launcher launcher;
-  if (!launcher.start(command, new_argc, new_argv, library))
+  InjectingLauncher launcher(library);
+  if (!launcher.start(command, new_argc, new_argv))
     return 1;
 
   int exit_code = 0;

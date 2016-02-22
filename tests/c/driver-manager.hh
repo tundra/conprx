@@ -9,6 +9,7 @@
 
 #include "agent/confront.hh"
 
+#include "agent/launch.hh"
 #include "async/promise-inl.hh"
 #include "driver.hh"
 #include "io/iop.hh"
@@ -80,22 +81,38 @@ private:
   Arena arena_;
 };
 
-// The service the driver will call back to when it wants to access the manager.
-class DriverManagerService : public plankton::rpc::Service, public tclib::DefaultDestructable {
+class FakeAgentLauncher : public Launcher {
 public:
-  DriverManagerService(DriverManager *manager);
-  virtual ~DriverManagerService() { }
+  FakeAgentLauncher();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
+  bool initialize();
+
+  tclib::ServerChannel *agent_channel() { return *agent_channel_; }
+
+protected:
+  virtual tclib::InStream *owner_in() { return agent_channel()->in(); }
+  virtual tclib::OutStream *owner_out() { return agent_channel()->out(); }
+  virtual bool start_connect_to_agent();
+  virtual bool complete_connect_to_agent();
+  virtual bool join(int *exit_code_out);
+
 private:
-  // Handles logs entries logged by the agent.
-  void on_log(plankton::rpc::RequestData&, ResponseCallback);
+  // Main entry-point for the agent monitor thread.
+  void *run_agent_monitor();
 
-  // Called when the agent has completed its setup.
-  void on_is_ready(plankton::rpc::RequestData&, ResponseCallback);
+  tclib::def_ref_t<tclib::ServerChannel> agent_channel_;
+  tclib::NativeThread agent_monitor_;
+};
 
-  DriverManager *manager_;
-  DriverManager *manager() { return manager_; }
+class NoAgentLauncher : public Launcher {
+public:
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  virtual bool use_agent() { return false; }
+
+protected:
+  virtual bool start_connect_to_agent();
+
 };
 
 // A manager that manages the lifetime of the driver, including starting it up,
@@ -119,12 +136,14 @@ public:
 
   // Notify this manager that it should install the console agent. Once enabled
   // this can't be disabled.
-  bool enable_agent();
+  bool enable_agent(bool use_fake);
 
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
   // request is.
   DriverRequest new_request() { return DriverRequest(this); }
+
+  Launcher *operator->() { return launcher(); }
 
   // Shorthands for requests that don't need the request object before sending
   // the message.
@@ -148,25 +167,9 @@ public:
 
   IncomingResponse send(OutgoingRequest *req);
 
-  // Notifies this manager that the agent has reported ready.
-  void mark_agent_ready() { agent_is_ready_ = true; }
-
-  // Has the agent reported that it's ready?
-  bool agent_is_ready() { return agent_is_ready_; }
-
 private:
-  // Cross-platform (but only used on non-msvc) implementation of enabling the
-  // agent that also works when dll injection doesn't exist. For testing only!
-  bool enable_agent_fake();
-
-  // Msvc-only implementation of enabling the agent that uses dll injection.
-  bool enable_agent_dll_inject();
-
-  // Main entry-point for the agent monitor thread.
-  void *run_agent_monitor();
-
-  tclib::NativeProcess process_;
-  bool agent_is_ready_;
+  tclib::def_ref_t<Launcher> launcher_;
+  Launcher *launcher() { return *launcher_; }
 
   // The channel through which we control the driver.
   tclib::def_ref_t<tclib::ServerChannel> channel_;
@@ -174,18 +177,11 @@ private:
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
 
-  // If there is a fake agent, this is our connection to it.
-  tclib::def_ref_t<tclib::ServerChannel> fake_agent_channel_;
-  tclib::ServerChannel *fake_agent_channel() { return *fake_agent_channel_; }
-  tclib::def_ref_t<StreamServiceConnector> fake_agent_;
-  StreamServiceConnector *fake_agent() { return *fake_agent_; }
-  bool has_fake_agent() { return !fake_agent_channel_.is_null(); }
-  tclib::def_ref_t<DriverManagerService> service_;
-  DriverManagerService *service() { return *service_; }
-
-  tclib::NativeThread agent_monitor_;
-
   bool trace_;
+  bool use_agent_;
+  bool use_agent() { return use_agent_; }
+  bool use_fake_agent_;
+  bool use_fake_agent() { return use_fake_agent_; }
   static utf8_t executable_path();
 };
 

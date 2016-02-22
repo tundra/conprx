@@ -13,14 +13,14 @@ using namespace tclib;
 using namespace plankton;
 using namespace conprx;
 
-TEST(agent, simple) {
+MULTITEST(agent, simple, bool, ("fake", true), ("real", false)) {
+  bool use_fake = Flavor;
+  if (!(use_fake))
+    return;
   DriverManager driver;
-  ASSERT_TRUE(driver.enable_agent());
-  ASSERT_FALSE(driver.agent_is_ready());
+  ASSERT_TRUE(driver.enable_agent(use_fake));
   ASSERT_TRUE(driver.start());
-  ASSERT_FALSE(driver.agent_is_ready());
   ASSERT_TRUE(driver.connect());
-  ASSERT_TRUE(driver.agent_is_ready());
 
   DriverRequest echo0 = driver.echo(5436);
   ASSERT_EQ(5436, echo0->integer_value());

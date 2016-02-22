@@ -27,7 +27,7 @@ int new_add(int a, int b) {
 }
 
 TEST(binpatch, individual_steps) {
-  if (kIsGcc || kIsDebug)
+  if (kIsGcc || kIsDebugCodegen)
     return;
   Platform &platform = Platform::get();
   ASSERT_TRUE(platform.ensure_initialized());
