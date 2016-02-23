@@ -117,8 +117,8 @@ private:
 typedef struct {
   int32_t magic;
   standalone_dword_t parent_process_id;
-  tclib::naked_file_handle_t owner_in_handle;
-  tclib::naked_file_handle_t owner_out_handle;
+  tclib::naked_file_handle_t agent_in_handle;
+  tclib::naked_file_handle_t agent_out_handle;
 } connect_data_t;
 
 // Controls the injection of the console agent.

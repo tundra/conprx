@@ -39,22 +39,22 @@ Launcher::Launcher()
   process_.set_flags(pfStartSuspendedOnWindows);
 }
 
-Launcher::~Launcher() {
-}
-
 bool InjectingLauncher::prepare_start() {
   return up_.open(NativePipe::pfDefault) && down_.open(NativePipe::pfDefault);
 }
 
 bool InjectingLauncher::start_connect_to_agent() {
+  // Set up the connection data to pass into the dll.
   connect_data_t data;
   data.magic = ConsoleAgent::kConnectDataMagic;
   data.parent_process_id = IF_MSVC(GetCurrentProcessId(), 0);
-  data.owner_in_handle = owner_in()->to_raw_handle();
-  data.owner_out_handle = owner_out()->to_raw_handle();
+  data.agent_in_handle = down_.in()->to_raw_handle();
+  data.agent_out_handle = up_.out()->to_raw_handle();
   blob_t blob_in = blob_new(&data, sizeof(data));
   injection()->set_connector(new_c_string("ConprxAgentConnect"), blob_in,
       blob_empty());
+
+  // Start the injection running.
   if (!process()->start_inject_library(injection())) {
     LOG_ERROR("Failed to start injecting %s.", agent_dll_.chars);
     return false;
@@ -63,7 +63,11 @@ bool InjectingLauncher::start_connect_to_agent() {
 }
 
 bool InjectingLauncher::complete_connect_to_agent() {
-  return process()->complete_inject_library(injection());
+  if (!ensure_agent_ready())
+    return false;
+  if (!process()->complete_inject_library(injection()))
+    return false;
+  return ensure_process_resumed();
 }
 
 bool Launcher::initialize() {
@@ -96,7 +100,7 @@ bool Launcher::start(utf8_t command, size_t argc, utf8_t *argv) {
   }
 
   state_ = lsStarted;
-  return true;
+  return connect_service();
 }
 
 bool Launcher::connect_agent() {
@@ -117,6 +121,14 @@ bool Launcher::connect_agent() {
   if (!complete_connect_to_agent())
     return false;
 
+  return ensure_agent_ready();
+}
+
+bool Launcher::ensure_agent_ready() {
+  while (!agent_is_ready_) {
+    if (!agent()->input()->process_next_instruction(NULL))
+      return false;
+  }
   return true;
 }
 
@@ -127,19 +139,11 @@ bool Launcher::ensure_process_resumed() {
 }
 
 bool Launcher::connect_service() {
-  CHECK_EQ("launch interaction out of order", lsStarted, state_);
-  if (use_agent()) {
-    while (!agent_is_ready_) {
-      if (!agent()->input()->process_next_instruction(NULL))
-        return false;
-    }
-  }
-  state_ = lsConnected;
   return true;
 }
 
 bool Launcher::process_messages() {
-  CHECK_EQ("launch interaction out of order", lsConnected, state_);
+  CHECK_EQ("launch interaction out of order", lsStarted, state_);
   return agent()->process_all_messages();
 }
 

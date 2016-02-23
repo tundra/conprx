@@ -28,7 +28,7 @@ int new_add(int a, int b) {
 
 TEST(binpatch, individual_steps) {
   if (kIsGcc || kIsDebugCodegen)
-    return;
+    SKIP_TEST(kIsGcc ? "msvc only" : "debug codegen");
   Platform &platform = Platform::get();
   ASSERT_TRUE(platform.ensure_initialized());
 

@@ -37,10 +37,10 @@ public:
   static WindowsConsoleAgent *get() { return instance_; }
 
 private:
-  def_ref_t<OutStream> owner_in_;
-  OutStream *owner_in() { return *owner_in_; }
-  def_ref_t<InStream> owner_out_;
-  InStream *owner_out() { return *owner_out_; }
+  def_ref_t<InStream> agent_in_;
+  InStream *agent_in() { return *agent_in_; }
+  def_ref_t<OutStream> agent_out_;
+  OutStream *agent_out() { return *agent_out_; }
 
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
@@ -76,34 +76,6 @@ bool WindowsConsoleAgent::dll_process_detach() {
 }
 
 bool WindowsConsoleAgent::install_agent_platform() {
-  // The blacklist is one way to protect against hosing the system completely
-  // if there's a bug, and a more fundamental one than the options since we
-  // use the blacklist to ensure that you can change the options using the
-  // registry editor, for instance. Hence the blacklist check should be short
-  // and sweet with few places for bugs to hide. And nothing nontrivial should
-  // happen before it.
-  if (is_process_hard_blacklisted())
-    return true;
-
-  // Then apply the options. This is the next step in ensuring that you can
-  // interact with the system even if there are problems with the agent so
-  // again as little nontrivial behavior that could harbor bugs should happen
-  // before it.
-  Options &options = Options::get();
-  if (options.verbose_logging())
-    // TODO: ensble verbose logging
-    ((void) 0);
-  if (!options.is_enabled())
-    return true;
-
-  // Okay at this point we can start with the actual work since we've made it
-  // safely through the guards above.
-  LoggingConsole *logger = new LoggingConsole(NULL);
-  ConsoleFrontend *original = NULL;
-  if (!install(options, *logger, &original))
-    return false;
-  logger->set_delegate(original);
-
   return true;
 }
 
@@ -145,19 +117,19 @@ int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
   if (parent_process == NULL)
     return cFailedToOpenParentProcess + GetLastError();
 
-  handle_t owner_in_handle = INVALID_HANDLE_VALUE;
-  if (!DuplicateHandle(parent_process, connect_data->owner_in_handle,
-      GetCurrentProcess(), &owner_in_handle, GENERIC_WRITE, false, 0))
+  handle_t agent_in_handle = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(parent_process, connect_data->agent_in_handle,
+      GetCurrentProcess(), &agent_in_handle, GENERIC_READ, false, 0))
     return cFailedToDuplicateOwnerIn + GetLastError();
-  owner_in_ = tclib::InOutStream::from_raw_handle(owner_in_handle);
+  agent_in_ = tclib::InOutStream::from_raw_handle(agent_in_handle);
 
-  handle_t owner_out_handle = INVALID_HANDLE_VALUE;
-  if (!DuplicateHandle(parent_process, connect_data->owner_out_handle,
-      GetCurrentProcess(), &owner_out_handle, GENERIC_READ, false, 0))
+  handle_t agent_out_handle = INVALID_HANDLE_VALUE;
+  if (!DuplicateHandle(parent_process, connect_data->agent_out_handle,
+      GetCurrentProcess(), &agent_out_handle, GENERIC_WRITE, false, 0))
     return cFailedToDuplicateOwnerOut + GetLastError();
-  owner_out_ = tclib::InOutStream::from_raw_handle(owner_out_handle);
+  agent_out_ = tclib::InOutStream::from_raw_handle(agent_out_handle);
 
-  return install_agent(owner_out(), owner_in()) ? cSuccess : cInstallationFailed;
+  return install_agent(agent_in(), agent_out()) ? cSuccess : cInstallationFailed;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {

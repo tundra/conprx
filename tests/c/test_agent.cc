@@ -15,10 +15,10 @@ using namespace conprx;
 
 MULTITEST(agent, simple, bool, ("fake", true), ("real", false)) {
   bool use_fake = Flavor;
-  if (!(use_fake))
-    return;
+  if (!use_fake && !DriverManager::kSupportsRealAgent)
+    SKIP_TEST(kIsMsvc ? "debug codegen" : "msvc only");
   DriverManager driver;
-  ASSERT_TRUE(driver.enable_agent(use_fake));
+  ASSERT_TRUE(driver.set_agent_type(use_fake ? DriverManager::atFake : DriverManager::atReal));
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 

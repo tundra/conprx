@@ -96,6 +96,7 @@ bool ConsoleAgent::send_is_ready() {
   rpc::IncomingResponse resp = owner()->socket()->send_request(&req);
   while (!resp->is_settled()) {
     if (!owner()->input()->process_next_instruction(NULL)) {
+      // We reached an error or EOF before the owner responded.
       WARN("Owner not ready");
       return false;
     }

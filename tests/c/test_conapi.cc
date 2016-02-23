@@ -22,5 +22,7 @@ TEST(conapi, functypes) {
    use(name);
    FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
 #  undef __EMIT_ASSIGN__
+#else
+  SKIP_TEST("msvc only");
 #endif
 }

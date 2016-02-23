@@ -41,7 +41,7 @@ private:
 class Launcher : public tclib::DefaultDestructable {
 public:
   Launcher();
-  virtual ~Launcher();
+  virtual ~Launcher() { }
 
   // Initialize this launcher's resources but don't actually launch anything.
   // Won't block.
@@ -84,7 +84,15 @@ protected:
   // them to resume the child process if it has been started suspended.
   bool ensure_process_resumed();
 
-  // Accessors used to get the in and out streams to use to talk to the agent.
+  // Loop around waiting for the agent to report to the owner service that
+  // it's ready. Does nothing if the agent is already ready.
+  bool ensure_agent_ready();
+
+  // There are four streams in play here: the owner pair and the agent pair.
+  // The owner in stream allows the owner to read what is written to the agent
+  // out stream. The agent in stream allows the agent to read what is written to
+  // the owner out stream. Don't get these mixed up -- the owner may handle the
+  // agent's streams but shouldn't use them itself.
   virtual tclib::InStream *owner_in() { return NULL; }
   virtual tclib::OutStream *owner_out() { return NULL; }
 
@@ -122,9 +130,22 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
 protected:
+  // Before we can start we need to open up the pipes over which we'll be
+  // communicating. These can be created without blocking so we do that early
+  // on.
   virtual bool prepare_start();
+
+  // Inject the dll and start it running. At some point after this has been
+  // called the dll installation code will wait to connect back to the owner
+  // and this call doesn't block to wait for that.
   virtual bool start_connect_to_agent();
+
+  // Here we'll perform the owner's side of the connection procedure, knowing
+  // that barring some unforeseen problem the agent will eventually be on the
+  // other side of the connection ready to connect. We will also release the
+  // process so the main program can start running.
   virtual bool complete_connect_to_agent();
+
   virtual bool use_agent() { return true; }
   virtual tclib::InStream *owner_in() { return up_.in(); }
   virtual tclib::OutStream *owner_out() { return down_.out(); }

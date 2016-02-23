@@ -17,15 +17,14 @@ using namespace tclib;
 
 DriverManager::DriverManager()
   : trace_(false)
-  , use_agent_(false)
-  , use_fake_agent_(false) {
+  , agent_type_(atNone) {
   channel_ = ServerChannel::create();
 }
 
-bool DriverManager::enable_agent(bool use_fake) {
-  UNLESS_MSVC(CHECK_TRUE("only fake agent", use_fake));
-  use_agent_ = true;
-  use_fake_agent_ = use_fake;
+bool DriverManager::set_agent_type(AgentType type) {
+  if (!kSupportsRealAgent)
+    CHECK_FALSE("real agent not supported", type != atReal);
+  agent_type_ = type;
   return true;
 }
 
@@ -127,16 +126,21 @@ bool DriverManager::start() {
   if (!channel()->allocate())
     return false;
   builder.add_option("channel", channel()->name().chars);
-  if (!use_agent()) {
-    launcher_ = new (kDefaultAlloc) NoAgentLauncher();
-  } else if (use_fake_agent()) {
-    FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
-    if (!launcher->allocate())
-      return false;
-    builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
-    launcher_ = launcher;
-  } else {
-    launcher_ = new (kDefaultAlloc) InjectingLauncher(string_empty());
+  switch (agent_type()) {
+    case atNone:
+      launcher_ = new (kDefaultAlloc) NoAgentLauncher();
+      break;
+    case atReal:
+      launcher_ = new (kDefaultAlloc) InjectingLauncher(agent_path());
+      break;
+    case atFake: {
+      FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
+      if (!launcher->allocate())
+        return false;
+      builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
+      launcher_ = launcher;
+      break;
+    }
   }
   if (!launcher()->initialize())
     return false;
@@ -191,6 +195,12 @@ bool DriverManager::join() {
 
 utf8_t DriverManager::executable_path() {
   const char *result = getenv("DRIVER");
+  ASSERT_TRUE(result != NULL);
+  return new_c_string(result);
+}
+
+utf8_t DriverManager::agent_path() {
+  const char *result = getenv("AGENT");
   ASSERT_TRUE(result != NULL);
   return new_c_string(result);
 }

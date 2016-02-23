@@ -92,6 +92,8 @@ public:
   // Allocate the underlying channel.
   bool allocate();
 
+  // We use this to not only connect the service but start the monitor thread
+  // running.
   virtual bool connect_service();
 
   tclib::ServerChannel *agent_channel() { return *agent_channel_; }
@@ -99,9 +101,16 @@ public:
 protected:
   virtual tclib::InStream *owner_in() { return agent_channel()->in(); }
   virtual tclib::OutStream *owner_out() { return agent_channel()->out(); }
+
+  // The fake agent launcher needs the process to be running before it can start
+  // talking to the remote agent so this does almost all of the work, it
+  // releases the process from being suspended and opens up the connection.
   virtual bool start_connect_to_agent();
-  virtual bool complete_connect_to_agent() { return true; }
+
   virtual bool use_agent() { return true; }
+
+  // In addition to joining the process this also joins the agent monitor
+  // thread.
   virtual bool join(int *exit_code_out);
 
 private:
@@ -120,6 +129,8 @@ public:
   virtual bool use_agent() { return false; }
 
 protected:
+  // This is only present such that we can report an error if anyone tries to
+  // call it.
   virtual bool start_connect_to_agent();
 
 };
@@ -128,6 +139,13 @@ protected:
 // and allows communication with it.
 class DriverManager {
 public:
+  // Which kind of agent to use.
+  enum AgentType {
+    atNone,
+    atFake,
+    atReal
+  };
+
   DriverManager();
 
   // Start up the driver executable.
@@ -145,7 +163,7 @@ public:
 
   // Notify this manager that it should install the console agent. Once enabled
   // this can't be disabled.
-  bool enable_agent(bool use_fake);
+  bool set_agent_type(AgentType type);
 
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
@@ -153,6 +171,9 @@ public:
   DriverRequest new_request() { return DriverRequest(this); }
 
   Launcher *operator->() { return launcher(); }
+
+  // Constant that's true when the real agent can work.
+  static const bool kSupportsRealAgent = kIsMsvc && !kIsDebugCodegen;
 
   // Shorthands for requests that don't need the request object before sending
   // the message.
@@ -187,11 +208,10 @@ private:
   StreamServiceConnector *connector() { return *connector_; }
 
   bool trace_;
-  bool use_agent_;
-  bool use_agent() { return use_agent_; }
-  bool use_fake_agent_;
-  bool use_fake_agent() { return use_fake_agent_; }
+  AgentType agent_type_;
+  AgentType agent_type() { return agent_type_; }
   static utf8_t executable_path();
+  static utf8_t agent_path();
 };
 
 } // namespace conprx
