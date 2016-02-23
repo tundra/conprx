@@ -119,6 +119,8 @@ private:
 
   tclib::def_ref_t<tclib::ServerChannel> agent_channel_;
   tclib::NativeThread agent_monitor_;
+  tclib::Drawbridge agent_monitor_done_;
+  tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
 };
 
 // Launcher that knows how to launch the driver with no agent. Useful for

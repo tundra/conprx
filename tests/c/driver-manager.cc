@@ -30,6 +30,7 @@ bool DriverManager::set_agent_type(AgentType type) {
 
 void *FakeAgentLauncher::run_agent_monitor() {
   address_arith_t result = process_messages();
+  agent_monitor_done()->lower();
   return reinterpret_cast<void*>(result);
 }
 
@@ -150,8 +151,6 @@ bool DriverManager::start() {
 }
 
 bool DriverManager::connect() {
-  if (!launcher()->connect_service())
-    return false;
   if (!channel()->open())
     return false;
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
@@ -205,12 +204,13 @@ utf8_t DriverManager::agent_path() {
   return new_c_string(result);
 }
 
-FakeAgentLauncher::FakeAgentLauncher() {
+FakeAgentLauncher::FakeAgentLauncher()
+  : agent_monitor_done_(Drawbridge::dsRaised) {
   agent_channel_ = ServerChannel::create();
 }
 
 bool FakeAgentLauncher::allocate() {
-  return agent_channel()->allocate();
+  return agent_monitor_done()->initialize() && agent_channel()->allocate();
 }
 
 bool FakeAgentLauncher::start_connect_to_agent() {
@@ -226,6 +226,8 @@ bool FakeAgentLauncher::connect_service() {
 }
 
 bool FakeAgentLauncher::join(int *exit_code_out) {
+  if (!agent_monitor_done()->pass())
+    return false;
   agent_monitor_.join();
   return Launcher::join(exit_code_out);
 }

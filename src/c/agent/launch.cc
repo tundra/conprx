@@ -63,6 +63,8 @@ bool InjectingLauncher::start_connect_to_agent() {
 }
 
 bool InjectingLauncher::complete_connect_to_agent() {
+  // TODO: ensure that we notice if injection goes wrong before just waiting
+  //   blindly for the agent to become ready.
   if (!ensure_agent_ready())
     return false;
   if (!process()->complete_inject_library(injection()))
