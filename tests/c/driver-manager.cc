@@ -23,7 +23,7 @@ DriverManager::DriverManager()
 
 bool DriverManager::set_agent_type(AgentType type) {
   if (!kSupportsRealAgent)
-    CHECK_FALSE("real agent not supported", type != atReal);
+    CHECK_FALSE("real agent not supported", type == atReal);
   agent_type_ = type;
   return true;
 }
