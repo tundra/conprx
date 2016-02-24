@@ -34,6 +34,7 @@ TEST(agent, inject_fail) {
   DriverManager driver;
   driver.set_agent_type(DriverManager::atReal);
   driver.set_agent_path(new_c_string("flip-flap-foobeliboo"));
+  driver.set_silence_log(true);
   log_o *old_log = silence_global_log();
   ASSERT_FALSE(driver.start());
   set_global_log(old_log);

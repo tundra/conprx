@@ -17,7 +17,8 @@ using namespace plankton;
 using namespace tclib;
 
 DriverManager::DriverManager()
-  : trace_(false)
+  : silence_log_(false)
+  , trace_(false)
   , agent_path_(string_empty())
   , agent_type_(atNone) {
   channel_ = ServerChannel::create();
@@ -144,6 +145,8 @@ bool DriverManager::start() {
       break;
     }
   }
+  if (silence_log_)
+    builder.add_option("silence-log", Variant::yes());
   B_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();

@@ -171,6 +171,10 @@ public:
   // value.
   void set_agent_path(utf8_t path) { agent_path_ = path; }
 
+  // Instruct the driver to not print log messages. Useful for when the driver
+  // is made to do stuff that we know will fail, for testing.
+  void set_silence_log(bool value) { silence_log_ = value; }
+
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
   // request is.
@@ -213,7 +217,7 @@ private:
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
 
-
+  bool silence_log_;
   bool trace_;
   utf8_t agent_path_;
   utf8_t agent_path();

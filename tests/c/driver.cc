@@ -142,6 +142,12 @@ public:
   virtual bool install_agent_platform() { return true; }
 };
 
+// A log that ignores everything.
+class SilentLog : public Log {
+public:
+  virtual bool record(log_entry_t *entry) { return true; }
+};
+
 // Holds the state for the console driver.
 class ConsoleDriverMain {
 public:
@@ -166,6 +172,8 @@ public:
 
 private:
   CommandLineReader reader_;
+  bool silence_log_;
+  SilentLog silent_log_;
 
   // The channel through which the client communicates with this driver.
   utf8_t channel_name_;
@@ -184,7 +192,8 @@ private:
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
-  : channel_name_(string_empty())
+  : silence_log_(false)
+  , channel_name_(string_empty())
   , fake_agent_channel_name_(string_empty()) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
@@ -195,6 +204,7 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
         error->offender());
     return false;
   }
+  silence_log_ = cmdline->option("silence-log").bool_value();
   const char *channel = cmdline->option("channel").string_chars();
   if (channel == NULL) {
     LOG_ERROR("No channel name specified");
@@ -208,6 +218,8 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
 }
 
 bool ConsoleDriverMain::open_connection() {
+  if (silence_log_)
+    silent_log_.ensure_installed();
   if (has_fake_agent_channel()) {
     fake_agent_channel_ = ClientChannel::create();
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
