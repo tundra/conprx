@@ -24,6 +24,7 @@ public:
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_TRAMPOLINE_DECL__)
 #undef __EMIT_TRAMPOLINE_DECL__
+  virtual dword_t get_last_error() { return 0; }
 private:
   Vector<PatchRequest*> patches_;
 };

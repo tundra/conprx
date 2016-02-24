@@ -443,8 +443,8 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
   return result;
 }
 
+#include "confront-dummy.cc"
+
 #ifdef IS_MSVC
 #  include "confront-msvc.cc"
-#else
-#  include "confront-fallback.cc"
 #endif

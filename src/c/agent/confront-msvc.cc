@@ -14,6 +14,8 @@ public:
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
+
+  virtual dword_t get_last_error();
 };
 
 handle_t WindowsConsoleFrontend::get_std_handle(dword_t handle) {
@@ -33,10 +35,10 @@ bool_t WindowsConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return SetConsoleTitleA(str);
 }
 
-dword_t ConsoleFrontend::get_last_error() {
+dword_t WindowsConsoleFrontend::get_last_error() {
   return GetLastError();
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native(tclib::ClientChannel *fake_agent) {
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native() {
   return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) WindowsConsoleFrontend());
 }

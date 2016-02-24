@@ -186,7 +186,7 @@ private:
   def_ref_t<ClientChannel> fake_agent_channel_;
   // Returns the fake agent channel or NULL if there is none.
   ClientChannel *fake_agent_channel() { return *fake_agent_channel_; }
-  bool has_fake_agent_channel() { return !string_is_empty(fake_agent_channel_name_); }
+  bool use_fake_agent() { return !string_is_empty(fake_agent_channel_name_); }
   def_ref_t<ConsoleAgent> fake_agent_;
   ConsoleAgent *fake_agent() { return *fake_agent_; }
 };
@@ -220,7 +220,7 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
 bool ConsoleDriverMain::open_connection() {
   if (silence_log_)
     silent_log_.ensure_installed();
-  if (has_fake_agent_channel()) {
+  if (use_fake_agent()) {
     fake_agent_channel_ = ClientChannel::create();
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
       return false;
@@ -235,7 +235,7 @@ bool ConsoleDriverMain::open_connection() {
 }
 
 bool ConsoleDriverMain::install_fake_agent() {
-  if (!has_fake_agent_channel())
+  if (!use_fake_agent())
     // There is no fake agent so this trivially succeeds.
     return true;
   return fake_agent()->install_agent(fake_agent_channel()->in(),
@@ -246,13 +246,21 @@ bool ConsoleDriverMain::run() {
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleProxy::registry());
-  def_ref_t<ConsoleFrontend> console = ConsoleFrontend::new_native(fake_agent_channel());
+  def_ref_t<ConsoleFrontend> console;
+  if (use_fake_agent() || !kIsMsvc) {
+    console = ConsoleFrontend::new_dummy();
+  } else {
+    // The else-part shouldn't ever be run but we need the new_native part to
+    // not be present on non-msvc platforms because it hasn't been implemented
+    // there.
+    console = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>(NULL));
+  }
   ConsoleFrontendService driver(*console);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();
   channel()->out()->close();
-  if (has_fake_agent_channel())
+  if (use_fake_agent())
     fake_agent_channel()->out()->close();
   return result;
 }

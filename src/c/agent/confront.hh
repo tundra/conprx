@@ -154,7 +154,7 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
-  dword_t get_last_error();
+  virtual dword_t get_last_error() = 0;
 
   // A description of a console function.
   struct FunctionInfo {
@@ -162,13 +162,11 @@ public:
     int key;
   };
 
-  // Creates and returns a new instance of the native console frontend. The
-  // assume_agent_used flags indicates whether the frontend we'll return should
-  // assume there's an agent installed. This is for testing only -- a process
-  // should not have to be aware of whether there's an agent installed -- but
-  // because injection only really works on windows we need this flag for the
-  // other platforms.
-  static tclib::pass_def_ref_t<ConsoleFrontend> new_native(tclib::ClientChannel *fake_agent);
+  // Creates and returns a new instance of the native console frontend.
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_native();
+
+  // Creates and returns a new dummy console frontend.
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_dummy();
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();
