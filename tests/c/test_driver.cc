@@ -41,7 +41,7 @@ TEST(driver, simple) {
   DriverRequest call4 = driver.is_handle(100);
   ASSERT_TRUE(*call4 == Variant::no());
 
-  ASSERT_TRUE(driver.join());
+  ASSERT_TRUE(driver.join(NULL));
 }
 
 TEST(driver, get_std_handle) {
@@ -61,7 +61,7 @@ TEST(driver, get_std_handle) {
   DriverRequest gsh1000 = driver.get_std_handle(1000);
   ASSERT_FALSE(gsh1000->native_as<Handle>()->is_valid());
 
-  ASSERT_TRUE(driver.join());
+  ASSERT_TRUE(driver.join(NULL));
 }
 
 TEST(driver, get_console_title) {
@@ -78,7 +78,7 @@ TEST(driver, get_console_title) {
   DriverRequest tit1 = driver.get_console_title_a(1024);
   ASSERT_C_STREQ("Looky here!", tit1->string_chars());
 
-  ASSERT_TRUE(driver.join());
+  ASSERT_TRUE(driver.join(NULL));
 }
 
 TEST(driver, errors) {
@@ -90,5 +90,5 @@ TEST(driver, errors) {
   ASSERT_TRUE(err.is_rejected());
   ASSERT_EQ(1090, err.error().native_as<ConsoleError>()->last_error());
 
-  ASSERT_TRUE(driver.join());
+  ASSERT_TRUE(driver.join(NULL));
 }

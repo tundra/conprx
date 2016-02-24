@@ -115,7 +115,7 @@ protected:
 
 private:
   // Main entry-point for the agent monitor thread.
-  void *run_agent_monitor();
+  opaque_t run_agent_monitor();
 
   tclib::def_ref_t<tclib::ServerChannel> agent_channel_;
   tclib::NativeThread agent_monitor_;
@@ -157,15 +157,19 @@ public:
   bool connect();
 
   // Wait for the driver to terminate.
-  bool join();
+  bool join(int *exit_code_out);
 
   // When devutils are enabled, allows you to trace all the requests that go
   // through this manager.
   ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
-  // Notify this manager that it should install the console agent. Once enabled
-  // this can't be disabled.
-  bool set_agent_type(AgentType type);
+  // Sets the type of agent to use for this manager. Note that not all agents
+  // are supported on all platforms.
+  void set_agent_type(AgentType type);
+
+  // Overrides the default agent path (set via an env variable) with the given
+  // value.
+  void set_agent_path(utf8_t path) { agent_path_ = path; }
 
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
@@ -209,11 +213,14 @@ private:
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
 
+
   bool trace_;
+  utf8_t agent_path_;
+  utf8_t agent_path();
   AgentType agent_type_;
   AgentType agent_type() { return agent_type_; }
   static utf8_t executable_path();
-  static utf8_t agent_path();
+  static utf8_t default_agent_path();
 };
 
 } // namespace conprx

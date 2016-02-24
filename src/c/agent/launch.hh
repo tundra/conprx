@@ -62,6 +62,10 @@ public:
   // Wait for the process to exit, storing the exit code in the out param.
   virtual bool join(int *exit_code_out);
 
+  // Must be called by the concrete implementation at the time appropriate to
+  // them to resume the child process if it has been started suspended.
+  bool ensure_process_resumed();
+
 protected:
   // Override this to do any work that needs to be performed before the process
   // can be launched.
@@ -80,13 +84,14 @@ protected:
   // that one of them resumes the process using ensure_process_resumed.
   virtual bool use_agent() = 0;
 
-  // Must be called by the concrete implementation at the time appropriate to
-  // them to resume the child process if it has been started suspended.
-  bool ensure_process_resumed();
+  // Create the agent service and open the connection to the agent.
+  bool attach_agent_service();
+
+  bool abort_agent_service();
 
   // Loop around waiting for the agent to report to the owner service that
   // it's ready. Does nothing if the agent is already ready.
-  bool ensure_agent_ready();
+  bool ensure_agent_service_ready();
 
   // There are four streams in play here: the owner pair and the agent pair.
   // The owner in stream allows the owner to read what is written to the agent
@@ -145,6 +150,8 @@ protected:
   // other side of the connection ready to connect. We will also release the
   // process so the main program can start running.
   virtual bool complete_connect_to_agent();
+
+  opaque_t ensure_agent_ready_background();
 
   virtual bool use_agent() { return true; }
   virtual tclib::InStream *owner_in() { return up_.in(); }

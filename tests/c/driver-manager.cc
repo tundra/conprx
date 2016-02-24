@@ -17,21 +17,23 @@ using namespace tclib;
 
 DriverManager::DriverManager()
   : trace_(false)
+  , agent_path_(string_empty())
   , agent_type_(atNone) {
   channel_ = ServerChannel::create();
 }
 
-bool DriverManager::set_agent_type(AgentType type) {
+void DriverManager::set_agent_type(AgentType type) {
   if (!kSupportsRealAgent)
     CHECK_FALSE("real agent not supported", type == atReal);
   agent_type_ = type;
-  return true;
 }
 
-void *FakeAgentLauncher::run_agent_monitor() {
-  address_arith_t result = process_messages();
-  agent_monitor_done()->lower();
-  return reinterpret_cast<void*>(result);
+opaque_t FakeAgentLauncher::run_agent_monitor() {
+  if (!process_messages())
+    return b2o(false);
+  if (!agent_monitor_done()->lower())
+    return b2o(false);
+  return b2o(true);
 }
 
 Variant DriverRequest::echo(Variant value) {
@@ -185,11 +187,18 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
   return resp;
 }
 
-bool DriverManager::join() {
+bool DriverManager::join(int *exit_code_out) {
   if (!channel()->close())
     return false;
   int exit_code = 0;
-  return launcher()->join(&exit_code) && (exit_code == 0);
+  if (!launcher()->join(&exit_code))
+    return false;
+  if (exit_code_out == NULL) {
+    return exit_code == 0;
+  } else {
+    *exit_code_out = exit_code;
+    return true;
+  }
 }
 
 utf8_t DriverManager::executable_path() {
@@ -199,6 +208,10 @@ utf8_t DriverManager::executable_path() {
 }
 
 utf8_t DriverManager::agent_path() {
+  return string_is_empty(agent_path_) ? default_agent_path() : agent_path_;
+}
+
+utf8_t DriverManager::default_agent_path() {
   const char *result = getenv("AGENT");
   ASSERT_TRUE(result != NULL);
   return new_c_string(result);
@@ -214,7 +227,9 @@ bool FakeAgentLauncher::allocate() {
 }
 
 bool FakeAgentLauncher::start_connect_to_agent() {
-  return ensure_process_resumed() && agent_channel()->open();
+  return ensure_process_resumed()
+      && agent_channel()->open()
+      && attach_agent_service();
 }
 
 bool FakeAgentLauncher::connect_service() {
@@ -228,7 +243,11 @@ bool FakeAgentLauncher::connect_service() {
 bool FakeAgentLauncher::join(int *exit_code_out) {
   if (!agent_monitor_done()->pass())
     return false;
-  agent_monitor_.join();
+  opaque_t monitor_result = o0();
+  if (!agent_monitor_.join(&monitor_result))
+    return false;
+  if (!o2b(monitor_result))
+    return false;
   return Launcher::join(exit_code_out);
 }
 
