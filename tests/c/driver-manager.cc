@@ -20,7 +20,9 @@ DriverManager::DriverManager()
   : silence_log_(false)
   , trace_(false)
   , agent_path_(string_empty())
-  , agent_type_(atNone) {
+  , agent_type_(atNone)
+  , frontend_type_(dfDummy)
+  , impl_(NULL) {
   channel_ = ServerChannel::create();
 }
 
@@ -28,6 +30,14 @@ void DriverManager::set_agent_type(AgentType type) {
   if (!kSupportsRealAgent)
     CHECK_FALSE("real agent not supported", type == atReal);
   agent_type_ = type;
+}
+
+void DriverManager::set_frontend_type(DriverFrontendType type) {
+  if (!kIsMsvc)
+    CHECK_FALSE("native frontend not supported", type == dfNative);
+  if (agent_type_ != atFake)
+    CHECK_FALSE("simulating frontend requires fake agent", type == dfSimulating);
+  frontend_type_ = type;
 }
 
 opaque_t FakeAgentLauncher::run_agent_monitor() {
@@ -48,6 +58,10 @@ Variant DriverRequest::is_handle(Variant value) {
 
 Variant DriverRequest::raise_error(int64_t last_error) {
   return send("raise_error", last_error);
+}
+
+Variant DriverRequest::poke_backend(Variant value) {
+  return send("poke_backend", value);
 }
 
 Variant DriverRequest::get_std_handle(int64_t n_std_handle) {
@@ -145,6 +159,21 @@ bool DriverManager::start() {
       break;
     }
   }
+  if (impl_ != NULL)
+    launcher_->set_impl(impl_);
+  const char *frontend_type_name = NULL;
+  switch (frontend_type()) {
+    case dfNative:
+      frontend_type_name = "native";
+      break;
+    case dfDummy:
+      frontend_type_name = "dummy";
+      break;
+    case dfSimulating:
+      frontend_type_name = "simulating";
+      break;
+  }
+  builder.add_option("frontend-type", frontend_type_name);
   if (silence_log_)
     builder.add_option("silence-log", Variant::yes());
   B_TRY(launcher()->initialize());

@@ -144,6 +144,10 @@ public:
   // Install this agent.
   bool install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
 
+  // Send a request back to the owner and wait for a response.
+  bool send_request(plankton::rpc::OutgoingRequest *request,
+      plankton::rpc::IncomingResponse *response_out);
+
 protected:
   // Perform the platform-specific part of the agent installation.
   virtual bool install_agent_platform() = 0;

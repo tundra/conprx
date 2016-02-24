@@ -20,6 +20,16 @@ using plankton::rpc::StreamServiceConnector;
 
 class Launcher;
 
+// Virtual type, implementations of which can be used as the implementation of
+// a console.
+class ConsoleImpl {
+public:
+  virtual ~ConsoleImpl() { }
+
+  // Debug/test call.
+  virtual int64_t on_poke(int64_t value) = 0;
+};
+
 // The service the driver will call back to when it wants to access the manager.
 class AgentOwnerService : public plankton::rpc::Service {
 public:
@@ -32,6 +42,10 @@ private:
 
   // Called when the agent has completed its setup.
   void on_is_ready(plankton::rpc::RequestData&, ResponseCallback);
+
+  // For testing and debugging -- a call that doesn't do anything but is just
+  // passed through to the implementation.
+  void on_poke(plankton::rpc::RequestData&, ResponseCallback);
 
   Launcher *launcher_;
   Launcher *launcher() { return launcher_; }
@@ -65,6 +79,13 @@ public:
   // Must be called by the concrete implementation at the time appropriate to
   // them to resume the child process if it has been started suspended.
   bool ensure_process_resumed();
+
+  // Sets the implementation the owner agent will delegate calls to when it
+  // receives them from the agent.
+  void set_impl(ConsoleImpl *impl) { impl_ = impl; }
+
+  // Returns the custom implementation backing this launcher.
+  ConsoleImpl *impl() { return impl_; }
 
 protected:
   // Override this to do any work that needs to be performed before the process
@@ -124,6 +145,8 @@ private:
   StreamServiceConnector *agent() { return *agent_; }
   AgentOwnerService service_;
   AgentOwnerService *service() { return &service_; }
+
+  ConsoleImpl *impl_;
 };
 
 // A launcher that works by injecting the agent as a dll into the process.

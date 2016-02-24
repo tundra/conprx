@@ -20,6 +20,8 @@
 
 namespace conprx {
 
+class ConsoleBackend;
+
 #define GET_SIG_RET(RET, PARAMS, ARGS) RET
 #define GET_SIG_PARAMS(RET, PARAMS, ARGS) PARAMS
 #define GET_SIG_ARGS(RET, PARAMS, ARGS) ARGS
@@ -156,6 +158,8 @@ public:
 
   virtual dword_t get_last_error() = 0;
 
+  virtual int64_t poke_backend(int64_t value) { return 0; }
+
   // A description of a console function.
   struct FunctionInfo {
     cstr_t name;
@@ -167,6 +171,10 @@ public:
 
   // Creates and returns a new dummy console frontend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_dummy();
+
+  // Returns a new simulating console frontend that simulates interaction with
+  // the given backend.
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(ConsoleBackend *backend);
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();

@@ -18,24 +18,29 @@
 
 namespace conprx {
 
+class ConsoleAgent;
+
 // Abstract console backend type.
 class ConsoleBackend : public tclib::DefaultDestructable {
 public:
   virtual ~ConsoleBackend() { }
 
-  virtual bool set_title(void *title, dword_t length, bool is_unicode) = 0;
-
-  virtual void handle_call() = 0;
+  // Send a debug/test poke to this backend.
+  virtual int64_t poke(int64_t value) = 0;
 };
 
-// Concrete console backend that that is backed by a remote service over
-// plankton rpc
+// Concrete console backend that that is backed by a remote agent.
 class RemoteConsoleBackend : public ConsoleBackend {
 public:
-  RemoteConsoleBackend(tclib::InStream *in, tclib::OutStream *out);
+  RemoteConsoleBackend(ConsoleAgent *agent) : agent_(agent) { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  virtual int64_t poke(int64_t value);
 
-public:
-  plankton::rpc::StreamServiceConnector connector_;
+  static tclib::pass_def_ref_t<ConsoleBackend> create(ConsoleAgent *agent);
+
+private:
+  ConsoleAgent *agent_;
+  ConsoleAgent *agent() { return agent_; }
 };
 
 } // conprx

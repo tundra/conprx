@@ -43,3 +43,35 @@ TEST(agent, inject_fail) {
   ASSERT_TRUE(driver.join(&exit_code));
   ASSERT_EQ(1, exit_code);
 }
+
+class PokeCounter : public ConsoleImpl {
+public:
+  PokeCounter()  : poke_count(0) { }
+  virtual int64_t on_poke(int64_t value);
+  size_t poke_count;
+};
+
+int64_t PokeCounter::on_poke(int64_t value) {
+  poke_count++;
+  return value + 257;
+}
+
+TEST(agent, simulate_rountrip) {
+  DriverManager driver;
+  driver.set_agent_type(DriverManager::atFake);
+  driver.set_frontend_type(dfSimulating);
+  PokeCounter counter;
+  driver.set_impl(&counter);
+  ASSERT_TRUE(driver.start());
+  ASSERT_TRUE(driver.connect());
+
+  ASSERT_EQ(0, counter.poke_count);
+  DriverRequest poke0 = driver.poke_backend(4212);
+  ASSERT_EQ(4212 + 257, poke0->integer_value());
+  ASSERT_EQ(1, counter.poke_count);
+  DriverRequest poke1 = driver.poke_backend(5457);
+  ASSERT_EQ(5457 + 257, poke1->integer_value());
+  ASSERT_EQ(2, counter.poke_count);
+
+  ASSERT_TRUE(driver.join(NULL));
+}

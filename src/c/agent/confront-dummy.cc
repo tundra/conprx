@@ -42,9 +42,9 @@ DummyConsoleFrontend::~DummyConsoleFrontend() {
 }
 
 handle_t DummyConsoleFrontend::get_std_handle(dword_t n_std_handle) {
-  address_arith_t result = (-12UL <= n_std_handle && n_std_handle <= -10UL)
+  ssize_t result = (-12UL <= n_std_handle && n_std_handle <= -10UL)
       ? n_std_handle + 18
-      : -1;
+      : IF_32_BIT(-1, -1LL);
   return reinterpret_cast<handle_t>(result);
 }
 

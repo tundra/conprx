@@ -19,7 +19,18 @@ namespace conprx {
 #define FOR_EACH_REMOTE_MESSAGE(F)                                             \
   F(echo,               (Variant value),        (value))                       \
   F(is_handle,          (Variant value),        (value))                       \
-  F(raise_error,        (int64_t last_error),   (last_error))
+  F(raise_error,        (int64_t last_error),   (last_error))                  \
+  F(poke_backend,       (Variant value),        (value))
+
+enum DriverFrontendType {
+  // The native frontend on this platform; only works on windows obviously.
+  dfNative,
+  // Dummy frontend that keeps everything in memory.
+  dfDummy,
+  // Simulating frontend that interacts through the backend. Requires the fake
+  // agent to be present to simulate through.
+  dfSimulating
+};
 
 // Utilities that don't fit anywhere else.
 class ConsoleProxy {

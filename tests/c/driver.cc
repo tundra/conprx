@@ -4,6 +4,7 @@
 #include "driver.hh"
 
 #include "agent/agent.hh"
+#include "agent/conback.hh"
 #include "agent/confront.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
@@ -72,6 +73,12 @@ void ConsoleFrontendService::raise_error(rpc::RequestData &data, ResponseCallbac
   Factory *factory = data.factory();
   ConsoleError *error = new (factory) ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
+}
+
+void ConsoleFrontendService::poke_backend(rpc::RequestData &data, ResponseCallback callback) {
+  int64_t value = data[0].integer_value();
+  int64_t result = frontend()->poke_backend(value);
+  callback(rpc::OutgoingResponse::success(result));
 }
 
 void ConsoleFrontendService::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
@@ -180,6 +187,8 @@ private:
   def_ref_t<ClientChannel> channel_;
   ClientChannel *channel() { return *channel_; }
 
+  DriverFrontendType frontend_type_;
+
   // If we're faking an agent this is the channel the fake agent will be using.
   // This is only for testing.
   utf8_t fake_agent_channel_name_;
@@ -194,6 +203,7 @@ private:
 ConsoleDriverMain::ConsoleDriverMain()
   : silence_log_(false)
   , channel_name_(string_empty())
+  , frontend_type_(dfDummy)
   , fake_agent_channel_name_(string_empty()) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
@@ -204,16 +214,27 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
         error->offender());
     return false;
   }
+
   silence_log_ = cmdline->option("silence-log").bool_value();
+
   const char *channel = cmdline->option("channel").string_chars();
   if (channel == NULL) {
     LOG_ERROR("No channel name specified");
     return false;
   }
   channel_name_ = new_c_string(channel);
+
   const char *fake_agent_channel = cmdline->option("fake-agent-channel").string_chars();
   if (fake_agent_channel != NULL)
     fake_agent_channel_name_ = new_c_string(fake_agent_channel);
+
+  Variant frontend_type = cmdline->option("frontend-type");
+  if (frontend_type == Variant::string("native"))
+    frontend_type_ = dfNative;
+  else if (frontend_type == Variant::string("dummy"))
+    frontend_type_ = dfDummy;
+  else if (frontend_type == Variant::string("simulating"))
+    frontend_type_ = dfSimulating;
   return true;
 }
 
@@ -246,16 +267,26 @@ bool ConsoleDriverMain::run() {
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleProxy::registry());
-  def_ref_t<ConsoleFrontend> console;
-  if (use_fake_agent() || !kIsMsvc) {
-    console = ConsoleFrontend::new_dummy();
-  } else {
-    // The else-part shouldn't ever be run but we need the new_native part to
-    // not be present on non-msvc platforms because it hasn't been implemented
-    // there.
-    console = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>(NULL));
+  def_ref_t<ConsoleFrontend> frontend;
+  def_ref_t<ConsoleBackend> backend;
+  switch (frontend_type_) {
+    case dfNative:
+      CHECK_TRUE("native frontend not supported", kIsMsvc);
+      // The else-part shouldn't ever be run but we need the new_native part to
+      // not be present on non-msvc platforms because it hasn't been implemented
+      // there.
+      frontend = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>(NULL));
+      break;
+    case dfDummy:
+      frontend = ConsoleFrontend::new_dummy();
+      break;
+    case dfSimulating:
+      CHECK_TRUE("fake agent required", use_fake_agent());
+      backend = RemoteConsoleBackend::create(fake_agent());
+      frontend = ConsoleFrontend::new_simulating(*backend);
+      break;
   }
-  ConsoleFrontendService driver(*console);
+  ConsoleFrontendService driver(*frontend);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();

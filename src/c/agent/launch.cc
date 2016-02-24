@@ -19,6 +19,7 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
   : launcher_(launcher) {
   register_method("log", new_callback(&AgentOwnerService::on_log, this));
   register_method("is_ready", new_callback(&AgentOwnerService::on_is_ready, this));
+  register_method("poke", new_callback(&AgentOwnerService::on_poke, this));
 }
 
 void AgentOwnerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
@@ -33,10 +34,18 @@ void AgentOwnerService::on_is_ready(rpc::RequestData& data, ResponseCallback res
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
 
+void AgentOwnerService::on_poke(rpc::RequestData& data, ResponseCallback resp) {
+  int64_t value = data[0].integer_value();
+  int64_t result = launcher()->impl()->on_poke(value);
+  resp(rpc::OutgoingResponse::success(result));
+}
+
+
 Launcher::Launcher()
   : agent_is_ready_(Drawbridge::dsRaised)
   , state_(lsConstructed)
-  , service_(this) {
+  , service_(this)
+  , impl_(NULL) {
   process_.set_flags(pfStartSuspendedOnWindows);
 }
 

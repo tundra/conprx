@@ -167,6 +167,10 @@ public:
   // are supported on all platforms.
   void set_agent_type(AgentType type);
 
+  // Sets the frontend type the driver should use. This setter is sanity checked
+  // against the agent type so you need to set the agent type first.
+  void set_frontend_type(DriverFrontendType type);
+
   // Overrides the default agent path (set via an env variable) with the given
   // value.
   void set_agent_path(utf8_t path) { agent_path_ = path; }
@@ -181,6 +185,9 @@ public:
   DriverRequest new_request() { return DriverRequest(this); }
 
   Launcher *operator->() { return launcher(); }
+
+  // Sets the impl to eventually pass to the launcher once it's been created.
+  void set_impl(ConsoleImpl *impl) { impl_ = impl; }
 
   // Constant that's true when the real agent can work.
   static const bool kSupportsRealAgent = kIsMsvc && !kIsDebugCodegen;
@@ -223,6 +230,10 @@ private:
   utf8_t agent_path();
   AgentType agent_type_;
   AgentType agent_type() { return agent_type_; }
+  DriverFrontendType frontend_type_;
+  DriverFrontendType frontend_type() { return frontend_type_; }
+  ConsoleImpl *impl_;
+
   static utf8_t executable_path();
   static utf8_t default_agent_path();
 };

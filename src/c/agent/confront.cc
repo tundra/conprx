@@ -445,6 +445,8 @@ bool_t LoggingConsole::write_console_output_w(handle_t console_output,
 
 #include "confront-dummy.cc"
 
+#include "confront-simul.cc"
+
 #ifdef IS_MSVC
 #  include "confront-msvc.cc"
 #endif

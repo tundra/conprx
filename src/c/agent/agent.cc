@@ -94,14 +94,18 @@ bool ConsoleAgent::install_agent(tclib::InStream *agent_in,
 
 bool ConsoleAgent::send_is_ready() {
   rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
-  rpc::IncomingResponse resp = owner()->socket()->send_request(&req);
+  rpc::IncomingResponse resp;
+  return send_request(&req, &resp);
+}
+
+bool ConsoleAgent::send_request(rpc::OutgoingRequest *request,
+    rpc::IncomingResponse *resp_out) {
+  rpc::IncomingResponse resp = owner()->socket()->send_request(request);
   while (!resp->is_settled()) {
-    if (!owner()->input()->process_next_instruction(NULL)) {
-      // We reached an error or EOF before the owner responded.
-      WARN("Owner not ready");
+    if (!owner()->input()->process_next_instruction(NULL))
       return false;
-    }
   }
+  *resp_out = resp;
   return true;
 }
 
