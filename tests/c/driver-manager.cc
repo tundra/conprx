@@ -7,8 +7,9 @@
 
 
 BEGIN_C_INCLUDES
-#include "utils/string-inl.h"
 #include "utils/strbuf.h"
+#include "utils/string-inl.h"
+#include "utils/trybool.h"
 END_C_INCLUDES
 
 using namespace conprx;
@@ -126,8 +127,7 @@ void CommandLineBuilder::add_option(Variant key, Variant value) {
 
 bool DriverManager::start() {
   CommandLineBuilder builder;
-  if (!channel()->allocate())
-    return false;
+  B_TRY(channel()->allocate());
   builder.add_option("channel", channel()->name().chars);
   switch (agent_type()) {
     case atNone:
@@ -138,23 +138,20 @@ bool DriverManager::start() {
       break;
     case atFake: {
       FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
-      if (!launcher->allocate())
-        return false;
+      B_TRY(launcher->allocate());
       builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
       launcher_ = launcher;
       break;
     }
   }
-  if (!launcher()->initialize())
-    return false;
+  B_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
   return launcher()->start(exec, 1, &args);
 }
 
 bool DriverManager::connect() {
-  if (!channel()->open())
-    return false;
+  B_TRY(channel()->open());
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
   connector_->set_default_type_registry(ConsoleProxy::registry());
@@ -188,11 +185,9 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
 }
 
 bool DriverManager::join(int *exit_code_out) {
-  if (!channel()->close())
-    return false;
+  B_TRY(channel()->close());
   int exit_code = 0;
-  if (!launcher()->join(&exit_code))
-    return false;
+  B_TRY(launcher()->join(&exit_code));
   if (exit_code_out == NULL) {
     return exit_code == 0;
   } else {
@@ -223,29 +218,29 @@ FakeAgentLauncher::FakeAgentLauncher()
 }
 
 bool FakeAgentLauncher::allocate() {
-  return agent_monitor_done()->initialize() && agent_channel()->allocate();
+  B_TRY(agent_monitor_done()->initialize());
+  B_TRY(agent_channel()->allocate());
+  return true;
 }
 
 bool FakeAgentLauncher::start_connect_to_agent() {
-  return ensure_process_resumed()
-      && agent_channel()->open()
-      && attach_agent_service();
+  B_TRY(ensure_process_resumed());
+  B_TRY(agent_channel()->open());
+  B_TRY(attach_agent_service());
+  return true;
 }
 
 bool FakeAgentLauncher::connect_service() {
-  if (!Launcher::connect_service())
-    return false;
+  B_TRY(Launcher::connect_service());
   agent_monitor_.set_callback(new_callback(&FakeAgentLauncher::run_agent_monitor,
       this));
   return agent_monitor_.start();
 }
 
 bool FakeAgentLauncher::join(int *exit_code_out) {
-  if (!agent_monitor_done()->pass())
-    return false;
+  B_TRY(agent_monitor_done()->pass());
   opaque_t monitor_result = o0();
-  if (!agent_monitor_.join(&monitor_result))
-    return false;
+  B_TRY(agent_monitor_.join(&monitor_result));
   if (!o2b(monitor_result))
     return false;
   return Launcher::join(exit_code_out);

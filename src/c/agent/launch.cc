@@ -88,8 +88,6 @@ bool InjectingLauncher::complete_connect_to_agent() {
   B_TRY(connector.join(&ready));
   B_TRY(o2b(ready));
   B_TRY(injected);
-  if (!injected)
-    return false;
   B_TRY(ensure_process_resumed());
   return true;
 }
@@ -128,12 +126,10 @@ bool Launcher::start(utf8_t command, size_t argc, utf8_t *argv) {
 
 bool Launcher::connect_agent() {
   // Start connecting but don't block.
-  if (!start_connect_to_agent())
-    return false;
+  B_TRY(start_connect_to_agent());
 
   // Wait for the agent to finish connecting.
-  if (!complete_connect_to_agent())
-    return false;
+  B_TRY(complete_connect_to_agent());
 
   return ensure_agent_service_ready();
 }
@@ -148,14 +144,14 @@ bool Launcher::attach_agent_service() {
 }
 
 bool Launcher::abort_agent_service() {
-  return owner_in()->close() && owner_out()->close();
+  B_TRY(owner_in()->close());
+  B_TRY(owner_out()->close());
+  return true;
 }
 
 bool Launcher::ensure_agent_service_ready() {
-  while (!agent_is_ready_) {
-    if (!agent()->input()->process_next_instruction(NULL))
-      return false;
-  }
+  while (!agent_is_ready_)
+    B_TRY(agent()->input()->process_next_instruction(NULL));
   return true;
 }
 
@@ -176,8 +172,8 @@ bool Launcher::process_messages() {
 
 bool Launcher::join(int *exit_code_out) {
   if (use_agent()) {
-    if (!owner_in()->close() || !owner_out()->close())
-      return false;
+    B_TRY(owner_in()->close());
+    B_TRY(owner_out()->close());
   }
   ProcessWaitIop wait(&process_, o0());
   if (!wait.execute()) {
