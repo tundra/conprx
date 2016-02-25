@@ -30,7 +30,7 @@ MULTITEST(agent, simple, bool, ("fake", true), ("real", false)) {
 
 TEST(agent, inject_fail) {
   if (!DriverManager::kSupportsRealAgent)
-    SKIP_TEST("requires dll injection");
+    SKIP_TEST("requires real agent");
   DriverManager driver;
   driver.set_agent_type(DriverManager::atReal);
   driver.set_agent_path(new_c_string("flip-flap-foobeliboo"));
@@ -72,6 +72,20 @@ TEST(agent, simulate_rountrip) {
   DriverRequest poke1 = driver.poke_backend(5457);
   ASSERT_EQ(5457 + 257, poke1->integer_value());
   ASSERT_EQ(2, counter.poke_count);
+
+  ASSERT_TRUE(driver.join(NULL));
+}
+
+TEST(agent, native_roundtrip) {
+  if (!DriverManager::kSupportsRealAgent)
+    SKIP_TEST("requires real agent");
+  DriverManager driver;
+  driver.set_agent_type(DriverManager::atReal);
+  driver.set_frontend_type(dfNative);
+  ASSERT_TRUE(driver.start());
+  ASSERT_TRUE(driver.connect());
+
+
 
   ASSERT_TRUE(driver.join(NULL));
 }

@@ -37,15 +37,27 @@ public:
   static WindowsConsoleAgent *get() { return instance_; }
 
 private:
+  static ntstatus_t NTAPI nt_request_wait_reply_port_bridge(handle_t port_handle,
+      lpc_message_t *request, lpc_message_t *incoming_reply);
+
+  ntstatus_t NTAPI nt_request_wait_reply_port(handle_t port_handle,
+      lpc_message_t *request, lpc_message_t *incoming_reply);
+
   def_ref_t<InStream> agent_in_;
   InStream *agent_in() { return *agent_in_; }
   def_ref_t<OutStream> agent_out_;
   OutStream *agent_out() { return *agent_out_; }
 
+  PatchRequest *rwrp_patch() { return &rwrp_patch_; }
+  PatchRequest rwrp_patch_;
+  PatchSet *patches() { return &patches_; }
+  PatchSet patches_;
+
   // A list of executable names we refuse to patch.
   static const size_t kBlacklistSize = 4;
   static cstr_t kBlacklist[kBlacklistSize];
 
+  static WindowsConsoleAgent *instance() { return instance_; }
   static WindowsConsoleAgent *instance_;
 };
 
@@ -62,7 +74,9 @@ cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
     TEXT("regedit.exe")
 };
 
-WindowsConsoleAgent::WindowsConsoleAgent() { }
+WindowsConsoleAgent::WindowsConsoleAgent()
+  : patches_(Platform::get(), Vector<PatchRequest>(&rwrp_patch_, 1)) {
+}
 
 bool WindowsConsoleAgent::dll_process_attach() {
   instance_ = new WindowsConsoleAgent();
@@ -75,8 +89,30 @@ bool WindowsConsoleAgent::dll_process_detach() {
   return true;
 }
 
+ntstatus_t WindowsConsoleAgent::nt_request_wait_reply_port_bridge(handle_t port_handle,
+      lpc_message_t *request, lpc_message_t *incoming_reply) {
+  return instance()->nt_request_wait_reply_port(port_handle, request, incoming_reply);
+}
+
+ntstatus_t WindowsConsoleAgent::nt_request_wait_reply_port(handle_t port_handle,
+      lpc_message_t *request, lpc_message_t *incoming_reply) {
+  return (rwrp_patch()->get_imposter(nt_request_wait_reply_port_bridge))(port_handle, request, incoming_reply);
+}
+
 fat_bool_t WindowsConsoleAgent::install_agent_platform() {
-  return F_TRUE;
+  module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+  if (ntdll == NULL) {
+    WARN("GetModuleHandle(ntdll.dll): %i", GetLastError());
+    return F_FALSE;
+  }
+  address_t rwrp_orig = Code::upcast(GetProcAddress(ntdll, "NtRequestWaitReplyPort"));
+  if (rwrp_orig == NULL) {
+    WARN("GetProcAddress(-, NtRequestWaitReplyPort): %i", GetLastError());
+    return F_FALSE;
+  }
+  address_t rprw_repl = Code::upcast(nt_request_wait_reply_port_bridge);
+  rwrp_patch_ = PatchRequest(rwrp_orig, rprw_repl);
+  return patches()->apply() ? F_TRUE : F_FALSE;
 }
 
 bool WindowsConsoleAgent::is_process_hard_blacklisted() {
