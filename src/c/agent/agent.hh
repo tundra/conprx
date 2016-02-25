@@ -73,6 +73,7 @@
 #include "confront.hh"
 #include "io/stream.hh"
 #include "rpc.hh"
+#include "utils/fatbool.hh"
 #include "utils/log.hh"
 #include "utils/types.hh"
 
@@ -129,7 +130,8 @@ public:
   // Install the given console instead of the built-in one. Returns true on
   // success. If this succeeds the output parameter will hold another console
   // which can be called to get the original console behavior.
-  static bool install(Options &options, ConsoleFrontend &console, ConsoleFrontend **original_out);
+  static fat_bool_t install(Options &options, ConsoleFrontend &console,
+      ConsoleFrontend **original_out);
 
   static const int32_t kConnectDataMagic = 0xFABACAEA;
 
@@ -142,7 +144,7 @@ public:
   static const int cSuccess = 0x0;
 
   // Install this agent.
-  bool install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
+  fat_bool_t install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
 
   // Send a request back to the owner and wait for a response.
   bool send_request(plankton::rpc::OutgoingRequest *request,
@@ -150,7 +152,7 @@ public:
 
 protected:
   // Perform the platform-specific part of the agent installation.
-  virtual bool install_agent_platform() = 0;
+  virtual fat_bool_t install_agent_platform() = 0;
 
 private:
   // Send the is-ready message to the owner.

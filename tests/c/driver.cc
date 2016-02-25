@@ -146,7 +146,7 @@ class FakeConsoleAgent : public ConsoleAgent {
 public:
   FakeConsoleAgent() { }
   virtual void default_destroy() { default_delete_concrete(this); }
-  virtual bool install_agent_platform() { return true; }
+  virtual fat_bool_t install_agent_platform() { return F_TRUE; }
 };
 
 // A log that ignores everything.

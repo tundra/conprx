@@ -79,17 +79,16 @@ bool StreamingLog::record(log_entry_t *entry) {
   return propagate(entry);
 }
 
-bool ConsoleAgent::install_agent(tclib::InStream *agent_in,
+fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
     tclib::OutStream *agent_out) {
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
   if (!owner()->init(empty_callback()))
-    return false;
+    return F_FALSE;
   log()->set_destination(owner());
   log()->ensure_installed();
-  if (!install_agent_platform())
-    return false;
+  F_TRY(install_agent_platform());
   send_is_ready();
-  return true;
+  return F_TRUE;
 }
 
 bool ConsoleAgent::send_is_ready() {
@@ -109,13 +108,14 @@ bool ConsoleAgent::send_request(rpc::OutgoingRequest *request,
   return true;
 }
 
-bool ConsoleAgent::install(Options &options, ConsoleFrontend &delegate, ConsoleFrontend **original_out) {
+fat_bool_t ConsoleAgent::install(Options &options, ConsoleFrontend &delegate,
+    ConsoleFrontend **original_out) {
   LOG_DEBUG("Installing agent");
   // Get and initialize the platform.
   LOG_DEBUG("Initializing platform");
   Platform &platform = Platform::get();
   if (!platform.ensure_initialized())
-    return false;
+    return F_FALSE;
 
   LOG_DEBUG("Creating patch requests");
   // Identify the set of functions we're going to patch. Some of them may not
@@ -150,13 +150,13 @@ bool ConsoleAgent::install(Options &options, ConsoleFrontend &delegate, ConsoleF
   // Create a patch set and apply it.
   PatchSet patches(platform, requests);
   if (!patches.apply())
-    return false;
+    return F_FALSE;
 
   *original_out = new OriginalConsole(Vector<PatchRequest*>(key_to_request,
       ConsoleFrontend::kFunctionCount));
 
   LOG_DEBUG("Successfully installed agent");
-  return true;
+  return F_TRUE;
 }
 
 // Expands to a bridge for each api function that calls the object stored in

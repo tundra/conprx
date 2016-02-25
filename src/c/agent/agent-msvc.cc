@@ -30,9 +30,9 @@ public:
 
   static bool dll_process_detach();
 
-  virtual bool install_agent_platform();
+  virtual fat_bool_t install_agent_platform();
 
-  int connect(blob_t data_in, blob_t data_out);
+  fat_bool_t connect(blob_t data_in, blob_t data_out, int *last_error_out);
 
   static WindowsConsoleAgent *get() { return instance_; }
 
@@ -75,8 +75,8 @@ bool WindowsConsoleAgent::dll_process_detach() {
   return true;
 }
 
-bool WindowsConsoleAgent::install_agent_platform() {
-  return true;
+fat_bool_t WindowsConsoleAgent::install_agent_platform() {
+  return F_TRUE;
 }
 
 bool WindowsConsoleAgent::is_process_hard_blacklisted() {
@@ -102,34 +102,41 @@ bool WindowsConsoleAgent::is_process_hard_blacklisted() {
   return false;
 }
 
-int WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out) {
+fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
+    int *last_error_out) {
   // Validate that the input data looks sane.
   if (data_in.size < sizeof(connect_data_t))
-    return cInvalidConnectDataSize;
+    return F_FALSE;
   connect_data_t *connect_data = static_cast<connect_data_t*>(data_in.start);
   if (connect_data->magic != kConnectDataMagic)
-    return cInvalidConnectDataMagic;
+    return F_FALSE;
 
   // Create a connection to the parent process so we can pass back error and
   // status messages.
   handle_t parent_process = OpenProcess(PROCESS_DUP_HANDLE, false,
       connect_data->parent_process_id);
-  if (parent_process == NULL)
-    return cFailedToOpenParentProcess + GetLastError();
+  if (parent_process == NULL) {
+    *last_error_out = GetLastError();
+    return F_FALSE;
+  }
 
   handle_t agent_in_handle = INVALID_HANDLE_VALUE;
   if (!DuplicateHandle(parent_process, connect_data->agent_in_handle,
-      GetCurrentProcess(), &agent_in_handle, GENERIC_READ, false, 0))
-    return cFailedToDuplicateOwnerIn + GetLastError();
+      GetCurrentProcess(), &agent_in_handle, GENERIC_READ, false, 0)) {
+    *last_error_out = GetLastError();
+    return F_FALSE;
+  }
   agent_in_ = tclib::InOutStream::from_raw_handle(agent_in_handle);
 
   handle_t agent_out_handle = INVALID_HANDLE_VALUE;
   if (!DuplicateHandle(parent_process, connect_data->agent_out_handle,
-      GetCurrentProcess(), &agent_out_handle, GENERIC_WRITE, false, 0))
-    return cFailedToDuplicateOwnerOut + GetLastError();
+      GetCurrentProcess(), &agent_out_handle, GENERIC_WRITE, false, 0)) {
+    *last_error_out = GetLastError();
+    return F_FALSE;
+  }
   agent_out_ = tclib::InOutStream::from_raw_handle(agent_out_handle);
 
-  return install_agent(agent_in(), agent_out()) ? cSuccess : cInstallationFailed;
+  return install_agent(agent_in(), agent_out());
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {
@@ -193,5 +200,10 @@ bool APIENTRY DllMain(module_t module, dword_t reason, void *) {
 }
 
 CONNECTOR_IMPL(ConprxAgentConnect, data_in, data_out) {
-  return WindowsConsoleAgent::get()->connect(data_in, data_out);
+  int last_error = 0;
+  fat_bool_t result = WindowsConsoleAgent::get()->connect(data_in, data_out,
+      &last_error);
+  return result
+      ? CONNECT_SUCCEEDED_RESULT()
+      : CONNECT_FAILED_RESULT(result.file_id(), result.line(), last_error);
 }
