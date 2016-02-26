@@ -9,36 +9,36 @@ using namespace conprx;
 
 class WindowsMemoryManager : public MemoryManager {
 public:
-  virtual bool open_for_writing(tclib::Blob region,
+  virtual fat_bool_t open_for_writing(tclib::Blob region,
       standalone_dword_t *old_perms);
-  virtual bool close_for_writing(tclib::Blob region,
+  virtual fat_bool_t close_for_writing(tclib::Blob region,
       standalone_dword_t old_perms);
   virtual tclib::Blob alloc_executable(address_t addr, size_t size);
   virtual bool free_block(tclib::Blob block);
 };
 
-bool WindowsMemoryManager::open_for_writing(tclib::Blob region,
+fat_bool_t WindowsMemoryManager::open_for_writing(tclib::Blob region,
     standalone_dword_t *old_perms) {
   dword_t temp_old_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), PAGE_EXECUTE_READWRITE,
       &temp_old_perms);
   if (!result) {
     LOG_ERROR("VirtualProtect(PAGE_EXECUTE_READWRITE) failed: %i", GetLastError());
-    return false;
+    return F_FALSE;
   }
   *old_perms = temp_old_perms;
-  return true;
+  return F_TRUE;
 }
 
-bool WindowsMemoryManager::close_for_writing(tclib::Blob region,
+fat_bool_t WindowsMemoryManager::close_for_writing(tclib::Blob region,
     standalone_dword_t old_perms) {
   dword_t dummy_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), old_perms, &dummy_perms);
   if (!result) {
     LOG_ERROR("VirtualProtect(%i) failed: %i", old_perms, GetLastError());
-    return false;
+    return F_FALSE;
   }
-  return true;
+  return F_TRUE;
 }
 
 tclib::Blob WindowsMemoryManager::alloc_executable(address_t addr, size_t size) {

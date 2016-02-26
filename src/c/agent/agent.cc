@@ -91,21 +91,19 @@ fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
   return F_TRUE;
 }
 
-bool ConsoleAgent::send_is_ready() {
+fat_bool_t ConsoleAgent::send_is_ready() {
   rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
   rpc::IncomingResponse resp;
   return send_request(&req, &resp);
 }
 
-bool ConsoleAgent::send_request(rpc::OutgoingRequest *request,
+fat_bool_t ConsoleAgent::send_request(rpc::OutgoingRequest *request,
     rpc::IncomingResponse *resp_out) {
   rpc::IncomingResponse resp = owner()->socket()->send_request(request);
-  while (!resp->is_settled()) {
-    if (!owner()->input()->process_next_instruction(NULL))
-      return false;
-  }
+  while (!resp->is_settled())
+    F_TRY(owner()->input()->process_next_instruction(NULL));
   *resp_out = resp;
-  return true;
+  return F_TRUE;
 }
 
 fat_bool_t ConsoleAgent::install(Options &options, ConsoleFrontend &delegate,

@@ -23,8 +23,8 @@ public:
   // Yields the appropriate disassembler for this architecture.
   virtual Disassembler *disassembler() = 0;
 
-  virtual tclib::pass_def_ref_t<Redirection> prepare_patch(address_t original,
-      address_t replacement, PreambleInfo *info_out);
+  virtual fat_bool_t prepare_patch(address_t original, address_t replacement,
+        tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info_out);
 
   // Returns the ideal preamble size to try to make available. What actually
   // gets patched may be different, either because not enough preamble is
@@ -51,8 +51,8 @@ protected:
   // destination.
   static size_t write_relative_jump_32(address_t code, address_t dest);
 
-  virtual tclib::pass_def_ref_t<Redirection> create_redirection(address_t original,
-      address_t replacement, PreambleInfo *info) = 0;
+  virtual fat_bool_t create_redirection(address_t original, address_t replacement,
+      tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info) = 0;
 };
 
 } // namespace conprx

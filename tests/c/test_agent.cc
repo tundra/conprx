@@ -19,13 +19,13 @@ MULTITEST(agent, simple, bool, ("fake", true), ("real", false)) {
     SKIP_TEST(kIsMsvc ? "debug codegen" : "msvc only");
   DriverManager driver;
   driver.set_agent_type(use_fake ? DriverManager::atFake : DriverManager::atReal);
-  ASSERT_TRUE(driver.start());
-  ASSERT_TRUE(driver.connect());
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
 
   DriverRequest echo0 = driver.echo(5436);
   ASSERT_EQ(5436, echo0->integer_value());
 
-  ASSERT_TRUE(driver.join(NULL));
+  ASSERT_F_TRUE(driver.join(NULL));
 }
 
 TEST(agent, inject_fail) {
@@ -38,9 +38,9 @@ TEST(agent, inject_fail) {
   log_o *old_log = silence_global_log();
   ASSERT_FALSE(driver.start());
   set_global_log(old_log);
-  ASSERT_TRUE(driver->ensure_process_resumed());
+  ASSERT_F_TRUE(driver->ensure_process_resumed());
   int exit_code = 0;
-  ASSERT_TRUE(driver.join(&exit_code));
+  ASSERT_F_TRUE(driver.join(&exit_code));
   ASSERT_EQ(1, exit_code);
 }
 
@@ -62,8 +62,8 @@ TEST(agent, simulate_rountrip) {
   driver.set_frontend_type(dfSimulating);
   PokeCounter counter;
   driver.set_impl(&counter);
-  ASSERT_TRUE(driver.start());
-  ASSERT_TRUE(driver.connect());
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
 
   ASSERT_EQ(0, counter.poke_count);
   DriverRequest poke0 = driver.poke_backend(4212);
@@ -73,7 +73,7 @@ TEST(agent, simulate_rountrip) {
   ASSERT_EQ(5457 + 257, poke1->integer_value());
   ASSERT_EQ(2, counter.poke_count);
 
-  ASSERT_TRUE(driver.join(NULL));
+  ASSERT_F_TRUE(driver.join(NULL));
 }
 
 TEST(agent, native_roundtrip) {
@@ -82,10 +82,7 @@ TEST(agent, native_roundtrip) {
   DriverManager driver;
   driver.set_agent_type(DriverManager::atReal);
   driver.set_frontend_type(dfNative);
-  ASSERT_TRUE(driver.start());
-  ASSERT_TRUE(driver.connect());
-
-
-
-  ASSERT_TRUE(driver.join(NULL));
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+  ASSERT_F_TRUE(driver.join(NULL));
 }

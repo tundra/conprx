@@ -8,6 +8,7 @@
 #include "sync/pipe.hh"
 #include "sync/process.hh"
 #include "sync/thread.hh"
+#include "utils/fatbool.hh"
 
 namespace conprx {
 
@@ -59,26 +60,26 @@ public:
 
   // Initialize this launcher's resources but don't actually launch anything.
   // Won't block.
-  virtual bool initialize();
+  virtual fat_bool_t initialize();
 
   // Start the process running and wait for it to be brought up, but don't
   // connect the agent owner service.
-  bool start(utf8_t command, size_t argc, utf8_t *argv);
+  fat_bool_t start(utf8_t command, size_t argc, utf8_t *argv);
 
   // Connect the agent owner service and wait for the agent to report back that
   // it's ready. Subtypes can override this to perform additional work before
   // and/or after.
-  virtual bool connect_service();
+  virtual fat_bool_t connect_service();
 
   // Run the agent owner service.
-  bool process_messages();
+  fat_bool_t process_messages();
 
   // Wait for the process to exit, storing the exit code in the out param.
-  virtual bool join(int *exit_code_out);
+  virtual fat_bool_t join(int *exit_code_out);
 
   // Must be called by the concrete implementation at the time appropriate to
   // them to resume the child process if it has been started suspended.
-  bool ensure_process_resumed();
+  fat_bool_t ensure_process_resumed();
 
   // Sets the implementation the owner agent will delegate calls to when it
   // receives them from the agent.
@@ -90,15 +91,15 @@ public:
 protected:
   // Override this to do any work that needs to be performed before the process
   // can be launched.
-  virtual bool prepare_start() { return true; }
+  virtual fat_bool_t prepare_start() { return F_TRUE; }
 
   // Override to perform any configuration of the process immediately after it
   // has been launched before the agent owner service has been started.
-  virtual bool start_connect_to_agent() { return true; }
+  virtual fat_bool_t start_connect_to_agent() { return F_TRUE; }
 
   // Override to perform any configuration of the process after the agent owner
   // service has been started.
-  virtual bool complete_connect_to_agent() { return true; }
+  virtual fat_bool_t complete_connect_to_agent() { return F_TRUE; }
 
   // Return true if this launcher intends to launch the agent. If it does it
   // must implement start_connect_to_agent and complete_connect_to_agent such
@@ -106,13 +107,13 @@ protected:
   virtual bool use_agent() = 0;
 
   // Create the agent service and open the connection to the agent.
-  bool attach_agent_service();
+  fat_bool_t attach_agent_service();
 
-  bool abort_agent_service();
+  fat_bool_t abort_agent_service();
 
   // Loop around waiting for the agent to report to the owner service that
   // it's ready. Does nothing if the agent is already ready.
-  bool ensure_agent_service_ready();
+  fat_bool_t ensure_agent_service_ready();
 
   // There are four streams in play here: the owner pair and the agent pair.
   // The owner in stream allows the owner to read what is written to the agent
@@ -133,7 +134,7 @@ private:
   };
 
   // Does the work of connecting the agent.
-  bool connect_agent();
+  fat_bool_t connect_agent();
 
   friend class AgentOwnerService;
   tclib::NativeProcess process_;
@@ -161,18 +162,18 @@ protected:
   // Before we can start we need to open up the pipes over which we'll be
   // communicating. These can be created without blocking so we do that early
   // on.
-  virtual bool prepare_start();
+  virtual fat_bool_t prepare_start();
 
   // Inject the dll and start it running. At some point after this has been
   // called the dll installation code will wait to connect back to the owner
   // and this call doesn't block to wait for that.
-  virtual bool start_connect_to_agent();
+  virtual fat_bool_t start_connect_to_agent();
 
   // Here we'll perform the owner's side of the connection procedure, knowing
   // that barring some unforeseen problem the agent will eventually be on the
   // other side of the connection ready to connect. We will also release the
   // process so the main program can start running.
-  virtual bool complete_connect_to_agent();
+  virtual fat_bool_t complete_connect_to_agent();
 
   opaque_t ensure_agent_ready_background();
 

@@ -49,13 +49,13 @@ Launcher::Launcher()
   process_.set_flags(pfStartSuspendedOnWindows);
 }
 
-bool InjectingLauncher::prepare_start() {
-  B_TRY(up_.open(NativePipe::pfDefault));
-  B_TRY(down_.open(NativePipe::pfDefault));
-  return true;
+fat_bool_t InjectingLauncher::prepare_start() {
+  F_TRY(up_.open(NativePipe::pfDefault));
+  F_TRY(down_.open(NativePipe::pfDefault));
+  return F_TRUE;
 }
 
-bool InjectingLauncher::start_connect_to_agent() {
+fat_bool_t InjectingLauncher::start_connect_to_agent() {
   // Set up the connection data to pass into the dll.
   connect_data_t data;
   data.magic = ConsoleAgent::kConnectDataMagic;
@@ -67,83 +67,79 @@ bool InjectingLauncher::start_connect_to_agent() {
       blob_empty());
 
   // Start the injection running.
-  if (!process()->start_inject_library(injection())) {
-    LOG_ERROR("Failed to start injecting %s.", agent_dll_.chars);
-    return false;
-  }
-  return true;
+  F_TRY(process()->start_inject_library(injection()));
+  return F_TRUE;
 }
 
 opaque_t InjectingLauncher::ensure_agent_ready_background() {
-  if (!attach_agent_service())
-    return b2o(false);
-  if (!ensure_agent_service_ready())
-    return b2o(false);
-  return b2o(true);
+  fat_bool_t attached = attach_agent_service();
+  if (!attached)
+    return f2o(attached);
+  fat_bool_t ready = ensure_agent_service_ready();
+  if (!ready)
+    return f2o(ready);
+  return f2o(F_TRUE);
 }
 
-bool InjectingLauncher::complete_connect_to_agent() {
+fat_bool_t InjectingLauncher::complete_connect_to_agent() {
   // Spin off a thread to communicate with the agent while we wait for the
   // injection to complete. Ideally we'd be able to wait for both on the same
   // thread but this works and we can look into a smarter way to do this if
   // there turns out to be a problem.
   tclib::NativeThread connector(new_callback(
       &InjectingLauncher::ensure_agent_ready_background, this));
-  B_TRY(connector.start());
-  bool injected = process()->complete_inject_library(injection());
+  F_TRY(connector.start());
+  fat_bool_t injected = process()->complete_inject_library(injection());
   if (!injected)
-    B_TRY(abort_agent_service());
+    F_TRY(abort_agent_service());
   opaque_t ready = o0();
-  B_TRY(connector.join(&ready));
-  B_TRY(o2b(ready));
-  B_TRY(injected);
-  B_TRY(ensure_process_resumed());
-  return true;
+  F_TRY(connector.join(&ready));
+  F_TRY(o2f(ready));
+  F_TRY(injected);
+  F_TRY(ensure_process_resumed());
+  return F_TRUE;
 }
 
-bool Launcher::initialize() {
+fat_bool_t Launcher::initialize() {
   CHECK_EQ("launch interaction out of order", lsConstructed, state_);
   // There's actually nothing to do here at the moment but that's likely to
   // change so leave it in.
   state_ = lsInitialized;
-  return true;
+  return F_TRUE;
 }
 
-bool Launcher::start(utf8_t command, size_t argc, utf8_t *argv) {
+fat_bool_t Launcher::start(utf8_t command, size_t argc, utf8_t *argv) {
   CHECK_EQ("launch interaction out of order", lsInitialized, state_);
-  B_TRY(prepare_start());
+  F_TRY(prepare_start());
 
   // Start the process -- if it's possible to start processes suspended it will
   // be suspended.
-  if (!process_.start(command, argc, argv)) {
-    LOG_ERROR("Failed to start %s.", command.chars);
-    return false;
-  }
+  F_TRY(process_.start(command, argc, argv));
 
   if (use_agent()) {
     // If we're using the agent connect it; this will also take care of resuming
     // the process.
-    B_TRY(connect_agent());
+    F_TRY(connect_agent());
   } else {
     // There is no agent so we resume the process manually.
-    B_TRY(ensure_process_resumed());
+    F_TRY(ensure_process_resumed());
   }
 
   state_ = lsStarted;
   return connect_service();
 }
 
-bool Launcher::connect_agent() {
+fat_bool_t Launcher::connect_agent() {
   // Start connecting but don't block.
-  B_TRY(start_connect_to_agent());
+  F_TRY(start_connect_to_agent());
 
   // Wait for the agent to finish connecting.
-  B_TRY(complete_connect_to_agent());
+  F_TRY(complete_connect_to_agent());
 
   return ensure_agent_service_ready();
 }
 
-bool Launcher::attach_agent_service() {
+fat_bool_t Launcher::attach_agent_service() {
   tclib::InStream *oin = owner_in();
   CHECK_FALSE("no owner in", oin == NULL);
   tclib::OutStream *oout = owner_out();
@@ -152,43 +148,49 @@ bool Launcher::attach_agent_service() {
   return agent()->init(service()->handler());
 }
 
-bool Launcher::abort_agent_service() {
-  B_TRY(owner_in()->close());
-  B_TRY(owner_out()->close());
-  return true;
+fat_bool_t Launcher::abort_agent_service() {
+  if (!owner_in()->close())
+    return F_FALSE;
+  if (!owner_out()->close())
+    return F_FALSE;
+  return F_TRUE;
 }
 
-bool Launcher::ensure_agent_service_ready() {
+fat_bool_t Launcher::ensure_agent_service_ready() {
   while (!agent_is_ready_)
-    B_TRY(agent()->input()->process_next_instruction(NULL));
-  return true;
+    F_TRY(agent()->input()->process_next_instruction(NULL));
+  return F_TRUE;
 }
 
-bool Launcher::ensure_process_resumed() {
+fat_bool_t Launcher::ensure_process_resumed() {
   // If we can suspend/resume the process will have been started suspended. This
   // is orthogonal to whether we inject or not.
-  return !NativeProcess::kCanSuspendResume || process_.resume();
+  if (!NativeProcess::kCanSuspendResume)
+    return F_TRUE;
+  return process_.resume();
 }
 
-bool Launcher::connect_service() {
-  return true;
+fat_bool_t Launcher::connect_service() {
+  return F_TRUE;
 }
 
-bool Launcher::process_messages() {
+fat_bool_t Launcher::process_messages() {
   CHECK_EQ("launch interaction out of order", lsStarted, state_);
   return agent()->process_all_messages();
 }
 
-bool Launcher::join(int *exit_code_out) {
+fat_bool_t Launcher::join(int *exit_code_out) {
   if (use_agent()) {
-    B_TRY(owner_in()->close());
-    B_TRY(owner_out()->close());
+    if (!owner_in()->close())
+      return F_FALSE;
+    if (!owner_out()->close())
+      return F_FALSE;
   }
   ProcessWaitIop wait(&process_, o0());
   if (!wait.execute()) {
     LOG_ERROR("Failed to wait for process.");
-    return false;
+    return F_FALSE;
   }
   *exit_code_out = process_.exit_code().peek_value(1);
-  return true;
+  return F_TRUE;
 }

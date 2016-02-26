@@ -13,8 +13,8 @@ public:
   virtual size_t write_imposter(PatchRequest &request, tclib::Blob memory);
   virtual Disassembler *disassembler();
   virtual size_t optimal_preable_size() { return kJmpSize; }
-  virtual pass_def_ref_t<Redirection> create_redirection(address_t original,
-      address_t replacement, PreambleInfo *info);
+  virtual fat_bool_t create_redirection(address_t original, address_t replacement,
+      pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info);
 
   // Returns the singleton ia32 instance.
   static X86_32 &get();
@@ -36,9 +36,10 @@ size_t X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
       request.original() + preamble_copy.size());
 }
 
-pass_def_ref_t<Redirection> X86_32::create_redirection(address_t original,
-    address_t replacement, PreambleInfo *info) {
-  return pass_def_ref_t<Redirection>(new (kDefaultAlloc) RelativeJump32Redirection());
+fat_bool_t X86_32::create_redirection(address_t original, address_t replacement,
+    pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info) {
+  *redir_out = pass_def_ref_t<Redirection>(new (kDefaultAlloc) RelativeJump32Redirection());
+  return F_TRUE;
 }
 
 bool X86_32::can_jump_relative_32(address_t from, address_t to) {

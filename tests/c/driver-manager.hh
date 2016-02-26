@@ -90,11 +90,11 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   // Allocate the underlying channel.
-  bool allocate();
+  fat_bool_t allocate();
 
   // We use this to not only connect the service but start the monitor thread
   // running.
-  virtual bool connect_service();
+  virtual fat_bool_t connect_service();
 
   tclib::ServerChannel *agent_channel() { return *agent_channel_; }
 
@@ -105,13 +105,13 @@ protected:
   // The fake agent launcher needs the process to be running before it can start
   // talking to the remote agent so this does almost all of the work, it
   // releases the process from being suspended and opens up the connection.
-  virtual bool start_connect_to_agent();
+  virtual fat_bool_t start_connect_to_agent();
 
   virtual bool use_agent() { return true; }
 
   // In addition to joining the process this also joins the agent monitor
   // thread.
-  virtual bool join(int *exit_code_out);
+  virtual fat_bool_t join(int *exit_code_out);
 
 private:
   // Main entry-point for the agent monitor thread.
@@ -133,7 +133,7 @@ public:
 protected:
   // This is only present such that we can report an error if anyone tries to
   // call it.
-  virtual bool start_connect_to_agent();
+  virtual fat_bool_t start_connect_to_agent();
 
 };
 
@@ -151,13 +151,13 @@ public:
   DriverManager();
 
   // Start up the driver executable.
-  bool start();
+  fat_bool_t start();
 
   // Connect to the running driver.
-  bool connect();
+  fat_bool_t connect();
 
   // Wait for the driver to terminate.
-  bool join(int *exit_code_out);
+  fat_bool_t join(int *exit_code_out);
 
   // When devutils are enabled, allows you to trace all the requests that go
   // through this manager.

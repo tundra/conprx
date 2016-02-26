@@ -41,11 +41,12 @@ void DriverManager::set_frontend_type(DriverFrontendType type) {
 }
 
 opaque_t FakeAgentLauncher::run_agent_monitor() {
-  if (!process_messages())
-    return b2o(false);
+  fat_bool_t processed = process_messages();
+  if (!processed)
+    return f2o(processed);
   if (!agent_monitor_done()->lower())
-    return b2o(false);
-  return b2o(true);
+    return f2o(F_FALSE);
+  return f2o(F_TRUE);
 }
 
 Variant DriverRequest::echo(Variant value) {
@@ -140,9 +141,9 @@ void CommandLineBuilder::add_option(Variant key, Variant value) {
   map_.set(key, value);
 }
 
-bool DriverManager::start() {
+fat_bool_t DriverManager::start() {
   CommandLineBuilder builder;
-  B_TRY(channel()->allocate());
+  F_TRY(channel()->allocate());
   builder.add_option("channel", channel()->name().chars);
   switch (agent_type()) {
     case atNone:
@@ -153,7 +154,7 @@ bool DriverManager::start() {
       break;
     case atFake: {
       FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
-      B_TRY(launcher->allocate());
+      F_TRY(launcher->allocate());
       builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
       launcher_ = launcher;
       break;
@@ -176,14 +177,14 @@ bool DriverManager::start() {
   builder.add_option("frontend-type", frontend_type_name);
   if (silence_log_)
     builder.add_option("silence-log", Variant::yes());
-  B_TRY(launcher()->initialize());
+  F_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
   return launcher()->start(exec, 1, &args);
 }
 
-bool DriverManager::connect() {
-  B_TRY(channel()->open());
+fat_bool_t DriverManager::connect() {
+  F_TRY(channel()->open());
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
   connector_->set_default_type_registry(ConsoleProxy::registry());
@@ -216,15 +217,15 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
   return resp;
 }
 
-bool DriverManager::join(int *exit_code_out) {
-  B_TRY(channel()->close());
+fat_bool_t DriverManager::join(int *exit_code_out) {
+  F_TRY(channel()->close());
   int exit_code = 0;
-  B_TRY(launcher()->join(&exit_code));
+  F_TRY(launcher()->join(&exit_code));
   if (exit_code_out == NULL) {
-    return exit_code == 0;
+    return F_BOOL(exit_code == 0);
   } else {
     *exit_code_out = exit_code;
-    return true;
+    return F_TRUE;
   }
 }
 
@@ -249,36 +250,37 @@ FakeAgentLauncher::FakeAgentLauncher()
   agent_channel_ = ServerChannel::create();
 }
 
-bool FakeAgentLauncher::allocate() {
-  B_TRY(agent_monitor_done()->initialize());
-  B_TRY(agent_channel()->allocate());
-  return true;
+fat_bool_t FakeAgentLauncher::allocate() {
+  if (!agent_monitor_done()->initialize())
+    return F_FALSE;
+  F_TRY(agent_channel()->allocate());
+  return F_TRUE;
 }
 
-bool FakeAgentLauncher::start_connect_to_agent() {
-  B_TRY(ensure_process_resumed());
-  B_TRY(agent_channel()->open());
-  B_TRY(attach_agent_service());
-  return true;
+fat_bool_t FakeAgentLauncher::start_connect_to_agent() {
+  F_TRY(ensure_process_resumed());
+  F_TRY(agent_channel()->open());
+  F_TRY(attach_agent_service());
+  return F_TRUE;
 }
 
-bool FakeAgentLauncher::connect_service() {
-  B_TRY(Launcher::connect_service());
+fat_bool_t FakeAgentLauncher::connect_service() {
+  F_TRY(Launcher::connect_service());
   agent_monitor_.set_callback(new_callback(&FakeAgentLauncher::run_agent_monitor,
       this));
-  return agent_monitor_.start();
+  return F_BOOL(agent_monitor_.start());
 }
 
-bool FakeAgentLauncher::join(int *exit_code_out) {
-  B_TRY(agent_monitor_done()->pass());
+fat_bool_t FakeAgentLauncher::join(int *exit_code_out) {
+  if (!agent_monitor_done()->pass())
+    return F_FALSE;
   opaque_t monitor_result = o0();
-  B_TRY(agent_monitor_.join(&monitor_result));
-  if (!o2b(monitor_result))
-    return false;
+  F_TRY(agent_monitor_.join(&monitor_result));
+  F_TRY(o2f(monitor_result));
   return Launcher::join(exit_code_out);
 }
 
-bool NoAgentLauncher::start_connect_to_agent() {
+fat_bool_t NoAgentLauncher::start_connect_to_agent() {
   UNREACHABLE("NoAgentLauncher::start_connect_to_agent");
-  return false;
+  return F_FALSE;
 }

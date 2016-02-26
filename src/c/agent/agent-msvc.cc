@@ -100,6 +100,9 @@ ntstatus_t WindowsConsoleAgent::nt_request_wait_reply_port(handle_t port_handle,
 }
 
 fat_bool_t WindowsConsoleAgent::install_agent_platform() {
+  // TODO: for this to work we need to expand the binpatch framework a bit so
+  //   disable it for now while I submit the outstanding changes.
+  return F_TRUE;
   module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
   if (ntdll == NULL) {
     WARN("GetModuleHandle(ntdll.dll): %i", GetLastError());
@@ -112,7 +115,7 @@ fat_bool_t WindowsConsoleAgent::install_agent_platform() {
   }
   address_t rprw_repl = Code::upcast(nt_request_wait_reply_port_bridge);
   rwrp_patch_ = PatchRequest(rwrp_orig, rprw_repl);
-  return patches()->apply() ? F_TRUE : F_FALSE;
+  return patches()->apply();
 }
 
 bool WindowsConsoleAgent::is_process_hard_blacklisted() {
@@ -241,5 +244,6 @@ CONNECTOR_IMPL(ConprxAgentConnect, data_in, data_out) {
       &last_error);
   return result
       ? CONNECT_SUCCEEDED_RESULT()
-      : CONNECT_FAILED_RESULT(result.file_id(), result.line(), last_error);
+      : CONNECT_FAILED_RESULT(fat_bool_file(result), fat_bool_line(result),
+          last_error);
 }

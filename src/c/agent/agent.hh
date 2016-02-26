@@ -147,7 +147,7 @@ public:
   fat_bool_t install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
 
   // Send a request back to the owner and wait for a response.
-  bool send_request(plankton::rpc::OutgoingRequest *request,
+  fat_bool_t send_request(plankton::rpc::OutgoingRequest *request,
       plankton::rpc::IncomingResponse *response_out);
 
 protected:
@@ -156,7 +156,7 @@ protected:
 
 private:
   // Send the is-ready message to the owner.
-  bool send_is_ready();
+  fat_bool_t send_is_ready();
 
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;

@@ -12,8 +12,8 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace tclib;
 
-bool MemoryManager::ensure_initialized() {
-  return true;
+fat_bool_t MemoryManager::ensure_initialized() {
+  return F_TRUE;
 }
 
 MemoryManager::~MemoryManager() {
@@ -37,26 +37,25 @@ PatchRequest::PatchRequest()
 
 PatchRequest::~PatchRequest() { }
 
-bool PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc) {
+fat_bool_t PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *alloc) {
   platform_ = platform;
   imposter_code_ = alloc->alloc_executable(0, 0, kImposterCodeStubSizeBytes);
   if (imposter_code_.is_empty())
-    return false;
+    return F_FALSE;
   // Determine the length of the preamble. This also determines whether the
   // preamble can safely be overwritten, otherwise we'll bail out.
   DEBUG("Preparing %s", name_);
   PreambleInfo pinfo;
 
-  pass_def_ref_t<Redirection> redir = platform->instruction_set().prepare_patch(
-      original_, replacement_, &pinfo);
-  if (redir.is_null())
-    return false;
+  pass_def_ref_t<Redirection> redir;
+  F_TRY(platform->instruction_set().prepare_patch(original_, replacement_,
+      &redir, &pinfo));
   redirection_ = redir;
   size_t size = pinfo.size();
   CHECK_REL("preamble too big", size, <=, kMaxPreambleSizeBytes);
   memcpy(preamble_copy_, original_, pinfo.size());
   preamble_size_ = size;
-  return true;
+  return F_TRUE;
 }
 
 address_t PatchRequest::get_or_create_imposter() {
@@ -83,21 +82,22 @@ PatchSet::PatchSet(Platform &platform, Vector<PatchRequest> requests)
   , status_(NOT_APPLIED)
   , old_perms_(0) { }
 
-bool PatchSet::prepare_apply() {
+fat_bool_t PatchSet::prepare_apply() {
   DEBUG("Preparing to apply patch set");
   if (requests().is_empty()) {
     // Trivially succeed if there are no patches to apply.
     status_ = PREPARED;
-    return true;
+    return F_TRUE;
   }
   for (size_t i = 0; i < requests().length(); i++) {
-    if (!requests()[i].prepare_apply(&platform_, alloc())) {
+    fat_bool_t applied = requests()[i].prepare_apply(&platform_, alloc());
+    if (!applied) {
       status_ = FAILED;
-      return false;
+      return applied;
     }
   }
   status_ = PREPARED;
-  return true;
+  return F_TRUE;
 }
 
 tclib::Blob PatchSet::determine_address_range() {
@@ -133,22 +133,23 @@ tclib::Blob PatchSet::determine_patch_range() {
   }
 }
 
-bool PatchSet::open_for_patching() {
+fat_bool_t PatchSet::open_for_patching() {
   DEBUG("Opening original code for writing");
   // Try opening the region for writing.
   tclib::Blob region = determine_patch_range();
-  if (!memory_manager().open_for_writing(region, &old_perms_)) {
+  fat_bool_t opened = memory_manager().open_for_writing(region, &old_perms_);
+  if (!opened) {
     status_= FAILED;
-    return false;
+    return opened;
   }
   // Validate that writing works.
   DEBUG("Validating that code is writable");
   if (validate_open_for_patching()) {
     status_ = OPEN;
-    return true;
+    return F_TRUE;
   } else {
     status_ = FAILED;
-    return false;
+    return F_FALSE;
   }
 }
 
@@ -168,17 +169,18 @@ bool PatchSet::validate_open_for_patching() {
   return true;
 }
 
-bool PatchSet::close_after_patching(Status success_status) {
+fat_bool_t PatchSet::close_after_patching(Status success_status) {
   DEBUG("Closing original code for writing");
   tclib::Blob region = determine_patch_range();
-  if (!memory_manager().close_for_writing(region, old_perms_)) {
+  fat_bool_t closed = memory_manager().close_for_writing(region, old_perms_);
+  if (!closed) {
     status_ = FAILED;
-    return false;
+    return closed;
   }
   instruction_set().flush_instruction_cache(region);
   DEBUG("Successfully closed original code");
   status_ = success_status;
-  return true;
+  return F_TRUE;
 }
 
 void PatchSet::install_redirects() {
@@ -214,31 +216,28 @@ void PatchSet::revert_redirects() {
 }
 
 
-bool PatchSet::apply() {
-  if (!prepare_apply())
-    return false;
+fat_bool_t PatchSet::apply() {
+  F_TRY(prepare_apply());
   if (!open_for_patching())
-    return false;
+    return F_FALSE;
   install_redirects();
   if (!close_after_patching(PatchSet::APPLIED))
-    return false;
-  return true;
+    return F_FALSE;
+  return F_TRUE;
 }
 
-bool PatchSet::revert() {
-  if (!open_for_patching())
-    return false;
+fat_bool_t PatchSet::revert() {
+  F_TRY(open_for_patching());
   revert_redirects();
-  if (!close_after_patching(PatchSet::NOT_APPLIED))
-    return false;
-  return true;
+  F_TRY(close_after_patching(PatchSet::NOT_APPLIED));
+  return F_TRUE;
 }
 
 Platform::Platform(InstructionSet &inst, MemoryManager &memman)
   : inst_(inst)
   , memman_(memman) { }
 
-bool Platform::ensure_initialized() {
+fat_bool_t Platform::ensure_initialized() {
   return memory_manager().ensure_initialized();
 }
 

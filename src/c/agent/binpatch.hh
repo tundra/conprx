@@ -33,6 +33,7 @@
 #include "c/stdvector.hh"
 #include "utils/alloc.hh"
 #include "utils/blob.hh"
+#include "utils/fatbool.hh"
 #include "utils/vector.hh"
 
 BEGIN_C_INCLUDES
@@ -109,13 +110,13 @@ public:
   ~PatchRequest();
 
   // Marks this request as having been prepared to be applied.
-  bool prepare_apply(Platform *platform, ProximityAllocator *alloc);
+  fat_bool_t prepare_apply(Platform *platform, ProximityAllocator *alloc);
 
   // Destructively install this request's redirect.
   void install_redirect();
 
   // Attempts to apply this patch.
-  bool apply(MemoryManager &memman);
+  fat_bool_t apply(MemoryManager &memman);
 
   address_t original() { return reinterpret_cast<address_t>(original_); }
 
@@ -204,7 +205,7 @@ class Platform {
 public:
   // Ensures that the platform object is fully initialized, if it hasn't been
   // already. Returns true on success.
-  bool ensure_initialized();
+  fat_bool_t ensure_initialized();
 
   MemoryManager &memory_manager() { return memman_; }
 
@@ -386,15 +387,15 @@ public:
   // Prepares to apply the patches. Preparing makes no code changes, it only
   // checks whether patching is possible and allocates the data needed to do
   // the patching. Returns true iff preparing succeeded.
-  bool prepare_apply();
+  fat_bool_t prepare_apply();
 
   // Attempts to set the permissions on the code we're going to patch. Returns
   // true iff this succeeds.
-  bool open_for_patching();
+  fat_bool_t open_for_patching();
 
   // Attempts to return the permissions on the code that has been patched to
   // the state it was before.
-  bool close_after_patching(Status success_status);
+  fat_bool_t close_after_patching(Status success_status);
 
   // Patches the redirect instructions into the original functions. It shouldn't
   // be possible for this to fail, any potential failure reasons should have
@@ -411,11 +412,11 @@ public:
 
   // Given a fresh patch set, runs through the sequence of operations that
   // causes the patches to be applied.
-  bool apply();
+  fat_bool_t apply();
 
   // Runs through the complete sequence of operations that restores the
   // originals to their initial state.
-  bool revert();
+  fat_bool_t revert();
 
   // Determines the lower and upper bound of the addresses to patch by scanning
   // over the requests and min/max'ing over the addresses. Note that this is
@@ -486,17 +487,17 @@ public:
 
   // If the manager needs any kind of initialization this call will ensure that
   // it has been initialized.
-  virtual bool ensure_initialized();
+  virtual fat_bool_t ensure_initialized();
 
   // Attempts to open the given memory region such that it can be written. If
   // successful the previous permissions should be stored in the given out
   // parameter.
-  virtual bool open_for_writing(tclib::Blob region, standalone_dword_t *old_perms) = 0;
+  virtual fat_bool_t open_for_writing(tclib::Blob region, standalone_dword_t *old_perms) = 0;
 
   // Attempts to close the given memory region such that it can no longer be
   // written. The old_perms parameter contains the value that was stored by
   // open_for_writing.
-  virtual bool close_for_writing(tclib::Blob region, standalone_dword_t old_perms) = 0;
+  virtual fat_bool_t close_for_writing(tclib::Blob region, standalone_dword_t old_perms) = 0;
 
   // Allocates a piece of executable memory of the given size near enough to
   // the given address that we can jump between them. If memory can't be
@@ -546,8 +547,8 @@ public:
   // overwritten by the redirect. Returns true if successful, false if there is
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
-  virtual tclib::pass_def_ref_t<Redirection> prepare_patch(address_t original,
-      address_t replacement, PreambleInfo *info_out) = 0;
+  virtual fat_bool_t prepare_patch(address_t original, address_t replacement,
+      tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info_out) = 0;
 
   // Fills the given memory with code that causes execution to halt.
   virtual void write_halt(tclib::Blob memory) = 0;
