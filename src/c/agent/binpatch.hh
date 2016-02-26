@@ -65,10 +65,21 @@ typedef uint32_t standalone_dword_t;
 // when the patch request is destroyed.
 class Redirection : public tclib::DefaultDestructable {
 public:
+  // The different types of redirections supported. These exist mainly for
+  // testing and debugging, there shouldn't be a need to dispatch on them.
+  enum Type {
+    rtAbs64,
+    rtRel32,
+    rtKangaroo
+  };
+
   virtual ~Redirection() { }
 
   // Write the redirect to the given destination into the given code.
   virtual size_t write_redirect(address_t code, address_t dest) = 0;
+
+  // Returns this redirection's type code. For testing.
+  virtual Type type() = 0;
 };
 
 /// ## Patch request
@@ -101,6 +112,15 @@ public:
 ///     to behave exactly like the original.
 class PatchRequest {
 public:
+  enum Flags {
+    // Don't allow 64-bit absolute jumps.
+    pfBanAbs64 = 0x1,
+    // Don't allow 32-bit relative jumps.
+    pfBanRel32 = 0x2,
+    // Don't allow kangaroo jumps (32-bit rel to 64-bit abs).
+    pfBanKangaroo = 0x4
+  };
+
   // Initializes a binary patch that replaces the given original function with
   // the given replacement.
   PatchRequest(address_t original, address_t replacement, const char *name = NULL);
@@ -141,6 +161,17 @@ public:
 
   tclib::Blob preamble_copy() { return tclib::Blob(preamble_copy_, preamble_size_); }
 
+  // Returns the type of the redirection that was applied to perform this
+  // patch. For testing.
+  Redirection::Type redirection_type() { return redirection_->type(); }
+
+  // Sets the flags that control how this patch is applied. The flags come from
+  // the Flags enum.
+  void set_flags(uint32_t flags) { flags_ = flags; }
+
+  // Returns this patch's flag set.
+  uint32_t flags() { return flags_; }
+
 private:
   // Returns the address of the trampoline, creating it on first call.
   address_t get_or_create_imposter();
@@ -159,6 +190,9 @@ private:
 
   // Optional display name, used for debugging.
   const char *name_;
+
+  // A set of bit flags that control how this patch is applied.
+  uint32_t flags_;
 
   // The completed imposter stub. Will be null until the imposter has been
   // written.
@@ -226,10 +260,10 @@ private:
 class VirtualAllocator {
 public:
   virtual ~VirtualAllocator() { }
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size) = 0;
+  virtual fat_bool_t alloc_executable(address_t addr, size_t size, tclib::Blob *blob_out) = 0;
   // Frees a block that was returned from alloc_executable. Returns true iff
   // freeing succeeds.
-  virtual bool free_block(tclib::Blob block) = 0;
+  virtual fat_bool_t free_block(tclib::Blob block) = 0;
 };
 
 // An allocator that allocates near an address and makes multiple attempts at
@@ -547,7 +581,7 @@ public:
   // overwritten by the redirect. Returns true if successful, false if there is
   // some reason the function can't be patched; if it returns false a message
   // will have been reported to the given message sink.
-  virtual fat_bool_t prepare_patch(address_t original, address_t replacement,
+  virtual fat_bool_t prepare_patch(PatchRequest *request, ProximityAllocator *alloc,
       tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info_out) = 0;
 
   // Fills the given memory with code that causes execution to halt.

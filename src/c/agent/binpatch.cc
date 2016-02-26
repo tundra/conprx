@@ -23,6 +23,7 @@ PatchRequest::PatchRequest(address_t original, address_t replacement, const char
   : original_(original)
   , replacement_(replacement)
   , name_(name)
+  , flags_(0)
   , imposter_(NULL)
   , platform_(NULL)
   , preamble_size_(0) { }
@@ -31,6 +32,7 @@ PatchRequest::PatchRequest()
   : original_(NULL)
   , replacement_(NULL)
   , name_(NULL)
+  , flags_(0)
   , imposter_(NULL)
   , platform_(NULL)
   , preamble_size_(0) { }
@@ -48,8 +50,7 @@ fat_bool_t PatchRequest::prepare_apply(Platform *platform, ProximityAllocator *a
   PreambleInfo pinfo;
 
   pass_def_ref_t<Redirection> redir;
-  F_TRY(platform->instruction_set().prepare_patch(original_, replacement_,
-      &redir, &pinfo));
+  F_TRY(platform->instruction_set().prepare_patch(this, alloc, &redir, &pinfo));
   redirection_ = redir;
   size_t size = pinfo.size();
   CHECK_REL("preamble too big", size, <=, kMaxPreambleSizeBytes);
@@ -337,14 +338,15 @@ bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocato
     return true;
   // There's no room so we allocate a new block.
   tclib::Blob block;
+  fat_bool_t succeeded = F_TRUE;
   if (is_restricted_) {
-    block = owner->direct_->alloc_executable(reinterpret_cast<address_t>(limit_),
-        static_cast<size_t>(owner->block_size_));
+    succeeded = owner->direct_->alloc_executable(reinterpret_cast<address_t>(limit_),
+        static_cast<size_t>(owner->block_size_), &block);
   } else {
-    block = owner->direct_->alloc_executable(0,
-        static_cast<size_t>(owner->block_size_));
+    succeeded =  owner->direct_->alloc_executable(0,
+        static_cast<size_t>(owner->block_size_), &block);
   }
-  if (block.is_empty()) {
+  if (!succeeded) {
     // We could get no memory so we deactivate this block such that we'll ignore
     // it from here on.
     is_active_ = false;

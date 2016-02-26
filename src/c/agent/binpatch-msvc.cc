@@ -13,8 +13,8 @@ public:
       standalone_dword_t *old_perms);
   virtual fat_bool_t close_for_writing(tclib::Blob region,
       standalone_dword_t old_perms);
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size);
-  virtual bool free_block(tclib::Blob block);
+  virtual fat_bool_t alloc_executable(address_t addr, size_t size, Blob *blob_out);
+  virtual fat_bool_t free_block(tclib::Blob block);
 };
 
 fat_bool_t WindowsMemoryManager::open_for_writing(tclib::Blob region,
@@ -41,17 +41,19 @@ fat_bool_t WindowsMemoryManager::close_for_writing(tclib::Blob region,
   return F_TRUE;
 }
 
-tclib::Blob WindowsMemoryManager::alloc_executable(address_t addr, size_t size) {
-  void *memory = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+fat_bool_t WindowsMemoryManager::alloc_executable(address_t addr, size_t size,
+    Blob *blob_out) {
+  void *memory = VirtualAlloc(addr, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
   if (memory == NULL) {
     LOG_ERROR("VirtualAlloc failed: %i", GetLastError());
-    return tclib::Blob();
+    return F_FALSE;
   }
-  return tclib::Blob(memory, size);
+  *blob_out = tclib::Blob(memory, size);
+  return F_TRUE;
 }
 
-bool WindowsMemoryManager::free_block(tclib::Blob block) {
-  return VirtualFree(block.start(), 0, MEM_RELEASE);
+fat_bool_t WindowsMemoryManager::free_block(Blob block) {
+  return F_BOOL(VirtualFree(block.start(), 0, MEM_RELEASE));
 }
 
 MemoryManager &MemoryManager::get() {

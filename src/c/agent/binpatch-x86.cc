@@ -9,11 +9,12 @@
 using namespace conprx;
 using namespace tclib;
 
-fat_bool_t GenericX86::prepare_patch(address_t original, address_t replacement,
+fat_bool_t GenericX86::prepare_patch(PatchRequest *request, ProximityAllocator *alloc,
       pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info_out) {
   // The length of this vector shouldn't matter since the disassembler reads
   // one byte at a time and stops as soon as we've seen enough. It doesn't
   // continue on to the end.
+  address_t original = request->original();
   Vector<byte_t> code(original, kMaxPreambleSizeBytes);
   size_t offset = 0;
   // This is the amount of space we're hoping to allocate, though we'll be okay
@@ -49,7 +50,7 @@ fat_bool_t GenericX86::prepare_patch(address_t original, address_t replacement,
       break;
   }
   info_out->populate(offset, last_instr);
-  return create_redirection(original, replacement, redir_out, info_out);
+  return create_redirection(request, alloc, redir_out, info_out);
 }
 
 void GenericX86::flush_instruction_cache(tclib::Blob memory) {

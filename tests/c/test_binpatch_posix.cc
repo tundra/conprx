@@ -23,7 +23,8 @@ public:
   // Extracts and calls the snippet contained in the code for f.
   static int32_t call_snippet(function_t f, int32_t a, int32_t b);
 
-  static void test_patch(int32_t e, function_t f, int32_t a, int32_t b);
+  static Redirection::Type test_patch(int32_t e, function_t f, int32_t a,
+      int32_t b, int32_t flags = 0);
 
   static int32_t intercept(int32_t a, int32_t b);
 
@@ -73,17 +74,37 @@ int32_t SnippetHelper::intercept(int32_t a, int32_t b) {
   return 79;
 }
 
-void SnippetHelper::test_patch(int32_t e, function_t f, int32_t a, int32_t b) {
+static int32_t add_really_short(int32_t a, int32_t b) {
+  BEGIN_SNIPPET
+    "add %ebx,%eax\n\t" // 2
+    NOPS(,,)            // 3
+    "ret\n\t"           // 1
+  END_SNIPPET
+}
+
+Redirection::Type SnippetHelper::test_patch(int32_t e, function_t f, int32_t a,
+    int32_t b, int32_t flags) {
   snippet_t snip = find_snippet(f);
   ASSERT_EQ(e, call_raw_snippet(a, b, snip));
   PatchRequest req(reinterpret_cast<address_t>(snip), reinterpret_cast<address_t>(intercept));
+  req.set_flags(flags);
   PatchSet set(Platform::get(), Vector<PatchRequest>(&req, 1));
-  ASSERT_TRUE(set.apply());
+  ASSERT_F_TRUE(set.apply());
   ASSERT_EQ(79, call_raw_snippet(a, b, snip));
-  ASSERT_TRUE(set.revert());
+  Redirection::Type type = req.redirection_type();
+  ASSERT_F_TRUE(set.revert());
   ASSERT_EQ(e, call_raw_snippet(a, b, snip));
+  return type;
 }
 
 TEST(binpatch, add_short) {
-  SnippetHelper::test_patch(17, add_short, 8, 9);
+  Redirection::Type long_redir = kIs32Bit ? Redirection::rtRel32 : Redirection::rtAbs64;
+  ASSERT_EQ(long_redir, SnippetHelper::test_patch(17, add_short, 8, 9));
+  Redirection::Type short_redir = Redirection::rtRel32;
+  ASSERT_EQ(short_redir, SnippetHelper::test_patch(19, add_really_short, 9, 10));
+  if (kIs64Bit) {
+    ASSERT_EQ(Redirection::rtKangaroo,
+        SnippetHelper::test_patch(19, add_really_short, 9, 10,
+            PatchRequest::pfBanRel32));
+  }
 }

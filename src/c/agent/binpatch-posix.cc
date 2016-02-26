@@ -17,8 +17,8 @@ public:
   virtual fat_bool_t ensure_initialized();
   virtual fat_bool_t open_for_writing(tclib::Blob region, standalone_dword_t *old_perms);
   virtual fat_bool_t close_for_writing(tclib::Blob region, standalone_dword_t old_perms);
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size);
-  virtual bool free_block(tclib::Blob block);
+  virtual fat_bool_t alloc_executable(address_t addr, size_t size, Blob *blob_out);
+  virtual fat_bool_t free_block(Blob block);
 private:
   bool is_initialized_;
   size_t page_size_;
@@ -80,21 +80,23 @@ fat_bool_t PosixMemoryManager::set_permissions(tclib::Blob region, int prot) {
   return F_TRUE;
 }
 
-tclib::Blob PosixMemoryManager::alloc_executable(address_t addr, size_t size) {
+fat_bool_t PosixMemoryManager::alloc_executable(address_t addr, size_t size,
+    tclib::Blob *blob_out) {
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
   int protect = PROT_READ | PROT_WRITE | PROT_EXEC;
   errno = 0;
-  void *result = mmap(NULL, page_size_, protect, flags, 0, 0);
+  void *result = mmap(addr, size, protect, flags, 0, 0);
   if (result == MAP_FAILED) {
-    LOG_ERROR("mmap(NULL, %i, %i, %i, 0, 0): %i", page_size_, protect, flags,
-        errno);
-    return tclib::Blob();
+    LOG_ERROR("mmap(%p, %i, %i, %i, 0, 0): %i", addr, size, protect,
+        flags, errno);
+    return F_FALSE;
   }
-  return tclib::Blob(result, size);
+  *blob_out = Blob(result, size);
+  return F_TRUE;
 }
 
-bool PosixMemoryManager::free_block(tclib::Blob block) {
-  return munmap(block.start(), block.size()) == 0;
+fat_bool_t PosixMemoryManager::free_block(Blob block) {
+  return F_BOOL(munmap(block.start(), block.size()) == 0);
 }
 
 MemoryManager &MemoryManager::get() {

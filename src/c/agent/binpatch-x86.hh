@@ -18,12 +18,13 @@ public:
   public:
     virtual void default_destroy() { default_delete_concrete(this); }
     virtual size_t write_redirect(address_t code, address_t dest);
+    virtual Type type() { return rtRel32; }
   };
 
   // Yields the appropriate disassembler for this architecture.
   virtual Disassembler *disassembler() = 0;
 
-  virtual fat_bool_t prepare_patch(address_t original, address_t replacement,
+  virtual fat_bool_t prepare_patch(PatchRequest *request, ProximityAllocator *alloc,
         tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info_out);
 
   // Returns the ideal preamble size to try to make available. What actually
@@ -51,7 +52,7 @@ protected:
   // destination.
   static size_t write_relative_jump_32(address_t code, address_t dest);
 
-  virtual fat_bool_t create_redirection(address_t original, address_t replacement,
+  virtual fat_bool_t create_redirection(PatchRequest *request, ProximityAllocator *alloc,
       tclib::pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info) = 0;
 };
 

@@ -9,6 +9,7 @@
 #include "test.hh"
 
 using namespace conprx;
+using namespace tclib;
 
 TEST(binpatch, datatypes) {
   ASSERT_EQ(1, sizeof(byte_t));
@@ -239,15 +240,16 @@ public:
   TestVirtualAllocator(behavior_t behavior) : behavior_(behavior) { }
   typedef platform_hash_map<address_arith_t, AllocRequest> AllocMap;
 
-  virtual tclib::Blob alloc_executable(address_t addr, size_t size);
-  virtual bool free_block(tclib::Blob block);
+  virtual fat_bool_t alloc_executable(address_t addr, size_t size, Blob *blob_out);
+  virtual fat_bool_t free_block(Blob block);
   AllocMap &allocs() { return allocs_; }
 private:
   behavior_t behavior_;
   AllocMap allocs_;
 };
 
-tclib::Blob TestVirtualAllocator::alloc_executable(address_t addr, size_t size) {
+fat_bool_t TestVirtualAllocator::alloc_executable(address_t addr, size_t size,
+    Blob *blob_out) {
   bool should_succeed = (behavior_ == ALWAYS_SUCCEED)
       || ((behavior_ == SUCCEED_AFTER_7) && (allocs_.size() >= 7));
   address_arith_t key = reinterpret_cast<address_arith_t>(addr);
@@ -255,14 +257,15 @@ tclib::Blob TestVirtualAllocator::alloc_executable(address_t addr, size_t size) 
   allocs_[key] = AllocRequest(addr, size);
   if (should_succeed) {
     address_t result = (addr == NULL) ? reinterpret_cast<address_t>(1 << 24) : addr;
-    return tclib::Blob(result, size);
+    *blob_out = tclib::Blob(result, size);
+    return F_TRUE;
   } else {
-    return tclib::Blob();
+    return F_FALSE;
   }
 }
 
-bool TestVirtualAllocator::free_block(tclib::Blob block) {
-  return true;
+fat_bool_t TestVirtualAllocator::free_block(tclib::Blob block) {
+  return F_TRUE;
 }
 
 TEST(binpatch, failing_unrestricted) {
