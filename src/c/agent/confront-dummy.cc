@@ -71,6 +71,10 @@ bool_t DummyConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return true;
 }
 
+uint32_t DummyConsoleFrontend::get_console_cp() {
+  return 0xB00B00;
+}
+
 dword_t DummyConsoleFrontend::get_last_error() {
   return 0xFABACAEA;
 }

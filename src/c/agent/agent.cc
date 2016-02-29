@@ -2,11 +2,13 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "agent.hh"
+#include "agent/conconn.hh"
+#include "agent/response.hh"
+#include "async/promise-inl.hh"
 #include "binpatch.hh"
 #include "confront.hh"
 #include "marshal-inl.hh"
 #include "utils/log.hh"
-#include "async/promise-inl.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -79,8 +81,64 @@ bool StreamingLog::record(log_entry_t *entry) {
   return propagate(entry);
 }
 
+ConsoleAgent::ConsoleAgent()
+  : agent_in_(NULL)
+  , agent_out_(NULL) {
+  // Clear the redirect mask.
+  memset(lpc_redirect_mask_, 0, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
+#define __SET_LPC_MASK__(Name, DLL, API) add_to_lpc_redirect_mask((DLL), (API));
+  FOR_EACH_LPC_TO_INTERCEPT(__SET_LPC_MASK__)
+#undef __SET_LPC_MASK__
+}
+
+void ConsoleAgent::add_to_lpc_redirect_mask(ushort_t dll, ushort_t api) {
+  uint32_t index = (dll << 16) | api;
+  uint32_t block_index = index >> 3;
+  uint8_t bit_index = index & 7;
+  CHECK_REL("index too big", block_index, <, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
+  uint8_t *block = lpc_redirect_mask_ + block_index;
+  *block = *block | static_cast<uint8_t>(1 << bit_index);
+}
+
+bool ConsoleAgent::should_redirect_lpc(ulong_t number) {
+  uint32_t block_index = number >> 3;
+  uint8_t bit_index = number & 7;
+  CHECK_REL("index too big", block_index, <, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
+  return (lpc_redirect_mask_[block_index] & (1 << bit_index)) != 0;
+}
+
+const char *ConsoleAgent::get_lpc_name(ulong_t number) {
+  switch (number) {
+#define __GEN_CASE__(Name, DLL, API) case ((DLL << 16) | API): return #Name;
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_CASE__)
+  FOR_EACH_OTHER_KNOWN_LPC(__GEN_CASE__)
+#undef __GEN_CASE__
+  default:
+    return NULL;
+  }
+}
+
+fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
+    lpc::Message *request, lpc::message_data_t *incoming_reply) {
+  switch (request->api_number()) {
+    case 0x3C:
+      return on_get_cp(request, &request->payload()->get_cp);
+    default:
+      return F_FALSE;
+  }
+}
+
+fat_bool_t ConsoleAgent::on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp) {
+  Response<int64_t> resp = connector()->get_console_cp();
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
+  get_cp->code_page_id = (resp.has_error() ? 0 : resp.value());
+  return F_TRUE;
+}
+
 fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
     tclib::OutStream *agent_out) {
+  agent_in_ = agent_in;
+  agent_out_ = agent_out;
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
   if (!owner()->init(empty_callback()))
     return F_FALSE;
@@ -91,8 +149,25 @@ fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
   return F_TRUE;
 }
 
+fat_bool_t ConsoleAgent::uninstall_agent() {
+  send_is_done();
+  F_TRY(uninstall_agent_platform());
+  log()->ensure_uninstalled();
+  if (agent_in_ != NULL)
+    F_TRY(F_BOOL(agent_in_->close()));
+  if (agent_out_ != NULL)
+    F_TRY(F_BOOL(agent_out_->close()));
+  return F_TRUE;
+}
+
 fat_bool_t ConsoleAgent::send_is_ready() {
   rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
+  rpc::IncomingResponse resp;
+  return send_request(&req, &resp);
+}
+
+fat_bool_t ConsoleAgent::send_is_done() {
+  rpc::OutgoingRequest req(Variant::null(), "is_done", 0, NULL);
   rpc::IncomingResponse resp;
   return send_request(&req, &resp);
 }

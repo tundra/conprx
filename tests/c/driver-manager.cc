@@ -17,12 +17,13 @@ using namespace plankton;
 using namespace tclib;
 
 DriverManager::DriverManager()
-  : silence_log_(false)
+  : has_started_agent_monitor_(false)
+  , silence_log_(false)
   , trace_(false)
   , agent_path_(string_empty())
   , agent_type_(atNone)
   , frontend_type_(dfDummy)
-  , impl_(NULL) {
+  , backend_(NULL) {
   channel_ = ServerChannel::create();
 }
 
@@ -38,15 +39,6 @@ void DriverManager::set_frontend_type(DriverFrontendType type) {
   if (agent_type_ != atFake)
     CHECK_FALSE("simulating frontend requires fake agent", type == dfSimulating);
   frontend_type_ = type;
-}
-
-opaque_t FakeAgentLauncher::run_agent_monitor() {
-  fat_bool_t processed = process_messages();
-  if (!processed)
-    return f2o(processed);
-  if (!agent_monitor_done()->lower())
-    return f2o(F_FALSE);
-  return f2o(F_TRUE);
 }
 
 Variant DriverRequest::echo(Variant value) {
@@ -83,6 +75,10 @@ Variant DriverRequest::set_console_title_a(const char *string) {
   return send("set_console_title_a", string);
 }
 
+Variant DriverRequest::get_console_cp() {
+  return send("get_console_cp");
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_fulfilled());
@@ -93,6 +89,11 @@ const Variant &DriverRequest::error() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_rejected());
   return response_->peek_error(Variant::null());
+}
+
+Variant DriverRequest::send(Variant selector) {
+  OutgoingRequest req(Variant::null(), selector);
+  return send_request(&req);
 }
 
 Variant DriverRequest::send(Variant selector, Variant arg) {
@@ -155,13 +156,17 @@ fat_bool_t DriverManager::start() {
     case atFake: {
       FakeAgentLauncher *launcher = new (kDefaultAlloc) FakeAgentLauncher();
       F_TRY(launcher->allocate());
-      builder.add_option("fake-agent-channel", launcher->agent_channel()->name().chars);
+      builder.add_option("fake-agent-channel",
+          launcher->agent_channel()->name().chars);
       launcher_ = launcher;
       break;
     }
+    default:
+      return F_FALSE;
   }
-  if (impl_ != NULL)
-    launcher_->set_impl(impl_);
+  if (backend_ != NULL)
+    launcher()->set_backend(backend_);
+  agent_monitor_.set_callback(new_callback(&Launcher::monitor_agent, launcher()));
   const char *frontend_type_name = NULL;
   switch (frontend_type()) {
     case dfNative:
@@ -180,7 +185,12 @@ fat_bool_t DriverManager::start() {
   F_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
-  return launcher()->start(exec, 1, &args);
+  F_TRY(launcher()->start(exec, 1, &args));
+  if (!use_agent())
+    return F_TRUE;
+  launcher()->agent_monitor_done()->raise();
+  has_started_agent_monitor_ = true;
+  return F_BOOL(agent_monitor_.start());
 }
 
 fat_bool_t DriverManager::connect() {
@@ -219,6 +229,14 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
 
 fat_bool_t DriverManager::join(int *exit_code_out) {
   F_TRY(channel()->close());
+  if (use_agent()) {
+    F_TRY(launcher()->close_agent());
+    if (has_started_agent_monitor_) {
+      opaque_t monitor_result = o0();
+      F_TRY(agent_monitor_.join(&monitor_result));
+      F_TRY(o2f(monitor_result));
+    }
+  }
   int exit_code = 0;
   F_TRY(launcher()->join(&exit_code));
   if (exit_code_out == NULL) {
@@ -245,14 +263,11 @@ utf8_t DriverManager::default_agent_path() {
   return new_c_string(result);
 }
 
-FakeAgentLauncher::FakeAgentLauncher()
-  : agent_monitor_done_(Drawbridge::dsRaised) {
+FakeAgentLauncher::FakeAgentLauncher() {
   agent_channel_ = ServerChannel::create();
 }
 
 fat_bool_t FakeAgentLauncher::allocate() {
-  if (!agent_monitor_done()->initialize())
-    return F_FALSE;
   F_TRY(agent_channel()->allocate());
   return F_TRUE;
 }
@@ -262,22 +277,6 @@ fat_bool_t FakeAgentLauncher::start_connect_to_agent() {
   F_TRY(agent_channel()->open());
   F_TRY(attach_agent_service());
   return F_TRUE;
-}
-
-fat_bool_t FakeAgentLauncher::connect_service() {
-  F_TRY(Launcher::connect_service());
-  agent_monitor_.set_callback(new_callback(&FakeAgentLauncher::run_agent_monitor,
-      this));
-  return F_BOOL(agent_monitor_.start());
-}
-
-fat_bool_t FakeAgentLauncher::join(int *exit_code_out) {
-  if (!agent_monitor_done()->pass())
-    return F_FALSE;
-  opaque_t monitor_result = o0();
-  F_TRY(agent_monitor_.join(&monitor_result));
-  F_TRY(o2f(monitor_result));
-  return Launcher::join(exit_code_out);
 }
 
 fat_bool_t NoAgentLauncher::start_connect_to_agent() {

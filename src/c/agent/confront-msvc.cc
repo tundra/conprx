@@ -3,6 +3,8 @@
 
 /// Console api implementation specific to the windows platform.
 
+#include "agent/confront.hh"
+
 using namespace conprx;
 using namespace tclib;
 
@@ -33,6 +35,10 @@ dword_t WindowsConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
 
 bool_t WindowsConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return SetConsoleTitleA(str);
+}
+
+uint_t WindowsConsoleFrontend::get_console_cp() {
+  return GetConsoleCP();
 }
 
 dword_t WindowsConsoleFrontend::get_last_error() {

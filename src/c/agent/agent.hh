@@ -72,6 +72,7 @@
 #include "binpatch.hh"
 #include "confront.hh"
 #include "io/stream.hh"
+#include "lpc.hh"
 #include "rpc.hh"
 #include "utils/fatbool.hh"
 #include "utils/log.hh"
@@ -125,6 +126,7 @@ typedef struct {
 // Controls the injection of the console agent.
 class ConsoleAgent : public tclib::DefaultDestructable {
 public:
+  ConsoleAgent();
   virtual ~ConsoleAgent() { }
 
   // Install the given console instead of the built-in one. Returns true on
@@ -144,26 +146,59 @@ public:
   static const int cSuccess = 0x0;
 
   // Install this agent.
-  fat_bool_t install_agent(tclib::InStream *owner_in, tclib::OutStream *owner_out);
+  fat_bool_t install_agent(tclib::InStream *agent_in, tclib::OutStream *agent_out);
+
+  // Remove this agent.
+  fat_bool_t uninstall_agent();
 
   // Send a request back to the owner and wait for a response.
   fat_bool_t send_request(plankton::rpc::OutgoingRequest *request,
       plankton::rpc::IncomingResponse *response_out);
 
+  // Returns true if messages with the given api number is on the list of
+  // messages to redirect through the agent.
+  bool should_redirect_lpc(ulong_t number);
+
+  // If the given number represents an lpc we know about returns the string name
+  // of it. Otherwise return NULL.
+  static const char *get_lpc_name(ulong_t number);
+
+  // Processes LPC messages.
+  fat_bool_t on_message(lpc::Interceptor *interceptor, lpc::Message *request,
+      lpc::message_data_t *incoming_reply);
+
+  StreamServiceConnector *owner() { return *owner_; }
+
+  virtual ConsoleConnector *connector() { return NULL; }
+
 protected:
   // Perform the platform-specific part of the agent installation.
   virtual fat_bool_t install_agent_platform() = 0;
+
+  // Perform the platform-specific part of the agent uninstall.
+  virtual fat_bool_t uninstall_agent_platform() = 0;
 
 private:
   // Send the is-ready message to the owner.
   fat_bool_t send_is_ready();
 
+  fat_bool_t send_is_done();
+
+  fat_bool_t on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp);
+
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
-  StreamServiceConnector *owner() { return *owner_; }
+  tclib::InStream *agent_in_;
+  tclib::OutStream *agent_out_;
 
   StreamingLog *log() { return &log_; }
   StreamingLog log_;
+
+  // A bit mask that indicates which lpc calls to pass through and which to
+  // redirect.
+  static const size_t kLpcRedirectMaskBlocks = 32;
+  uint8_t lpc_redirect_mask_[kLpcRedirectMaskBlocks];
+  void add_to_lpc_redirect_mask(ushort_t dll, ushort_t api);
 
   // Returns the address of the console function with the given name.
   static address_t get_console_function_address(cstr_t name);
@@ -180,6 +215,14 @@ private:
   // The console object currently being delegated to.
   static ConsoleFrontend &delegate() { return *static_cast<ConsoleFrontend*>(NULL); }
 };
+
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
+  F(GetConsoleTitle,    0,      36)                                            \
+  F(SetConsoleTitle,    0,      37)
+
+#define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
+  F(BaseDllInitHelper,  0,      76)                                            \
+  F(GetFileType,        0,      35)
 
 // Expands the given macro for each boolean option. The arguments are:
 // <field>              <upper camel>           <all caps>

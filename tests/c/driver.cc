@@ -4,7 +4,7 @@
 #include "driver.hh"
 
 #include "agent/agent.hh"
-#include "agent/conback.hh"
+#include "agent/conconn.hh"
 #include "agent/confront.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
@@ -121,6 +121,15 @@ void ConsoleFrontendService::set_console_title_a(rpc::RequestData &data, Respons
   }
 }
 
+void ConsoleFrontendService::get_console_cp(rpc::RequestData &data, ResponseCallback callback) {
+  uint_t cp = frontend()->get_console_cp();
+  // GetConsoleCP doesn't specify how it indicates errors but it seems to be
+  // by returning 0 so that's what we do here.
+  callback((cp == 0)
+      ? rpc::OutgoingResponse::failure(new_console_error(data.factory()))
+      : rpc::OutgoingResponse::success(cp));
+}
+
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
   Handle *handle = new (factory) Handle(raw_handle);
   return factory->new_native(handle);
@@ -147,6 +156,7 @@ public:
   FakeConsoleAgent() { }
   virtual void default_destroy() { default_delete_concrete(this); }
   virtual fat_bool_t install_agent_platform() { return F_TRUE; }
+  virtual fat_bool_t uninstall_agent_platform() { return F_TRUE; }
 };
 
 // A log that ignores everything.
@@ -268,7 +278,7 @@ bool ConsoleDriverMain::run() {
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleProxy::registry());
   def_ref_t<ConsoleFrontend> frontend;
-  def_ref_t<ConsoleBackend> backend;
+  def_ref_t<ConsoleConnector> conconn;
   switch (frontend_type_) {
     case dfNative:
       CHECK_TRUE("native frontend not supported", kIsMsvc);
@@ -282,8 +292,9 @@ bool ConsoleDriverMain::run() {
       break;
     case dfSimulating:
       CHECK_TRUE("fake agent required", use_fake_agent());
-      backend = RemoteConsoleBackend::create(fake_agent());
-      frontend = ConsoleFrontend::new_simulating(*backend);
+      conconn = PrpcConsoleConnector::create(fake_agent()->owner()->socket(),
+          fake_agent()->owner()->input());
+      frontend = ConsoleFrontend::new_simulating(*conconn);
       break;
   }
   ConsoleFrontendService driver(*frontend);
@@ -292,7 +303,7 @@ bool ConsoleDriverMain::run() {
   bool result = connector.process_all_messages();
   channel()->out()->close();
   if (use_fake_agent())
-    fake_agent_channel()->out()->close();
+    F_TRY(fake_agent()->uninstall_agent());
   return result;
 }
 

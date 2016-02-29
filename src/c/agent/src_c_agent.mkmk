@@ -11,8 +11,9 @@ def build_object(filename):
 agent_files = [
   "agent.cc",
   "binpatch.cc",
-  "conback.cc",
+  "conconn.cc",
   "confront.cc",
+  "lpc.cc",
 ]
 
 utils = get_external("src", "c", "utils", "objects")

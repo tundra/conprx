@@ -4,6 +4,7 @@
 #ifndef _CONPRX_AGENT_LAUNCH
 #define _CONPRX_AGENT_LAUNCH
 
+#include "agent/response.hh"
 #include "rpc.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
@@ -23,12 +24,14 @@ class Launcher;
 
 // Virtual type, implementations of which can be used as the implementation of
 // a console.
-class ConsoleImpl {
+class ConsoleBackend {
 public:
-  virtual ~ConsoleImpl() { }
+  virtual ~ConsoleBackend() { }
 
   // Debug/test call.
-  virtual int64_t on_poke(int64_t value) = 0;
+  virtual Response<int64_t> on_poke(int64_t value) = 0;
+
+  virtual Response<int64_t> get_cp() = 0;
 };
 
 // The service the driver will call back to when it wants to access the manager.
@@ -43,10 +46,13 @@ private:
 
   // Called when the agent has completed its setup.
   void on_is_ready(plankton::rpc::RequestData&, ResponseCallback);
+  void on_is_done(plankton::rpc::RequestData&, ResponseCallback);
 
   // For testing and debugging -- a call that doesn't do anything but is just
   // passed through to the implementation.
   void on_poke(plankton::rpc::RequestData&, ResponseCallback);
+
+  void on_get_cp(plankton::rpc::RequestData&, ResponseCallback);
 
   Launcher *launcher_;
   Launcher *launcher() { return launcher_; }
@@ -77,16 +83,29 @@ public:
   // Wait for the process to exit, storing the exit code in the out param.
   virtual fat_bool_t join(int *exit_code_out);
 
+  fat_bool_t close_agent();
+
   // Must be called by the concrete implementation at the time appropriate to
   // them to resume the child process if it has been started suspended.
   fat_bool_t ensure_process_resumed();
 
-  // Sets the implementation the owner agent will delegate calls to when it
-  // receives them from the agent.
-  void set_impl(ConsoleImpl *impl) { impl_ = impl; }
+  // Sets the backend the owner agent will delegate calls to when it receives
+  // them from the agent.
+  void set_backend(ConsoleBackend *backend) { backend_ = backend; }
 
-  // Returns the custom implementation backing this launcher.
-  ConsoleImpl *impl() { return impl_; }
+  // Returns the custom backend backing this launcher.
+  ConsoleBackend *backend() { return backend_; }
+
+  // Runs the loop that monitors the agent service and handles requests. While
+  // the launch is running there needs to be a thread doing this, which they
+  // do by calling this.
+  opaque_t monitor_agent();
+
+  // Returns a drawbridge that gets lowered when the the agent monitor is done.
+  // This is useful when running the agent in a separate thread: you close the
+  // connection which causes the agent to wind down and then wait for this
+  // to be lowered.
+  tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
 
 protected:
   // Override this to do any work that needs to be performed before the process
@@ -140,14 +159,16 @@ private:
   tclib::NativeProcess process_;
 
   bool agent_is_ready_;
+  bool agent_is_done_;
   State state_;
 
   tclib::def_ref_t<StreamServiceConnector> agent_;
   StreamServiceConnector *agent() { return *agent_; }
   AgentOwnerService service_;
   AgentOwnerService *service() { return &service_; }
+  tclib::Drawbridge agent_monitor_done_;
 
-  ConsoleImpl *impl_;
+  ConsoleBackend *backend_;
 };
 
 // A launcher that works by injecting the agent as a dll into the process.

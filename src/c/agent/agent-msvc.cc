@@ -1,6 +1,7 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "agent/conconn.hh"
 #include "io/stream.hh"
 #include "socket.hh"
 #include "sync/injectee.hh"
@@ -20,11 +21,6 @@ public:
   WindowsConsoleAgent();
   virtual void default_destroy() { default_delete_concrete(this); }
 
-  // Returns true iff the current process is hardcoded blacklisted. Returns true
-  // if this process should not be patched under any circumstances, no matter
-  // what options are set.
-  static bool is_process_hard_blacklisted();
-
   // Called when the dll process attach notification is received.
   static bool dll_process_attach();
 
@@ -32,30 +28,24 @@ public:
 
   virtual fat_bool_t install_agent_platform();
 
+  virtual fat_bool_t uninstall_agent_platform();
+
   fat_bool_t connect(blob_t data_in, blob_t data_out, int *last_error_out);
 
   static WindowsConsoleAgent *get() { return instance_; }
 
-private:
-  static ntstatus_t NTAPI nt_request_wait_reply_port_bridge(handle_t port_handle,
-      lpc_message_t *request, lpc_message_t *incoming_reply);
+  virtual ConsoleConnector *connector() { return *connector_; }
 
-  ntstatus_t NTAPI nt_request_wait_reply_port(handle_t port_handle,
-      lpc_message_t *request, lpc_message_t *incoming_reply);
+private:
+  def_ref_t<ConsoleConnector> connector_;
+
+  lpc::Interceptor interceptor_;
+  lpc::Interceptor *interceptor() { return &interceptor_; }
 
   def_ref_t<InStream> agent_in_;
   InStream *agent_in() { return *agent_in_; }
   def_ref_t<OutStream> agent_out_;
   OutStream *agent_out() { return *agent_out_; }
-
-  PatchRequest *rwrp_patch() { return &rwrp_patch_; }
-  PatchRequest rwrp_patch_;
-  PatchSet *patches() { return &patches_; }
-  PatchSet patches_;
-
-  // A list of executable names we refuse to patch.
-  static const size_t kBlacklistSize = 4;
-  static cstr_t kBlacklist[kBlacklistSize];
 
   static WindowsConsoleAgent *instance() { return instance_; }
   static WindowsConsoleAgent *instance_;
@@ -63,19 +53,8 @@ private:
 
 WindowsConsoleAgent *WindowsConsoleAgent::instance_ = NULL;
 
-cstr_t WindowsConsoleAgent::kBlacklist[kBlacklistSize] = {
-    // These are internal windows services that become unhappy if we try to
-    // patch them. Also it serves no purpose.
-    TEXT("conhost.exe"),
-    TEXT("svchost.exe"),
-    TEXT("WerFault.exe"),
-    // Leave the registry editor untouched since, in the worst case, you may
-    // need it to disable the agent if it becomes broken.
-    TEXT("regedit.exe")
-};
-
 WindowsConsoleAgent::WindowsConsoleAgent()
-  : patches_(Platform::get(), Vector<PatchRequest>(&rwrp_patch_, 1)) {
+  : interceptor_(new_callback(&ConsoleAgent::on_message, static_cast<ConsoleAgent*>(this))) {
 }
 
 bool WindowsConsoleAgent::dll_process_attach() {
@@ -84,61 +63,23 @@ bool WindowsConsoleAgent::dll_process_attach() {
 }
 
 bool WindowsConsoleAgent::dll_process_detach() {
+  if (instance_ == NULL)
+    return true;
+  fat_bool_t uninstalled = instance()->uninstall_agent();
+  if (!uninstalled)
+    LOG_WARN("Failed to uninstall agent (%0x04x:%i)", fat_bool_file(uninstalled),
+        fat_bool_line(uninstalled));
   delete instance_;
   instance_ = NULL;
   return true;
 }
 
-ntstatus_t WindowsConsoleAgent::nt_request_wait_reply_port_bridge(handle_t port_handle,
-      lpc_message_t *request, lpc_message_t *incoming_reply) {
-  return instance()->nt_request_wait_reply_port(port_handle, request, incoming_reply);
-}
-
-ntstatus_t WindowsConsoleAgent::nt_request_wait_reply_port(handle_t port_handle,
-      lpc_message_t *request, lpc_message_t *incoming_reply) {
-  return (rwrp_patch()->get_imposter(nt_request_wait_reply_port_bridge))(port_handle, request, incoming_reply);
-}
-
 fat_bool_t WindowsConsoleAgent::install_agent_platform() {
-  // TODO: for this to work we need to expand the binpatch framework a bit so
-  //   disable it for now while I submit the outstanding changes.
-  return F_TRUE;
-  module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-  if (ntdll == NULL) {
-    WARN("GetModuleHandle(ntdll.dll): %i", GetLastError());
-    return F_FALSE;
-  }
-  address_t rwrp_orig = Code::upcast(GetProcAddress(ntdll, "NtRequestWaitReplyPort"));
-  if (rwrp_orig == NULL) {
-    WARN("GetProcAddress(-, NtRequestWaitReplyPort): %i", GetLastError());
-    return F_FALSE;
-  }
-  address_t rprw_repl = Code::upcast(nt_request_wait_reply_port_bridge);
-  rwrp_patch_ = PatchRequest(rwrp_orig, rprw_repl);
-  return patches()->apply();
+  return interceptor()->install();
 }
 
-bool WindowsConsoleAgent::is_process_hard_blacklisted() {
-  // It is not safe to log at this point since this is run in *every* process
-  // the system has, including processes that are too fundamental to support
-  // the stuff we need for logging.
-  char_t buffer[1024];
-  // Passing NULL means the current process. Now we know.
-  size_t length = GetModuleFileName(NULL, buffer, 1024);
-  if (length == 0)
-    // If we can't determine the executable's name we better not try patching
-    // it.
-    return true;
-  // Scan through the blacklist to see if this process matches anything. I
-  // imaging this will have to get smarter, possibly even support some amount
-  // of external configuration and/or wildcard matching. Laters.
-  Vector<char_t> executable(buffer, length);
-  for (size_t i = 0; i < kBlacklistSize; i++) {
-    Vector<char_t> entry(const_cast<char_t*>(kBlacklist[i]), lstrlen(kBlacklist[i]));
-    if (executable.has_suffix(entry))
-      return true;
-  }
-  return false;
+fat_bool_t WindowsConsoleAgent::uninstall_agent_platform() {
+  return interceptor()->uninstall();
 }
 
 fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
@@ -175,7 +116,10 @@ fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
   }
   agent_out_ = tclib::InOutStream::from_raw_handle(agent_out_handle);
 
-  return install_agent(agent_in(), agent_out());
+  F_TRY(install_agent(agent_in(), agent_out()));
+
+  connector_ = PrpcConsoleConnector::create(owner()->socket(), owner()->input());
+  return F_TRUE;
 }
 
 address_t ConsoleAgent::get_console_function_address(cstr_t name) {

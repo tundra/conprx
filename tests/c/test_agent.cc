@@ -44,24 +44,24 @@ TEST(agent, inject_fail) {
   ASSERT_EQ(1, exit_code);
 }
 
-class PokeCounter : public ConsoleImpl {
+class PokeCounter : public DummyConsoleBackend {
 public:
   PokeCounter()  : poke_count(0) { }
-  virtual int64_t on_poke(int64_t value);
+  virtual Response<int64_t> on_poke(int64_t value);
   size_t poke_count;
 };
 
-int64_t PokeCounter::on_poke(int64_t value) {
+Response<int64_t> PokeCounter::on_poke(int64_t value) {
   poke_count++;
-  return value + 257;
+  return Response<int64_t>::of(value + 257);
 }
 
-TEST(agent, simulate_rountrip) {
+TEST(agent, simulate_roundtrip) {
   DriverManager driver;
   driver.set_agent_type(DriverManager::atFake);
   driver.set_frontend_type(dfSimulating);
   PokeCounter counter;
-  driver.set_impl(&counter);
+  driver.set_backend(&counter);
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
@@ -76,13 +76,36 @@ TEST(agent, simulate_rountrip) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
+class CpImpl : public DummyConsoleBackend {
+public:
+  virtual Response<int64_t> get_cp() { return cp; }
+  Response<int64_t> cp;
+};
+
 TEST(agent, native_roundtrip) {
   if (!DriverManager::kSupportsRealAgent)
     SKIP_TEST("requires real agent");
+  CpImpl backend;
   DriverManager driver;
+  driver.set_backend(&backend);
   driver.set_agent_type(DriverManager::atReal);
   driver.set_frontend_type(dfNative);
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
+
+  backend.cp = Response<int64_t>::of(82723);
+  DriverRequest cp0 = driver.get_console_cp();
+  ASSERT_EQ(82723, cp0->integer_value());
+
+  backend.cp = Response<int64_t>::of(32728);
+  DriverRequest cp1 = driver.get_console_cp();
+  ASSERT_EQ(32728, cp1->integer_value());
+
+  // For some reason positive error codes aren't propagated but negative ones
+  // work.
+  backend.cp = Response<int64_t>::error(-123);
+  DriverRequest cp2 = driver.get_console_cp();
+  ASSERT_EQ(-123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
+
   ASSERT_F_TRUE(driver.join(NULL));
 }

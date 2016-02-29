@@ -4,7 +4,7 @@
 /// Console api implementation specific to the windows platform.
 
 #include "confront.hh"
-#include "conback.hh"
+#include "conconn.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -18,7 +18,7 @@ using namespace tclib;
 // that they can be used for testing.
 class SimulatingConsoleFrontend : public ConsoleFrontend {
 public:
-  SimulatingConsoleFrontend(ConsoleBackend *backend);
+  SimulatingConsoleFrontend(ConsoleConnector *connector);
   ~SimulatingConsoleFrontend();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
@@ -32,20 +32,21 @@ public:
   virtual int64_t poke_backend(int64_t value);
 
 private:
-  ConsoleBackend *backend() { return backend_; }
-  ConsoleBackend *backend_;
+  ConsoleConnector *connector() { return connector_; }
+  ConsoleConnector *connector_;
+  dword_t last_error_;
 
 };
 
-SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleBackend *backend)
-  : backend_(backend) {
-}
+SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleConnector *connector)
+  : connector_(connector)
+  , last_error_(0) { }
 
 SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 }
 
 int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
-  return backend()->poke(value);
+  return connector()->poke(value).flush(0, &last_error_);
 }
 
 handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n_std_handle) {
@@ -65,10 +66,14 @@ bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return false;
 }
 
-dword_t SimulatingConsoleFrontend::get_last_error() {
-  return 0xFABACAEA;
+uint_t SimulatingConsoleFrontend::get_console_cp() {
+  return 0;
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleBackend *backend) {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) SimulatingConsoleFrontend(backend));
+dword_t SimulatingConsoleFrontend::get_last_error() {
+  return last_error_;
+}
+
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleConnector *connector) {
+  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) SimulatingConsoleFrontend(connector));
 }

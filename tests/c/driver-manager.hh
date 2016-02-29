@@ -71,6 +71,7 @@ private:
     : is_used_(false)
     , manager_(connection) { }
 
+  Variant send(Variant selector);
   Variant send(Variant selector, Variant arg0);
   Variant send(Variant selector, Variant arg0, Variant arg1, Variant arg2);
   Variant send_request(OutgoingRequest *req);
@@ -92,10 +93,6 @@ public:
   // Allocate the underlying channel.
   fat_bool_t allocate();
 
-  // We use this to not only connect the service but start the monitor thread
-  // running.
-  virtual fat_bool_t connect_service();
-
   tclib::ServerChannel *agent_channel() { return *agent_channel_; }
 
 protected:
@@ -109,18 +106,9 @@ protected:
 
   virtual bool use_agent() { return true; }
 
-  // In addition to joining the process this also joins the agent monitor
-  // thread.
-  virtual fat_bool_t join(int *exit_code_out);
-
 private:
-  // Main entry-point for the agent monitor thread.
-  opaque_t run_agent_monitor();
 
   tclib::def_ref_t<tclib::ServerChannel> agent_channel_;
-  tclib::NativeThread agent_monitor_;
-  tclib::Drawbridge agent_monitor_done_;
-  tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
 };
 
 // Launcher that knows how to launch the driver with no agent. Useful for
@@ -186,8 +174,8 @@ public:
 
   Launcher *operator->() { return launcher(); }
 
-  // Sets the impl to eventually pass to the launcher once it's been created.
-  void set_impl(ConsoleImpl *impl) { impl_ = impl; }
+  // Sets the backend to eventually pass to the launcher once it's been created.
+  void set_backend(ConsoleBackend *backend) { backend_ = backend; }
 
   // Constant that's true when the real agent can work.
   static const bool kSupportsRealAgent = kIsMsvc && !kIsDebugCodegen;
@@ -224,18 +212,28 @@ private:
   tclib::def_ref_t<StreamServiceConnector> connector_;
   StreamServiceConnector *connector() { return *connector_; }
 
+  tclib::NativeThread agent_monitor_;
+  bool has_started_agent_monitor_;
+
   bool silence_log_;
   bool trace_;
   utf8_t agent_path_;
   utf8_t agent_path();
   AgentType agent_type_;
   AgentType agent_type() { return agent_type_; }
+  bool use_agent() { return agent_type_ != atNone; }
   DriverFrontendType frontend_type_;
   DriverFrontendType frontend_type() { return frontend_type_; }
-  ConsoleImpl *impl_;
+  ConsoleBackend *backend_;
 
   static utf8_t executable_path();
   static utf8_t default_agent_path();
+};
+
+class DummyConsoleBackend : public ConsoleBackend {
+public:
+  virtual Response<int64_t> on_poke(int64_t value) { return Response<int64_t>::error(1); }
+  virtual Response<int64_t> get_cp() { return Response<int64_t>::error(1); }
 };
 
 } // namespace conprx

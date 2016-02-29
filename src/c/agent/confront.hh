@@ -20,7 +20,7 @@
 
 namespace conprx {
 
-class ConsoleBackend;
+class ConsoleConnector;
 
 #define GET_SIG_RET(RET, PARAMS, ARGS) RET
 #define GET_SIG_PARAMS(RET, PARAMS, ARGS) PARAMS
@@ -92,6 +92,7 @@ class ConsoleBackend;
     (console_output, string, chars_to_write))
 #define psigDWordToStr(F) F(_, (int64_t bufsize), (bufsize))
 #define psigAnsiCStrToVariant(F) F(_, (const char* string), (string))
+#define psigVoidToDWord(F) F(_, (), ())
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -105,12 +106,13 @@ class ConsoleBackend;
   F(WriteConsoleA,              write_console_a,                (X), sigWriteConsoleA,              psigWriteConsoleA)     \
   F(GetConsoleTitleA,           get_console_title_a,            (X), sigStrToDWord,                 psigDWordToStr)        \
   F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool,             psigAnsiCStrToVariant) \
+  F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 psigVoidToDWord)       \
+
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
   FOR_EACH_CONAPI_FUNCTION(F)                                                                                              \
   F(AllocConsole,               alloc_console,                  (X), sigVoidToBool,                 _)                     \
   F(FreeConsole,                free_console,                   (X), sigVoidToBool,                 _)                     \
-  F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 _)                     \
   F(GetConsoleCursorInfo,       get_console_cursor_info,        (X), sigGetConsoleCursorInfo,       _)                     \
   F(GetConsoleMode,             get_console_mode,               (X), sigGetConsoleMode,             _)                     \
   F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 _)                     \
@@ -174,7 +176,8 @@ public:
 
   // Returns a new simulating console frontend that simulates interaction with
   // the given backend.
-  static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(ConsoleBackend *backend);
+  static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(
+      ConsoleConnector *connector);
 
   // Returns a list containing descriptions of all the console functions.
   static Vector<FunctionInfo> functions();
