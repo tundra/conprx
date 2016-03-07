@@ -67,8 +67,8 @@ bool WindowsConsoleAgent::dll_process_detach() {
     return true;
   fat_bool_t uninstalled = instance()->uninstall_agent();
   if (!uninstalled)
-    LOG_WARN("Failed to uninstall agent (%0x04x:%i)", fat_bool_file(uninstalled),
-        fat_bool_line(uninstalled));
+    LOG_WARN("Failed to uninstall agent (" kFatBoolFileLine ")",
+        fat_bool_file(uninstalled), fat_bool_line(uninstalled));
   delete instance_;
   instance_ = NULL;
   return true;

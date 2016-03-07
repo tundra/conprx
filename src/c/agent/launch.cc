@@ -123,9 +123,14 @@ fat_bool_t InjectingLauncher::complete_connect_to_agent() {
     F_TRY(abort_agent_service());
   opaque_t ready = o0();
   F_TRY(connector.join(&ready));
-  F_TRY(o2f(ready));
-  F_TRY(injected);
-  F_TRY(ensure_process_resumed());
+  if (!o2f(ready) || !injected) {
+    // If injecting fails we kill the process (so it doesn't hang) and abort.
+    F_TRY(process()->kill());
+    F_TRY(o2f(ready));
+    F_TRY(injected);
+  } else {
+    F_TRY(ensure_process_resumed());
+  }
   return F_TRUE;
 }
 

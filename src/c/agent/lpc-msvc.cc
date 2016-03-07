@@ -13,6 +13,7 @@ Interceptor::Interceptor(handler_t handler)
   : handler_(handler)
   , patches_(Platform::get(), Vector<PatchRequest>(patch_requests_, kPatchRequestCount))
   , enabled_(true)
+  , enable_special_handlers_(false)
   , is_locating_cccs_(false)
   , locate_cccs_result_(F_FALSE)
   , console_client_call_server_(NULL)
@@ -35,14 +36,24 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   // optimizing compiler made the call into a jump, which is good in general but
   // not what we want here.
   Interceptor *inter = current();
-  if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
-    void *stack[kLocateCCCSStackSize];
-    CaptureStackBackTrace(0, kLocateCCCSStackSize, stack, NULL);
-    inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
-    return 0;
-  } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
-    inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
-    return 0;
+  if (inter->enable_special_handlers_) {
+    if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
+      void *stack[kLocateCCCSStackSize];
+      memset(stack, 0, kLocateCCCSStackSize * sizeof(void*));
+      dword_t captured = CaptureStackBackTrace(0, kLocateCCCSStackSize, stack, NULL);
+      if (captured < kLocateCCCSStackSize) {
+        inter->locate_cccs_result_ = F_FALSE;
+        return 0;
+      } else {
+        inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
+        return 0;
+      }
+    } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
+      inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
+      return 0;
+    } else {
+      return inter->nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
+    }
   } else {
     return inter->nt_request_wait_reply_port(port_handle, request, incoming_reply);
   }
@@ -129,9 +140,9 @@ fat_bool_t Interceptor::calibrate(Interceptor *inter) {
   // First try to locate ConsoleClientCallServer. The result variables start out
   // F_FALSE so if for some reason we don't hit the calibration handlers they'll
   // not be set to F_TRUE and we'll fail below.
-  inter->is_locating_cccs_ = true;
+  inter->enable_special_handlers_ = inter->is_locating_cccs_ = true;
   GetConsoleCP();
-  inter->is_locating_cccs_ = false;
+  inter->enable_special_handlers_ = inter->is_locating_cccs_ = false;
   F_TRY(inter->locate_cccs_result_);
 
   // From here on we don't need to be in a static function so we let a method
@@ -145,10 +156,10 @@ fat_bool_t Interceptor::infer_calibration_from_cccs() {
   struct_zero_fill(message);
   capture_buffer_data_t capture_buffer;
   struct_zero_fill(capture_buffer);
-  is_calibrating_ = true;
+  enable_special_handlers_ = is_calibrating_ = true;
   (console_client_call_server_)(&message, &capture_buffer, kCalibrationApiNumber,
       0);
-  is_calibrating_ = false;
+  enable_special_handlers_ = is_calibrating_ = false;
   F_TRY(calibrate_result_);
 
   // The calibration message appears to have gone well. Now we have the info we

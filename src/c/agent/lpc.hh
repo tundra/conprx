@@ -127,6 +127,7 @@ private:
 
   handler_t handler_;
   bool enabled_;
+  bool enable_special_handlers_;
 
   // Data associated with locating ConsoleClientCallServer.
   bool is_locating_cccs_;
