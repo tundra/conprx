@@ -42,17 +42,20 @@ public:
 
 private:
   // Handles logs entries logged by the agent.
-  void on_log(plankton::rpc::RequestData&, ResponseCallback);
+  void on_log(plankton::rpc::RequestData*, ResponseCallback);
 
   // Called when the agent has completed its setup.
-  void on_is_ready(plankton::rpc::RequestData&, ResponseCallback);
-  void on_is_done(plankton::rpc::RequestData&, ResponseCallback);
+  void on_is_ready(plankton::rpc::RequestData*, ResponseCallback);
+  void on_is_done(plankton::rpc::RequestData*, ResponseCallback);
 
   // For testing and debugging -- a call that doesn't do anything but is just
   // passed through to the implementation.
-  void on_poke(plankton::rpc::RequestData&, ResponseCallback);
+  void on_poke(plankton::rpc::RequestData*, ResponseCallback);
 
-  void on_get_cp(plankton::rpc::RequestData&, ResponseCallback);
+  void on_get_cp(plankton::rpc::RequestData*, ResponseCallback);
+
+  // The fallback to call on unknown messages.
+  void message_not_understood(plankton::rpc::RequestData*, ResponseCallback);
 
   Launcher *launcher_;
   Launcher *launcher() { return launcher_; }

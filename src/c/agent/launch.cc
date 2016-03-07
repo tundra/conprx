@@ -22,21 +22,22 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
   register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
   register_method("poke", new_callback(&AgentOwnerService::on_poke, this));
   register_method("get_cp", new_callback(&AgentOwnerService::on_get_cp, this));
+  set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
 }
 
-void AgentOwnerService::on_log(rpc::RequestData& data, ResponseCallback resp) {
+void AgentOwnerService::on_log(rpc::RequestData *data, ResponseCallback resp) {
   TextWriter writer;
-  writer.write(data[0]);
+  writer.write(data->argument(0));
   INFO("AGENT LOG: %s", *writer);
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
 
-void AgentOwnerService::on_is_ready(rpc::RequestData& data, ResponseCallback resp) {
+void AgentOwnerService::on_is_ready(rpc::RequestData *data, ResponseCallback resp) {
   launcher()->agent_is_ready_ = true;
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
 
-void AgentOwnerService::on_is_done(rpc::RequestData& data, ResponseCallback resp) {
+void AgentOwnerService::on_is_done(rpc::RequestData *data, ResponseCallback resp) {
   launcher()->agent_is_done_ = true;
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
@@ -50,13 +51,21 @@ static void forward_response(Response<T> resp, rpc::Service::ResponseCallback ca
   }
 }
 
-void AgentOwnerService::on_poke(rpc::RequestData& data, ResponseCallback resp) {
-  int64_t value = data[0].integer_value();
+void AgentOwnerService::on_poke(rpc::RequestData *data, ResponseCallback resp) {
+  int64_t value = data->argument(0).integer_value();
   forward_response(launcher()->backend()->on_poke(value), resp);
 }
 
-void AgentOwnerService::on_get_cp(rpc::RequestData& data, ResponseCallback resp) {
+void AgentOwnerService::on_get_cp(rpc::RequestData *data, ResponseCallback resp) {
   forward_response(launcher()->backend()->get_cp(), resp);
+}
+
+void AgentOwnerService::message_not_understood(rpc::RequestData *data,
+    ResponseCallback resp) {
+  TextWriter writer;
+  writer.write(data->selector());
+  WARN("Unknown agent message %s", *writer);
+  resp(rpc::OutgoingResponse::failure(Variant::null()));
 }
 
 Launcher::Launcher()

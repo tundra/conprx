@@ -27,7 +27,7 @@ public:
   ConsoleFrontendService(ConsoleFrontend *console);
 
 #define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
-  void name(rpc::RequestData &data, ResponseCallback callback);
+  void name(rpc::RequestData *data, ResponseCallback callback);
   FOR_EACH_REMOTE_MESSAGE(__DECL_DRIVER_BY_NAME__)
 #define __DECL_DRIVER_FUNCTION__(Name, name, MINOR, SIG, PSIG) __DECL_DRIVER_BY_NAME__(name, , )
   FOR_EACH_CONAPI_FUNCTION(__DECL_DRIVER_FUNCTION__)
@@ -59,74 +59,74 @@ ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *console)
 #undef __REG_DRIVER_BY_NAME
 }
 
-void ConsoleFrontendService::echo(rpc::RequestData &data, ResponseCallback callback) {
-  callback(rpc::OutgoingResponse::success(data[0]));
+void ConsoleFrontendService::echo(rpc::RequestData *data, ResponseCallback callback) {
+  callback(rpc::OutgoingResponse::success(data->argument(0)));
 }
 
-void ConsoleFrontendService::is_handle(rpc::RequestData &data, ResponseCallback callback) {
-  Handle *handle = data[0].native_as<Handle>();
+void ConsoleFrontendService::is_handle(rpc::RequestData *data, ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
   callback(rpc::OutgoingResponse::success(Variant::boolean(handle != NULL)));
 }
 
-void ConsoleFrontendService::raise_error(rpc::RequestData &data, ResponseCallback callback) {
-  int64_t last_error = data[0].integer_value();
-  Factory *factory = data.factory();
+void ConsoleFrontendService::raise_error(rpc::RequestData *data, ResponseCallback callback) {
+  int64_t last_error = data->argument(0).integer_value();
+  Factory *factory = data->factory();
   ConsoleError *error = new (factory) ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
 }
 
-void ConsoleFrontendService::poke_backend(rpc::RequestData &data, ResponseCallback callback) {
-  int64_t value = data[0].integer_value();
+void ConsoleFrontendService::poke_backend(rpc::RequestData *data, ResponseCallback callback) {
+  int64_t value = data->argument(0).integer_value();
   int64_t result = frontend()->poke_backend(value);
   callback(rpc::OutgoingResponse::success(result));
 }
 
-void ConsoleFrontendService::get_std_handle(rpc::RequestData &data, ResponseCallback callback) {
-  dword_t n_std_handle = to_dword(data[0]);
+void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCallback callback) {
+  dword_t n_std_handle = to_dword(data->argument(0));
   handle_t handle = frontend()->get_std_handle(n_std_handle);
-  callback(rpc::OutgoingResponse::success(wrap_handle(handle, data.factory())));
+  callback(rpc::OutgoingResponse::success(wrap_handle(handle, data->factory())));
 }
 
-void ConsoleFrontendService::write_console_a(rpc::RequestData &data, ResponseCallback callback) {
-  handle_t output = data[0].native_as<Handle>()->ptr();
-  const char *buffer = data[1].string_chars();
-  dword_t chars_to_write = to_dword(data[2]);
+void ConsoleFrontendService::write_console_a(rpc::RequestData *data, ResponseCallback callback) {
+  handle_t output = data->argument(0).native_as<Handle>()->ptr();
+  const char *buffer = data->argument(1).string_chars();
+  dword_t chars_to_write = to_dword(data->argument(2));
   dword_t chars_written = 0;
   if (frontend()->write_console_a(output, buffer, chars_to_write, &chars_written,
       NULL)) {
     callback(rpc::OutgoingResponse::success(chars_written));
   } else {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
   }
 }
 
-void ConsoleFrontendService::get_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
-  dword_t chars_to_read = to_dword(data[0]);
+void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
+  dword_t chars_to_read = to_dword(data->argument(0));
   ansi_char_t *buf = new ansi_char_t[chars_to_read];
   dword_t len = frontend()->get_console_title_a(buf, chars_to_read);
   if (len == 0) {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
   } else {
-    String result = data.factory()->new_string(buf, static_cast<uint32_t>(len));
+    String result = data->factory()->new_string(buf, static_cast<uint32_t>(len));
     callback(rpc::OutgoingResponse::success(result));
   }
 }
 
-void ConsoleFrontendService::set_console_title_a(rpc::RequestData &data, ResponseCallback callback) {
-  const char *new_title = data[0].string_chars();
+void ConsoleFrontendService::set_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
+  const char *new_title = data->argument(0).string_chars();
   if (frontend()->set_console_title_a(new_title)) {
     callback(rpc::OutgoingResponse::success(Variant::yes()));
   } else {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data.factory())));
+    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
   }
 }
 
-void ConsoleFrontendService::get_console_cp(rpc::RequestData &data, ResponseCallback callback) {
+void ConsoleFrontendService::get_console_cp(rpc::RequestData *data, ResponseCallback callback) {
   uint_t cp = frontend()->get_console_cp();
   // GetConsoleCP doesn't specify how it indicates errors but it seems to be
   // by returning 0 so that's what we do here.
   callback((cp == 0)
-      ? rpc::OutgoingResponse::failure(new_console_error(data.factory()))
+      ? rpc::OutgoingResponse::failure(new_console_error(data->factory()))
       : rpc::OutgoingResponse::success(cp));
 }
 
