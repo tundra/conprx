@@ -88,6 +88,16 @@ private:
   // if possible.
   fat_bool_t process_locate_cccs_message(handle_t port_handle, void **stack);
 
+  // Try to infer the address of a function given an array of function pointers
+  // that we expect will be present in a stack trace, as well as a stack trace.
+  // The function array indicates where the pcs in the stack trace must be in
+  // order for the inference to try to extract the address. One of the blobs
+  // must have a NULL start which indicates that it's a placeholder for the
+  // function we're interested in. On success a pointer to the beginning of the
+  // function is stored to result_out, otherwise false is returned.
+  fat_bool_t infer_address_guided(tclib::Blob *functions, void **stack_trace,
+      size_t depth, void **result_out);
+
   // Process the calibration message sent after we've located CCCS.
   fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);
 
