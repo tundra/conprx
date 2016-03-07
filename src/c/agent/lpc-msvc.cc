@@ -196,17 +196,11 @@ static bool is_pc_within_function(void *pc, tclib::Blob fun) {
   return is_pc_within_function(pc, new_fun);
 }
 
-// Try to infer the address of a function given an array of function pointers
-// that we expect will be present in a stack trace, as well as a stack trace.
-// The function array is expected to contain one empty blob which indicates the
-// position of the function to infer.
 fat_bool_t Interceptor::infer_address_guided(tclib::Blob *functions, void **stack_trace,
     size_t depth, void **result_out) {
-  size_t placeholder_index = depth;
+  size_t result_index = depth;
   // Scan through the stack trace and see if the entries lie within the
   // functions we expect them to.
-  void *result_pc = NULL;
-  size_t result_size = 0;
   for (size_t i = 0; i < depth; i++) {
     tclib::Blob fun = functions[i];
     void *pc = stack_trace[i];
@@ -217,9 +211,7 @@ fat_bool_t Interceptor::infer_address_guided(tclib::Blob *functions, void **stac
     if (fun.is_empty()) {
       // If this is the placeholder we record its index as well as the pc which
       // we can assume will be within the function.
-      placeholder_index = i;
-      result_pc = pc;
-      result_size = fun.size();
+      result_index = i;
       continue;
     }
     if (!is_pc_within_function(pc, fun))
@@ -227,11 +219,11 @@ fat_bool_t Interceptor::infer_address_guided(tclib::Blob *functions, void **stac
       // bail.
       return F_FALSE;
   }
-  CHECK_TRUE("no placeholder found", placeholder_index != depth);
-  CHECK_TRUE("placeholder at the bottom", placeholder_index != (depth - 1));
+  CHECK_TRUE("no placeholder found", result_index != depth);
+  CHECK_TRUE("placeholder at the bottom", result_index != (depth - 1));
   // Okay so the stack has checked out so now we try to extract the address. We
   // first grab the pc of the function that called the one we're looking for.
-  address_t caller_pc = reinterpret_cast<address_t>(stack_trace[placeholder_index + 1]);
+  address_t caller_pc = reinterpret_cast<address_t>(stack_trace[result_index + 1]);
   // Then we step backwards over the 32-bit relative call instruction we assume
   // will be there. We can in principle check that the functions aren't more
   // than 32 bits apart because we know both pcs but that can be added later if
@@ -250,6 +242,8 @@ fat_bool_t Interceptor::infer_address_guided(tclib::Blob *functions, void **stac
   // Check that the pc we found above is within the candidate function. If the
   // above has gone wrong and it's not a call this is likely to catch it, but
   // it's not airtight.
+  void *result_pc = stack_trace[result_index];
+  size_t result_size = functions[result_index].size();
   if (!is_pc_within_function(result_pc, tclib::Blob(result, result_size)))
     return F_FALSE;
   *result_out = result;
@@ -261,7 +255,7 @@ fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
   locate_cccs_port_handle_ = port_handle;
   tclib::Blob expected_stack[4] = {
       tclib::Blob(nt_request_wait_reply_port_bridge, 256),
-      tclib::Blob(NULL, 256),
+      tclib::Blob(NULL /* ConsoleClientCallServer */, 256),
       tclib::Blob(GetConsoleCP, 256),
       tclib::Blob(calibrate, 256)
   };
