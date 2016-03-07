@@ -22,32 +22,41 @@ Interceptor::Interceptor(handler_t handler)
   , calibration_capture_buffer_(NULL)
   , console_server_port_handle_(INVALID_HANDLE_VALUE) { }
 
-#define __DEFINE_LPC_BRIDGE__(Name, name, RET, SIG, ARGS)                      \
-  RET NTAPI Interceptor::name##_bridge SIG {                                   \
-    return current()->name ARGS;                                               \
+ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_handle,
+    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
+  // Similarly to Interceptor::calibrate we deliberately do the work here up
+  // to the point where we capture the stack trace in a static function such
+  // that we can check that there's a call to it on the stack. Whatever happens
+  // after the stack capture doesn't matter but just for simplicity we keep all
+  // the calibration stuff here so the instance method can ignore that
+  // completely. Also, for this to work we need to be sure the compiler
+  // materializes the call to this function since otherwise it doesn't show up
+  // in the stack trace. When it simply delegated to the instance method the
+  // optimizing compiler made the call into a jump, which is good in general but
+  // not what we want here.
+  Interceptor *inter = current();
+  if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
+    void *stack[kLocateCCCSStackSize];
+    CaptureStackBackTrace(0, kLocateCCCSStackSize, stack, NULL);
+    inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
+    return 0;
+  } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
+    inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
+    return 0;
+  } else {
+    return inter->nt_request_wait_reply_port(port_handle, request, incoming_reply);
   }
-FOR_EACH_LPC_FUNCTION(__DEFINE_LPC_BRIDGE__)
-#undef __DEFINE_LPC_BRIDGE__
+}
 
 ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *incoming_reply) {
-  if (enabled_) {
-    if (request->api_number == kGetConsoleCPApiNumber && is_locating_cccs_) {
-      // If this call is used to locate ConsoleClientCallServer
-      void *stack[kLocateCCCSStackSize];
-      CaptureStackBackTrace(0, kLocateCCCSStackSize, stack, NULL);
-      locate_cccs_result_ = process_locate_cccs_message(port_handle, stack);
-      return 0;
-    } else if (request->api_number == kCalibrationApiNumber && is_calibrating_) {
-      calibrate_result_ = process_calibration_message(port_handle, request);
-      return 0;
-    } else if (port_handle == console_server_port_handle_) {
-      lpc::Message message(request, port_xform());
-      fat_bool_t result = handler_(this, &message, incoming_reply);
-      return result ? 0 : 1;
-    }
+  if (enabled_ && port_handle == console_server_port_handle_) {
+    lpc::Message message(request, port_xform());
+    fat_bool_t result = handler_(this, &message, incoming_reply);
+    return result ? 0 : 1;
+  } else {
+    return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
   }
-  return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
 }
 
 fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
@@ -85,7 +94,7 @@ fat_bool_t Interceptor::uninstall() {
   return patches()->revert();
 }
 
-fat_bool_t Interceptor::calibrate(Interceptor *interceptor) {
+fat_bool_t Interceptor::calibrate(Interceptor *inter) {
   // Okay so this deserves a thorough explanation. What's going on here is that
   // when the connection between the process and the console server is first
   // opened the server describes itself and expects the client, that is the
@@ -120,14 +129,14 @@ fat_bool_t Interceptor::calibrate(Interceptor *interceptor) {
   // First try to locate ConsoleClientCallServer. The result variables start out
   // F_FALSE so if for some reason we don't hit the calibration handlers they'll
   // not be set to F_TRUE and we'll fail below.
-  interceptor->is_locating_cccs_ = true;
+  inter->is_locating_cccs_ = true;
   GetConsoleCP();
-  interceptor->is_locating_cccs_ = false;
-  F_TRY(interceptor->locate_cccs_result_);
+  inter->is_locating_cccs_ = false;
+  F_TRY(inter->locate_cccs_result_);
 
   // From here on we don't need to be in a static function so we let a method
   // do the rest.
-  return interceptor->infer_calibration_from_cccs();
+  return inter->infer_calibration_from_cccs();
 }
 
 fat_bool_t Interceptor::infer_calibration_from_cccs() {
@@ -178,22 +187,22 @@ fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
   // Save the port handle for later, we'll need it during calibration.
   locate_cccs_port_handle_ = port_handle;
   // Check the assumption that the immediate caller is the bridge function.
-  void *ntrwrpb_pc = stack[1];
+  void *ntrwrpb_pc = stack[0];
   address_t ntrwrpb = get_effective_function_address(nt_request_wait_reply_port_bridge);
   size_t ntrwrpb_offset = get_pc_offset(ntrwrpb_pc, ntrwrpb);
   if (ntrwrpb_offset > 256)
     return F_FALSE;
   // If we're right this will be an offset within ConsoleClientCallServer.
-  void *cccs_pc = stack[2];
+  void *cccs_pc = stack[1];
   // Check that the caller of ConsoleClientCallServer is GetConsoleCP.
-  address_t gcc_pc = reinterpret_cast<address_t>(stack[3]);
+  address_t gcc_pc = reinterpret_cast<address_t>(stack[2]);
   address_t gcc = get_effective_function_address(GetConsoleCP);
   size_t gcc_offset =  get_pc_offset(gcc_pc, gcc);
   if (gcc_offset >= 256)
     return F_FALSE;
   // Check that the caller of GetConsoleCP is calibrate. This is why calibrate
   // needs to be static at least until the point where it calls GetConsoleCP.
-  void *crv_pc = stack[4];
+  void *crv_pc = stack[3];
   address_t crv = get_effective_function_address(calibrate);
   size_t crv_offset = get_pc_offset(crv_pc, crv);
   if (crv_offset >= 256)

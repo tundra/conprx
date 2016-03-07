@@ -45,7 +45,7 @@ Response<T> PrpcConsoleConnector::send_request(rpc::OutgoingRequest *request,
     return Response<T>::of(C::convert(resp->peek_value(Variant::null())));
   } else {
     Variant error = resp->peek_error(Variant::null());
-    return Response<T>::error(error.integer_value());
+    return Response<T>::error(static_cast<dword_t>(error.integer_value()));
   }
 }
 

@@ -32,8 +32,17 @@ private:
 };
 
 // The amount of stack to look at to try to determine the location of
-// ConsoleClientCallServer.
-#define kLocateCCCSStackSize 5
+// ConsoleClientCallServer. It's 4 because the stack is expected to look like
+// this,
+//
+//   - Interceptor::nt_request_wait_reply_port_bridge
+//   - ConsoleClientCallServer
+//   - GetConsoleCP
+//   - Interceptor::calibrate
+//   - ...
+//
+// so 4 frames lets us validate that it does.
+#define kLocateCCCSStackSize 4
 
 // An interceptor deals with the full process of replacing the implementation of
 // NtRequestWaitReplyPort. There's a few steps to getting everything set up
