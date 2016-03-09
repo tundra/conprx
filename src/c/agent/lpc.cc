@@ -132,9 +132,11 @@ fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
       break;
     stack_trace = Vector<void*>(stack_trace.start() + 1, stack_trace.length() - 1);
   }
-  if (stack_trace.length() < depth)
+  if (stack_trace.length() < depth) {
+    Sleep(30000);
     // There's not enough stack left to match the functions so we're done.
     return F_FALSE;
+  }
   // Scan through the stack trace and see if the entries lie within the
   // functions we expect them to.
   for (size_t i = 0; i < depth; i++) {

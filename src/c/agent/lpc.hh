@@ -42,8 +42,10 @@ private:
 //   - ...
 //
 // so 4 frames lets us validate that it does.
-#define kLocateCCCSStackSize 4
-#define kLocateCCCSChunkSize 128
+#define kLocateCCCSStackTemplateSize 4
+
+// The amount of stack to capture and compare against the template.
+#define kLocateCCCSStackCaptureSize 5
 
 // An interceptor deals with the full process of replacing the implementation of
 // NtRequestWaitReplyPort. There's a few steps to getting everything set up

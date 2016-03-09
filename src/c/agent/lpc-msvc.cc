@@ -40,8 +40,8 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   Interceptor *inter = current();
   if (inter->enable_special_handlers_) {
     if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
-      void *scratch[kLocateCCCSStackSize];
-      Vector<void*> stack(scratch, kLocateCCCSStackSize);
+      void *scratch[kLocateCCCSStackCaptureSize];
+      Vector<void*> stack(scratch, kLocateCCCSStackCaptureSize);
       memset(stack.start(), 0, stack.size_bytes());
       if (!inter->capture_stacktrace(stack))
         return 0;
@@ -185,14 +185,14 @@ int32_t Interceptor::infer_stack_direction() {
 fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
     Vector<void*> stack_trace) {
   locate_cccs_port_handle_ = port_handle;
-  tclib::Blob expected_stack[kLocateCCCSStackSize] = {
+  tclib::Blob expected_stack[kLocateCCCSStackTemplateSize] = {
       tclib::Blob(nt_request_wait_reply_port_bridge, 256),
       tclib::Blob(NULL /* ConsoleClientCallServer */, 256),
       tclib::Blob(GetConsoleCP, 256),
       tclib::Blob(calibrate, 256)
   };
   void *guided_cccs = NULL;
-  F_TRY(infer_address_guided(Vector<tclib::Blob>(expected_stack, kLocateCCCSStackSize),
+  F_TRY(infer_address_guided(Vector<tclib::Blob>(expected_stack, kLocateCCCSStackTemplateSize),
       stack_trace, &guided_cccs));
   console_client_call_server_ = reinterpret_cast<console_client_call_server_f>(guided_cccs);
   return F_TRUE;
