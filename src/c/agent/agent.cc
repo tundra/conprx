@@ -159,15 +159,6 @@ fat_bool_t ConsoleAgent::send_request(rpc::OutgoingRequest *request,
   return F_TRUE;
 }
 
-// The default options construction.
-Options::Options() :
-#define __EMIT_INIT__(name, defawlt, Name, NAME) name##_(defawlt) ,
-    FOR_EACH_BOOL_OPTION(__EMIT_INIT__)
-#undef __EMIT_INIT__
-    dummy_(false) { }
-
 #ifdef IS_MSVC
 #include "agent-msvc.cc"
-#else
-#include "agent-posix.cc"
 #endif

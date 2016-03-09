@@ -137,21 +137,13 @@ class ConsoleConnector;
 // types.
 class ConsoleFrontend : public tclib::DefaultDestructable {
 public:
-  virtual ~ConsoleFrontend();
+  virtual ~ConsoleFrontend() { }
 
   // The types of the naked console functions.
 #define __DECLARE_CONAPI_FUNCTION__(Name, name, FLAGS, SIG, PSIG)              \
   typedef SIG(GET_SIG_RET) (WINAPI *name##_t)SIG(GET_SIG_PARAMS);
-  FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_FUNCTION__)
 #undef __DECLARE_CONAPI_FUNCTION__
-
-  enum key_t {
-#define __DECLARE_CONAPI_KEY__(Name, name, FLAGS, SIG, PSIG)                   \
-    name##_key,
-    FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_KEY__)
-#undef __DECLARE_CONAPI_KEY__
-    kFunctionCount
-  };
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
   virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS) = 0;
@@ -161,12 +153,6 @@ public:
   virtual dword_t get_last_error() = 0;
 
   virtual int64_t poke_backend(int64_t value) { return 0; }
-
-  // A description of a console function.
-  struct FunctionInfo {
-    cstr_t name;
-    int key;
-  };
 
   // Creates and returns a new instance of the native console frontend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_native();
@@ -178,10 +164,6 @@ public:
   // the given backend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(
       ConsoleConnector *connector);
-
-  // Returns a list containing descriptions of all the console functions.
-  static Vector<FunctionInfo> functions();
-
 };
 
 } // conprx

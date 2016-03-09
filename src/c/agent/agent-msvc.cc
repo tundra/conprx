@@ -122,56 +122,6 @@ fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
   return F_TRUE;
 }
 
-address_t ConsoleAgent::get_console_function_address(cstr_t name) {
-  module_t kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
-  return Code::upcast(GetProcAddress(kernel32, name));
-}
-
-// Windows-specific implementation of the options. The reason to make this into
-// a class is such that it has access to the protected fields in Options.
-class WindowsOptions : public Options {
-public:
-  WindowsOptions();
-
-  // Reads any options from environment variables.
-  void override_from_environment();
-
-  // Attempts to read the given environment variable and if present sets the
-  // field to its value, otherwise doesn't change it.
-  void override_bool_from_environment(bool *field, cstr_t name);
-};
-
-WindowsOptions::WindowsOptions() {
-  // Override with values from the environment.
-  override_from_environment();
-}
-
-void WindowsOptions::override_from_environment() {
-#define __EMIT_ENV_READ__(name, defawlt, Name, NAME)                           \
-  override_bool_from_environment(&name##_, TEXT("CONSOLE_AGENT_" NAME));
-  FOR_EACH_BOOL_OPTION(__EMIT_ENV_READ__)
-#undef __EMIT_ENV_READ__
-}
-
-void WindowsOptions::override_bool_from_environment(bool *field, cstr_t name) {
-  char_t buffer[256];
-  if (GetEnvironmentVariable(name, buffer, 256) == 0)
-    // There was no environment variable with that name.
-    return;
-  if (strcmp(buffer, "1") == 0) {
-    *field = true;
-  } else if (strcmp(buffer, "0") == 0) {
-    *field = false;
-  }
-}
-
-Options &Options::get() {
-  static WindowsOptions *options = NULL;
-  if (options == NULL)
-    options = new WindowsOptions();
-  return *options;
-}
-
 bool APIENTRY DllMain(module_t module, dword_t reason, void *) {
   switch (reason) {
     case DLL_PROCESS_ATTACH:

@@ -194,9 +194,6 @@ private:
   uint8_t lpc_redirect_mask_[kLpcRedirectMaskBlocks];
   void add_to_lpc_redirect_mask(ushort_t dll, ushort_t api);
 
-  // Returns the address of the console function with the given name.
-  static address_t get_console_function_address(cstr_t name);
-
 #define __EMIT_DELEGATE_BRIDGE__(Name, name, FLAGS, SIG, PSIG)                 \
   static SIG(GET_SIG_RET) WINAPI name##_bridge SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
@@ -210,33 +207,5 @@ private:
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
   F(BaseDllInitHelper,  0,      76)                                            \
   F(GetFileType,        0,      35)
-
-// Expands the given macro for each boolean option. The arguments are:
-// <field>              <upper camel>           <all caps>
-#define FOR_EACH_BOOL_OPTION(F)                                                \
-  F(is_enabled,      true,      "Enabled",              "ENABLED")             \
-  F(verbose_logging, false,     "VerboseLogging",       "VERBOSE_LOGGING")
-
-// The set of options that control how the agent behaves. Where these are read
-// from depends on the platform; on windows from the registry.
-class Options {
-public:
-  Options();
-
-#define __EMIT_BOOL_GETTER__(name, defawlt, Name, NAME) bool name() { return name##_; }
-  FOR_EACH_BOOL_OPTION(__EMIT_BOOL_GETTER__)
-#undef __EMIT_BOOL_GETTER__
-
-  // Returns the singleton options instance.
-  static Options &get();
-
-protected:
-#define __EMIT_BOOL_FIELD__(name, defawlt, Name, NAME) bool name##_;
-  FOR_EACH_BOOL_OPTION(__EMIT_BOOL_FIELD__)
-#undef __EMIT_BOOL_FIELD__
-
-  // Dummy unused field.
-  bool dummy_;
-};
 
 } // namespace conprx
