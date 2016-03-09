@@ -24,7 +24,9 @@ void Interceptor::capture_stack_top(Vector<void*> dest) {
   // The stack grows down so the top of the stack, the bookend var, must be at
   // the lowest address.
   address_t start = reinterpret_cast<address_t>(&bookend_var);
-  memcpy(dest.start(), start, dest.size_bytes());
+  // Because the vector may be stack-allocated they may overlap so we have to
+  // use memmove rather than memcpy. Thanks to valgrind for pointing that out.
+  memmove(dest.start(), start, dest.size_bytes());
 }
 
 // Returns true iff the given pc is within the function covered by the given

@@ -129,12 +129,6 @@ public:
   ConsoleAgent();
   virtual ~ConsoleAgent() { }
 
-  // Install the given console instead of the built-in one. Returns true on
-  // success. If this succeeds the output parameter will hold another console
-  // which can be called to get the original console behavior.
-  static fat_bool_t install(Options &options, ConsoleFrontend &console,
-      ConsoleFrontend **original_out);
-
   static const int32_t kConnectDataMagic = 0xFABACAEA;
 
   static const int cInvalidConnectDataSize = 0x11110000;
@@ -203,17 +197,10 @@ private:
   // Returns the address of the console function with the given name.
   static address_t get_console_function_address(cstr_t name);
 
-  // Returns the address of the delegator that turns static function calls into
-  // method calls on the delegate object.
-  static address_t get_delegate_bridge(int key);
-
 #define __EMIT_DELEGATE_BRIDGE__(Name, name, FLAGS, SIG, PSIG)                 \
   static SIG(GET_SIG_RET) WINAPI name##_bridge SIG(GET_SIG_PARAMS);
   FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
 #undef __EMIT_DELEGATE_BRIDGE__
-
-  // The console object currently being delegated to.
-  static ConsoleFrontend &delegate() { return *static_cast<ConsoleFrontend*>(NULL); }
 };
 
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \

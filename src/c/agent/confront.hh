@@ -184,31 +184,6 @@ public:
 
 };
 
-// A console implementation that logs all interaction before forwarding it to
-// a given delegate.
-class LoggingConsole : public ConsoleFrontend {
-public:
-  LoggingConsole(ConsoleFrontend *delegate) : delegate_(delegate) { }
-  virtual void default_destroy() { tclib::default_delete_concrete(this); }
-
-  void set_delegate(ConsoleFrontend *delegate) { delegate_ = delegate; }
-
-  // TODO: replace with a proper delegate when the console interface is the full
-  //   set of methods.
-  LoggingConsole &delegate() { return *static_cast<LoggingConsole*>(NULL); }
-
-  // Sends the given complete log message.
-  void emit_message(plankton::Variant message);
-
-#define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
-  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
-  FOR_EACH_FULL_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
-#undef __DECLARE_CONAPI_METHOD__
-
-private:
-  ConsoleFrontend *delegate_;
-};
-
 } // conprx
 
 #endif // _AGENT_CONSOLE_FRONTEND_HH
