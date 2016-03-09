@@ -180,6 +180,8 @@ private:
 
   fat_bool_t on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp);
 
+  fat_bool_t on_set_cp(lpc::Message *req, lpc::set_cp_m *set_cp);
+
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
   tclib::InStream *agent_in_;

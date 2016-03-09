@@ -22,6 +22,7 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
   register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
   register_method("poke", new_callback(&AgentOwnerService::on_poke, this));
   register_method("get_cp", new_callback(&AgentOwnerService::on_get_cp, this));
+  register_method("set_cp", new_callback(&AgentOwnerService::on_set_cp, this));
   set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
 }
 
@@ -43,11 +44,27 @@ void AgentOwnerService::on_is_done(rpc::RequestData *data, ResponseCallback resp
 }
 
 template <typename T>
+class VariantDefaultConverter {
+public:
+  static Variant convert(T value) {
+    return Variant(value);
+  }
+};
+
+template <>
+class VariantDefaultConverter<bool_t> {
+public:
+  static Variant convert(bool_t value) {
+    return Variant::boolean(value);
+  }
+};
+
+template <typename T>
 static void forward_response(Response<T> resp, rpc::Service::ResponseCallback callback) {
   if (resp.has_error()) {
     callback(rpc::OutgoingResponse::failure(Variant::integer(resp.error())));
   } else {
-    callback(rpc::OutgoingResponse::success(resp.value()));
+    callback(rpc::OutgoingResponse::success(VariantDefaultConverter<T>::convert(resp.value())));
   }
 }
 
@@ -58,6 +75,11 @@ void AgentOwnerService::on_poke(rpc::RequestData *data, ResponseCallback resp) {
 
 void AgentOwnerService::on_get_cp(rpc::RequestData *data, ResponseCallback resp) {
   forward_response(launcher()->backend()->get_cp(), resp);
+}
+
+void AgentOwnerService::on_set_cp(rpc::RequestData *data, ResponseCallback resp) {
+  uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
+  forward_response(launcher()->backend()->set_cp(value), resp);
 }
 
 void AgentOwnerService::message_not_understood(rpc::RequestData *data,

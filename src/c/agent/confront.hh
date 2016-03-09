@@ -27,7 +27,8 @@ class ConsoleConnector;
 #define GET_SIG_ARGS(RET, PARAMS, ARGS) ARGS
 
 #define sigVoidToBool(F) F(bool_t, (), ())
-#define sigVoidToUInt(F) F(uint_t, (), ())
+#define sigVoidToUInt(F) F(uint32_t, (), ())
+#define sigUIntToBool(F) F(bool_t, (uint32_t value), (value))
 #define sigVoidToHWnd(F) F(hwnd_t, (), ())
 #define sigWideStrToDWord(F) F(dword_t, (wide_str_t str, dword_t n), (str, n))
 #define sigWideCStrToBool(F) F(bool_t, (wide_cstr_t str), (str))
@@ -93,6 +94,7 @@ class ConsoleConnector;
 #define psigDWordToStr(F) F(_, (int64_t bufsize), (bufsize))
 #define psigAnsiCStrToVariant(F) F(_, (const char* string), (string))
 #define psigVoidToDWord(F) F(_, (), ())
+#define psigUIntToBool(F) F(_, (uint32_t value), (value))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -107,6 +109,7 @@ class ConsoleConnector;
   F(GetConsoleTitleA,           get_console_title_a,            (X), sigStrToDWord,                 psigDWordToStr)        \
   F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool,             psigAnsiCStrToVariant) \
   F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 psigVoidToDWord)       \
+  F(SetConsoleCP,               set_console_cp,                 (X), sigUIntToBool,                 psigUIntToBool)        \
 
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \

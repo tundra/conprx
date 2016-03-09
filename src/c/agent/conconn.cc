@@ -22,11 +22,17 @@ using namespace tclib;
 template <typename T>
 class DefaultConverter { };
 
-template <>
-class DefaultConverter<int64_t> {
-public:
-  static int64_t convert(const Variant &variant) { return variant.integer_value(); }
-};
+#define DECLARE_CONVERTER(type_t, EXPR)                                        \
+  template <> class DefaultConverter<type_t> {                                 \
+  public:                                                                      \
+    static type_t convert(const Variant &variant) {                            \
+      return (EXPR);                                                           \
+    }                                                                          \
+  }
+
+DECLARE_CONVERTER(int64_t, variant.integer_value());
+DECLARE_CONVERTER(bool_t, variant.bool_value());
+DECLARE_CONVERTER(uint32_t, static_cast<uint32_t>(variant.integer_value()));
 
 PrpcConsoleConnector::PrpcConsoleConnector(rpc::MessageSocket *socket,
     InputSocket *in)
@@ -62,10 +68,17 @@ Response<int64_t> PrpcConsoleConnector::poke(int64_t value) {
   return send_request_default<int64_t>(&req, &resp);
 }
 
-Response<int64_t> PrpcConsoleConnector::get_console_cp() {
+Response<uint32_t> PrpcConsoleConnector::get_console_cp() {
   rpc::OutgoingRequest req(Variant::null(), "get_cp");
   rpc::IncomingResponse resp;
-  return send_request_default<int64_t>(&req, &resp);
+  return send_request_default<uint32_t>(&req, &resp);
+}
+
+Response<bool_t> PrpcConsoleConnector::set_console_cp(uint32_t value) {
+  Variant arg = value;
+  rpc::OutgoingRequest req(Variant::null(), "set_cp", 1, &arg);
+  rpc::IncomingResponse resp;
+  return send_request_default<bool_t>(&req, &resp);
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

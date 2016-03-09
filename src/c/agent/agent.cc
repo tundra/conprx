@@ -101,15 +101,23 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
   switch (request->api_number()) {
     case 0x3C:
       return on_get_cp(request, &request->payload()->get_cp);
+    case 0x3D:
+      return on_set_cp(request, &request->payload()->set_cp);
     default:
       return F_FALSE;
   }
 }
 
 fat_bool_t ConsoleAgent::on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp) {
-  Response<int64_t> resp = connector()->get_console_cp();
+  Response<uint32_t> resp = connector()->get_console_cp();
   req->data()->return_value = static_cast<ulong_t>(resp.error());
   get_cp->code_page_id = (resp.has_error() ? 0 : resp.value());
+  return F_TRUE;
+}
+
+fat_bool_t ConsoleAgent::on_set_cp(lpc::Message *req, lpc::set_cp_m *set_cp) {
+  Response<bool_t> resp = connector()->set_console_cp(static_cast<uint32_t>(set_cp->code_page_id));
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
   return F_TRUE;
 }
 

@@ -25,7 +25,9 @@ public:
   // Send a debug/test poke to this backend.
   virtual Response<int64_t> poke(int64_t value) = 0;
 
-  virtual Response<int64_t> get_console_cp() = 0;
+  virtual Response<uint32_t> get_console_cp() = 0;
+
+  virtual Response<bool_t> set_console_cp(uint32_t value) = 0;
 };
 
 // Concrete console connector that is implemented by sending messages over
@@ -35,7 +37,8 @@ public:
   PrpcConsoleConnector(plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
   virtual Response<int64_t> poke(int64_t value);
-  virtual Response<int64_t> get_console_cp();
+  virtual Response<uint32_t> get_console_cp();
+  virtual Response<bool_t> set_console_cp(uint32_t value);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);

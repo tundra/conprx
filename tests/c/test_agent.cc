@@ -78,34 +78,73 @@ TEST(agent, simulate_roundtrip) {
 
 class CpImpl : public DummyConsoleBackend {
 public:
-  virtual Response<int64_t> get_cp() { return cp; }
-  Response<int64_t> cp;
+  virtual Response<uint32_t> get_cp() { return cp; }
+  virtual Response<bool_t> set_cp(uint32_t value) {
+    cp = Response<uint32_t>::of(value);
+    return Response<bool_t>::of(true);
+  }
+  Response<uint32_t> cp;
 };
 
-TEST(agent, native_roundtrip) {
-  if (!DriverManager::kSupportsRealAgent)
-    SKIP_TEST("requires real agent");
+#define SKIP_IF_UNSUPPORTED(USE_REAL) do {                                     \
+  if ((USE_REAL) && !DriverManager::kSupportsRealAgent)                        \
+    SKIP_TEST("requires real agent");                                          \
+} while (false)
+
+static void configure_driver(DriverManager *driver, bool use_real) {
+  if (use_real) {
+    driver->set_agent_type(DriverManager::atReal);
+    driver->set_frontend_type(dfNative);
+  } else {
+    driver->set_agent_type(DriverManager::atFake);
+    driver->set_frontend_type(dfSimulating);
+  }
+}
+
+MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
+  bool use_real = Flavor;
+  SKIP_IF_UNSUPPORTED(use_real);
   CpImpl backend;
   DriverManager driver;
   driver.set_backend(&backend);
-  driver.set_agent_type(DriverManager::atReal);
-  driver.set_frontend_type(dfNative);
+  configure_driver(&driver, use_real);
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.cp = Response<int64_t>::of(82723);
+  backend.cp = Response<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
   ASSERT_EQ(82723, cp0->integer_value());
 
-  backend.cp = Response<int64_t>::of(32728);
+  backend.cp = Response<uint32_t>::of(32728);
   DriverRequest cp1 = driver.get_console_cp();
   ASSERT_EQ(32728, cp1->integer_value());
 
   // For some reason positive error codes aren't propagated but negative ones
   // work.
-  backend.cp = Response<int64_t>::error(-123);
+  backend.cp = Response<uint32_t>::error(-123);
   DriverRequest cp2 = driver.get_console_cp();
   ASSERT_EQ(-123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}
+
+MULTITEST(agent, native_set_cp, bool, ("real", true), ("simul", false)) {
+  bool use_real = Flavor;
+  SKIP_IF_UNSUPPORTED(use_real);
+  CpImpl backend;
+  DriverManager driver;
+  driver.set_backend(&backend);
+  configure_driver(&driver, use_real);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  backend.cp = Response<uint32_t>::of(82723);
+  DriverRequest cp0 = driver.get_console_cp();
+  ASSERT_EQ(82723, cp0->integer_value());
+
+  DriverRequest cp1 = driver.set_console_cp(54643);
+  ASSERT_TRUE(cp1->bool_value());
+  ASSERT_EQ(54643, backend.cp.value());
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

@@ -37,8 +37,12 @@ bool_t WindowsConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return SetConsoleTitleA(str);
 }
 
-uint_t WindowsConsoleFrontend::get_console_cp() {
+uint32_t WindowsConsoleFrontend::get_console_cp() {
   return GetConsoleCP();
+}
+
+bool_t WindowsConsoleFrontend::set_console_cp(uint32_t value) {
+  return SetConsoleCP(value);
 }
 
 dword_t WindowsConsoleFrontend::get_last_error() {

@@ -31,7 +31,9 @@ public:
   // Debug/test call.
   virtual Response<int64_t> on_poke(int64_t value) = 0;
 
-  virtual Response<int64_t> get_cp() = 0;
+  virtual Response<uint32_t> get_cp() = 0;
+
+  virtual Response<bool_t> set_cp(uint32_t value) = 0;
 };
 
 // The service the driver will call back to when it wants to access the manager.
@@ -53,6 +55,8 @@ private:
   void on_poke(plankton::rpc::RequestData*, ResponseCallback);
 
   void on_get_cp(plankton::rpc::RequestData*, ResponseCallback);
+
+  void on_set_cp(plankton::rpc::RequestData*, ResponseCallback);
 
   // The fallback to call on unknown messages.
   void message_not_understood(plankton::rpc::RequestData*, ResponseCallback);

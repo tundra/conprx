@@ -122,12 +122,19 @@ void ConsoleFrontendService::set_console_title_a(rpc::RequestData *data, Respons
 }
 
 void ConsoleFrontendService::get_console_cp(rpc::RequestData *data, ResponseCallback callback) {
-  uint_t cp = frontend()->get_console_cp();
+  uint32_t cp = frontend()->get_console_cp();
   // GetConsoleCP doesn't specify how it indicates errors but it seems to be
   // by returning 0 so that's what we do here.
   callback((cp == 0)
       ? rpc::OutgoingResponse::failure(new_console_error(data->factory()))
       : rpc::OutgoingResponse::success(cp));
+}
+
+void ConsoleFrontendService::set_console_cp(rpc::RequestData *data, ResponseCallback callback) {
+  uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
+  callback(frontend()->set_console_cp(value)
+      ? rpc::OutgoingResponse::success(Variant::yes())
+      : rpc::OutgoingResponse::failure(new_console_error(data->factory())));
 }
 
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {

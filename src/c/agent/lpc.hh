@@ -222,8 +222,11 @@ struct get_cp_m {
   bool_t output;
 };
 
+typedef get_cp_m set_cp_m;
+
 union message_payload_t {
   get_cp_m get_cp;
+  set_cp_m set_cp;
 };
 
 // A console api message, a superset of a port message.

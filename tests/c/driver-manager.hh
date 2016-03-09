@@ -241,7 +241,8 @@ private:
 class DummyConsoleBackend : public ConsoleBackend {
 public:
   virtual Response<int64_t> on_poke(int64_t value) { return Response<int64_t>::error(1); }
-  virtual Response<int64_t> get_cp() { return Response<int64_t>::error(1); }
+  virtual Response<uint32_t> get_cp() { return Response<uint32_t>::error(1); }
+  virtual Response<bool_t> set_cp(uint32_t value) { return Response<bool_t>::error(1); }
 };
 
 } // namespace conprx
