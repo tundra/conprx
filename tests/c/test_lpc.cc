@@ -44,15 +44,17 @@ TEST(lpc, infer_unguided_successful) {
   if (!capture_result)
     return;
   void *guided_out = NULL;
-  ASSERT_F_TRUE(Interceptor::infer_address_guided(funs, stack, &guided_out));
-  ASSERT_PTREQ(CODE_UPCAST(fun_two), guided_out);
+  fat_bool_t guided_result = Interceptor::infer_address_guided(funs, stack, &guided_out);
+  if (kIsDebugCodegen)
+    ASSERT_F_TRUE(guided_result);
+  if (guided_result)
+    ASSERT_PTREQ(CODE_UPCAST(fun_two), guided_out);
 
   void *unguided_out = NULL;
   fat_bool_t unguided_result = Interceptor::infer_address_unguided(funs, top,
       &unguided_out, Vector<void*>());
   if (kIsDebugCodegen)
     ASSERT_F_TRUE(unguided_result);
-  if (!unguided_result)
-    return;
-  ASSERT_PTREQ(CODE_UPCAST(fun_two), unguided_out);
+  if (unguided_result)
+    ASSERT_PTREQ(CODE_UPCAST(fun_two), unguided_out);
 }
