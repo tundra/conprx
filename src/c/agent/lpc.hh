@@ -75,14 +75,6 @@ public:
     bool was_enabled_;
   };
 
-  // Given a vector of functions which indicate the expected layout of the
-  // stack, one of which is left NULL, and a raw block of the stack, attempts to
-  // infer the address of the function that has been left out of the function
-  // vector. If successful the result is written into result_out and if pcs_out
-  // is nonempty the pc of each function calls is written into it.
-  static fat_bool_t infer_address_unguided(Vector<tclib::Blob> functions,
-      Vector<void*> stack, void **result_out, Vector<void*> pcs_out);
-
   // Try to infer the address of a function given an array of function pointers
   // that we expect will be present in a stack trace, as well as a stack trace.
   // The function array indicates where the pcs in the stack trace must be in
@@ -96,10 +88,6 @@ public:
   // Capture the current stack trace, storing it in the given buffer. Returns
   // true iff enough stack could be captured to fill the buffer.
   static fat_bool_t capture_stacktrace(Vector<void*> buffer);
-
-  // Captures as much of the raw call stack as will fit in the given buffer and
-  // stores it there.
-  static void capture_stack_top(Vector<void*> dest);
 
 private:
   typedef ntstatus_t (*console_client_call_server_f)(void *message,

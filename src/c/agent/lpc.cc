@@ -19,16 +19,6 @@ Interceptor::Disable::~Disable() {
   interceptor_->enabled_ = was_enabled_;
 }
 
-void Interceptor::capture_stack_top(Vector<void*> dest) {
-  size_t bookend_var = 0;
-  // The stack grows down so the top of the stack, the bookend var, must be at
-  // the lowest address.
-  address_t start = reinterpret_cast<address_t>(&bookend_var);
-  // Because the vector may be stack-allocated they may overlap so we have to
-  // use memmove rather than memcpy. Thanks to valgrind for pointing that out.
-  memmove(dest.start(), start, dest.size_bytes());
-}
-
 // Returns true iff the given pc is within the function covered by the given
 // blob *or* we can determine that the blob is actually equivalent to some other
 // function and the pc is within that.
@@ -73,53 +63,6 @@ static bool extract_destination_from_return_pc(address_t caller_pc, void **resul
   // above has gone wrong and it's not a call this is likely to catch it, but
   // it's not airtight.
   return true;
-}
-
-fat_bool_t Interceptor::infer_address_unguided(Vector<tclib::Blob> functions,
-    Vector<void*> stack, void **result_out, Vector<void*> pcs_out) {
-  size_t wi = 0;
-  size_t fi = 0;
-  size_t caller_index = functions.length();
-  // Scan through the functions. For each function advance a scan through the
-  // stack chunk to find a pc within the current function.
-  void *result = NULL;
-  for (fi = 0; fi < functions.length() && wi < stack.length();) {
-    tclib::Blob fun = functions[fi];
-    if (fun.is_empty()) {
-      // This is the function we're interested in so we're not going to scan
-      // the stack -- we don't know it's address so there's nothing to look for.
-      caller_index = fi + 1;
-      fi++;
-      continue;
-    }
-    while (wi < stack.length()) {
-      void *next_word = stack[wi++];
-      if (is_pc_within_function(next_word, fun)) {
-        // We found an address on the stack within the next function we
-        // expected.
-        bool in_caller = (fi == caller_index);
-        if (in_caller) {
-          // Also, this function is the one that calls the one we're interested
-          // in so try to extract an address.
-          address_t caller_pc = reinterpret_cast<address_t>(next_word);
-          if (!extract_destination_from_return_pc(caller_pc, &result))
-            // We couldn't extract an address so we have to keep trying in case
-            // there are more locations to try.
-            continue;
-        }
-        // We're not in the caller so we can move on to the next function
-        // to try.
-        fi++;
-        break;
-      }
-    }
-  }
-  if (fi == functions.length() && result != NULL) {
-    *result_out = result;
-    return F_TRUE;
-  } else {
-    return F_FALSE;
-  }
 }
 
 fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
