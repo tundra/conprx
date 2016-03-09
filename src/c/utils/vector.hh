@@ -26,6 +26,8 @@ public:
   // Returns the number of elements in this vector.
   size_t length() const { return length_; }
 
+  size_t size_bytes() const { return length_ * sizeof(T); }
+
   // Returns the address of the beginning of this vector.
   T *start() { return elms_; }
   const T *start() const { return elms_; }
@@ -77,7 +79,7 @@ public:
   }
 
   // Returns the memory range covered by this vector.
-  tclib::Blob memory() { return tclib::Blob(elms_, length_ * sizeof(T)); }
+  tclib::Blob memory() { return tclib::Blob(elms_, size_bytes()); }
 
 private:
   // Given two pointers, returns the distance between them.

@@ -43,6 +43,7 @@ private:
 //
 // so 4 frames lets us validate that it does.
 #define kLocateCCCSStackSize 4
+#define kLocateCCCSChunkSize 128
 
 // An interceptor deals with the full process of replacing the implementation of
 // NtRequestWaitReplyPort. There's a few steps to getting everything set up
@@ -72,6 +73,32 @@ public:
     bool was_enabled_;
   };
 
+  // Given a vector of functions which indicate the expected layout of the
+  // stack, one of which is left NULL, and a raw block of the stack, attempts to
+  // infer the address of the function that has been left out of the function
+  // vector. If successful the result is written into result_out and if pcs_out
+  // is nonempty the pc of each function calls is written into it.
+  static fat_bool_t infer_address_unguided(Vector<tclib::Blob> functions,
+      Vector<void*> stack, void **result_out, Vector<void*> pcs_out);
+
+  // Try to infer the address of a function given an array of function pointers
+  // that we expect will be present in a stack trace, as well as a stack trace.
+  // The function array indicates where the pcs in the stack trace must be in
+  // order for the inference to try to extract the address. One of the blobs
+  // must have a NULL start which indicates that it's a placeholder for the
+  // function we're interested in. On success a pointer to the beginning of the
+  // function is stored to result_out, otherwise false is returned.
+  static fat_bool_t infer_address_guided(Vector<tclib::Blob> functions,
+      Vector<void*> stack_trace, void **result_out);
+
+  // Capture the current stack trace, storing it in the given buffer. Returns
+  // true iff enough stack could be captured to fill the buffer.
+  static fat_bool_t capture_stacktrace(Vector<void*> buffer);
+
+  // Captures as much of the raw call stack as will fit in the given buffer and
+  // stores it there.
+  static void capture_stack_top(Vector<void*> dest);
+
 private:
   typedef ntstatus_t (*console_client_call_server_f)(void *message,
       void *capture_buffer, ulong_t api_number, ulong_t request_length);
@@ -86,17 +113,12 @@ private:
 
   // Processes a stack trace to extract the address of ConsoleClientCallServer,
   // if possible.
-  fat_bool_t process_locate_cccs_message(handle_t port_handle, void **stack);
+  fat_bool_t process_locate_cccs_message(handle_t port_handle,
+      Vector<void*>);
 
-  // Try to infer the address of a function given an array of function pointers
-  // that we expect will be present in a stack trace, as well as a stack trace.
-  // The function array indicates where the pcs in the stack trace must be in
-  // order for the inference to try to extract the address. One of the blobs
-  // must have a NULL start which indicates that it's a placeholder for the
-  // function we're interested in. On success a pointer to the beginning of the
-  // function is stored to result_out, otherwise false is returned.
-  fat_bool_t infer_address_guided(tclib::Blob *functions, void **stack_trace,
-      size_t depth, void **result_out);
+  // Returns -1 if the stack grows down (it almost surely does) and 1 if it
+  // grows up.
+  int32_t infer_stack_direction();
 
   // Process the calibration message sent after we've located CCCS.
   fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);

@@ -8,6 +8,7 @@ filenames = [
   "test_binpatch.cc",
   "test_conapi.cc",
   "test_driver.cc",
+  "test_lpc.cc",
   "test_vector.cc",
   "driver-shared.cc",
   "driver-manager.cc",

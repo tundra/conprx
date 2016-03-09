@@ -21,7 +21,9 @@ Interceptor::Interceptor(handler_t handler)
   , is_calibrating_(false)
   , calibrate_result_(F_FALSE)
   , calibration_capture_buffer_(NULL)
-  , console_server_port_handle_(INVALID_HANDLE_VALUE) { }
+  , console_server_port_handle_(INVALID_HANDLE_VALUE) {
+  CHECK_EQ("stack grows up", -1, infer_stack_direction());
+}
 
 ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_handle,
     lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
@@ -38,16 +40,13 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   Interceptor *inter = current();
   if (inter->enable_special_handlers_) {
     if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
-      void *stack[kLocateCCCSStackSize];
-      memset(stack, 0, kLocateCCCSStackSize * sizeof(void*));
-      dword_t captured = CaptureStackBackTrace(0, kLocateCCCSStackSize, stack, NULL);
-      if (captured < kLocateCCCSStackSize) {
-        inter->locate_cccs_result_ = F_FALSE;
+      void *scratch[kLocateCCCSStackSize];
+      Vector<void*> stack(scratch, kLocateCCCSStackSize);
+      memset(stack.start(), 0, stack.size_bytes());
+      if (!inter->capture_stacktrace(stack))
         return 0;
-      } else {
-        inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
-        return 0;
-      }
+      inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
+      return 0;
     } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
       inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
       return 0;
@@ -172,96 +171,30 @@ fat_bool_t Interceptor::infer_calibration_from_cccs() {
   return F_TRUE;
 }
 
-// Returns true iff the given pc is within the function covered by the given
-// blob *or* we can determine that the blob is actually equivalent to some other
-// function and the pc is within that.
-static bool is_pc_within_function(void *pc, tclib::Blob fun) {
-  void *start = fun.start();
-  void *end = fun.end();
-  if (start <= pc && pc <= end)
-    // The pc is trivially within the function.
-    return true;
-  // If it's not within the function directly it might be because that function
-  // is simply a jump to another function, this is for instance the case with
-  // incremental linking. So we check if it is.
-  address_t addr = reinterpret_cast<address_t>(start);
-  if (addr[0] != 0xE9)
-    // First instruction is not a jump so we're done.
-    return false;
-  // Grab the destination of the jump and try again. This will not terminate if
-  // there is a cycle but why would there be?
-  int32_t offset = reinterpret_cast<int32_t*>(addr + 1)[0];
-  void *new_start = addr + 5 + offset;
-  Blob new_fun(new_start, fun.size());
-  return is_pc_within_function(pc, new_fun);
+static int32_t calc_stack_direction(size_t *caller_ptr) {
+  size_t var = 0;
+  return (caller_ptr == NULL)
+      ? calc_stack_direction(&var)
+      : ((&var < caller_ptr) ? -1 : 1);
 }
 
-fat_bool_t Interceptor::infer_address_guided(tclib::Blob *functions, void **stack_trace,
-    size_t depth, void **result_out) {
-  size_t result_index = depth;
-  // Scan through the stack trace and see if the entries lie within the
-  // functions we expect them to.
-  for (size_t i = 0; i < depth; i++) {
-    tclib::Blob fun = functions[i];
-    void *pc = stack_trace[i];
-    if (pc == NULL)
-      // The stack trace function sometimes leaves null entries, or doesn't
-      // fill them out. In either case it's a sign this won't work.
-      return F_FALSE;
-    if (fun.is_empty()) {
-      // If this is the placeholder we record its index as well as the pc which
-      // we can assume will be within the function.
-      result_index = i;
-      continue;
-    }
-    if (!is_pc_within_function(pc, fun))
-      // We found a stack trace entry that's not in the function we expected;
-      // bail.
-      return F_FALSE;
-  }
-  CHECK_TRUE("no placeholder found", result_index != depth);
-  CHECK_TRUE("placeholder at the bottom", result_index != (depth - 1));
-  // Okay so the stack has checked out so now we try to extract the address. We
-  // first grab the pc of the function that called the one we're looking for.
-  address_t caller_pc = reinterpret_cast<address_t>(stack_trace[result_index + 1]);
-  // Then we step backwards over the 32-bit relative call instruction we assume
-  // will be there. We can in principle check that the functions aren't more
-  // than 32 bits apart because we know both pcs but that can be added later if
-  // necessary.
-  address_t call_pc = caller_pc - 5;
-  // Check that it looks like a call. This may give false positives since it
-  // might be a different instruction that happened to have an E8 in its
-  // payload. But most likely it's not.
-  if (call_pc[0] != 0xE8)
-    return F_FALSE;
-  // Assuming it's a call the next 4 bytes will be the relative offset.
-  int32_t call_offset = reinterpret_cast<int32_t*>(call_pc + 1)[0];
-  // So this should be the address of the function we're looking for. The +5 is
-  // again because it's relative to the end of the call instruction.
-  void *result = call_pc + 5 + call_offset;
-  // Check that the pc we found above is within the candidate function. If the
-  // above has gone wrong and it's not a call this is likely to catch it, but
-  // it's not airtight.
-  void *result_pc = stack_trace[result_index];
-  size_t result_size = functions[result_index].size();
-  if (!is_pc_within_function(result_pc, tclib::Blob(result, result_size)))
-    return F_FALSE;
-  *result_out = result;
-  return F_TRUE;
+int32_t Interceptor::infer_stack_direction() {
+  return calc_stack_direction(NULL);
 }
 
 fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
-    void **stack) {
+    Vector<void*> stack_trace) {
   locate_cccs_port_handle_ = port_handle;
-  tclib::Blob expected_stack[4] = {
+  tclib::Blob expected_stack[kLocateCCCSStackSize] = {
       tclib::Blob(nt_request_wait_reply_port_bridge, 256),
       tclib::Blob(NULL /* ConsoleClientCallServer */, 256),
       tclib::Blob(GetConsoleCP, 256),
       tclib::Blob(calibrate, 256)
   };
-  void *cccs = NULL;
-  F_TRY(infer_address_guided(expected_stack, stack, 4, &cccs));
-  console_client_call_server_ = reinterpret_cast<console_client_call_server_f>(cccs);
+  void *guided_cccs = NULL;
+  F_TRY(infer_address_guided(Vector<tclib::Blob>(expected_stack, kLocateCCCSStackSize),
+      stack_trace, &guided_cccs));
+  console_client_call_server_ = reinterpret_cast<console_client_call_server_f>(guided_cccs);
   return F_TRUE;
 }
 
@@ -273,4 +206,10 @@ fat_bool_t Interceptor::process_calibration_message(handle_t port_handle,
     return F_FALSE;
   calibration_capture_buffer_ = message->capture_buffer;
   return F_TRUE;
+}
+
+fat_bool_t Interceptor::capture_stacktrace(Vector<void*> buffer) {
+  ulong_t frames = static_cast<ulong_t>(buffer.length());
+  ushort_t captured = CaptureStackBackTrace(0, frames, buffer.start(), NULL);
+  return F_BOOL(frames == captured);
 }
