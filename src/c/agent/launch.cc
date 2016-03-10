@@ -78,12 +78,12 @@ void AgentOwnerService::on_poke(rpc::RequestData *data, ResponseCallback resp) {
 }
 
 void AgentOwnerService::on_get_console_cp(rpc::RequestData *data, ResponseCallback resp) {
-  forward_response(launcher()->backend()->get_cp(), resp);
+  forward_response(launcher()->backend()->get_console_cp(), resp);
 }
 
 void AgentOwnerService::on_set_console_cp(rpc::RequestData *data, ResponseCallback resp) {
   uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
-  forward_response(launcher()->backend()->set_cp(value), resp);
+  forward_response(launcher()->backend()->set_console_cp(value), resp);
 }
 
 void AgentOwnerService::message_not_understood(rpc::RequestData *data,

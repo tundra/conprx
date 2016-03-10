@@ -78,8 +78,8 @@ TEST(agent, simulate_roundtrip) {
 
 class CpImpl : public DummyConsoleBackend {
 public:
-  virtual Response<uint32_t> get_cp() { return cp; }
-  virtual Response<bool_t> set_cp(uint32_t value) {
+  virtual Response<uint32_t> get_console_cp() { return cp; }
+  virtual Response<bool_t> set_console_cp(uint32_t value) {
     cp = Response<uint32_t>::of(value);
     return Response<bool_t>::of(true);
   }
