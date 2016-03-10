@@ -79,6 +79,14 @@ bool_t DummyConsoleFrontend::set_console_cp(uint32_t value) {
   return false;
 }
 
+uint32_t DummyConsoleFrontend::get_console_output_cp() {
+  return 0xF00F00;
+}
+
+bool_t DummyConsoleFrontend::set_console_output_cp(uint32_t value) {
+  return false;
+}
+
 dword_t DummyConsoleFrontend::get_last_error() {
   return 0xFABACAEA;
 }

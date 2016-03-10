@@ -31,9 +31,9 @@ public:
   // Debug/test call.
   virtual Response<int64_t> on_poke(int64_t value) = 0;
 
-  virtual Response<uint32_t> get_console_cp() = 0;
+  virtual Response<uint32_t> get_console_cp(bool is_output) = 0;
 
-  virtual Response<bool_t> set_console_cp(uint32_t value) = 0;
+  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 };
 
 // The service the driver will call back to when it wants to access the manager.

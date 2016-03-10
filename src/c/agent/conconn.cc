@@ -68,15 +68,16 @@ Response<int64_t> PrpcConsoleConnector::poke(int64_t value) {
   return send_request_default<int64_t>(&req, &resp);
 }
 
-Response<uint32_t> PrpcConsoleConnector::get_console_cp() {
-  rpc::OutgoingRequest req(Variant::null(), "get_console_cp");
+Response<uint32_t> PrpcConsoleConnector::get_console_cp(bool is_output) {
+  Variant args[1] = {Variant::boolean(is_output)};
+  rpc::OutgoingRequest req(Variant::null(), "get_console_cp", 1, args);
   rpc::IncomingResponse resp;
   return send_request_default<uint32_t>(&req, &resp);
 }
 
-Response<bool_t> PrpcConsoleConnector::set_console_cp(uint32_t value) {
-  Variant arg = value;
-  rpc::OutgoingRequest req(Variant::null(), "set_console_cp", 1, &arg);
+Response<bool_t> PrpcConsoleConnector::set_console_cp(uint32_t value, bool is_output) {
+  Variant args[2] = {value, Variant::boolean(is_output)};
+  rpc::OutgoingRequest req(Variant::null(), "set_console_cp", 2, args);
   rpc::IncomingResponse resp;
   return send_request_default<bool_t>(&req, &resp);
 }

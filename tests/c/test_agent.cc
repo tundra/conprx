@@ -76,15 +76,23 @@ TEST(agent, simulate_roundtrip) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
-class CpImpl : public DummyConsoleBackend {
+class CodePageBackend : public DummyConsoleBackend {
 public:
-  virtual Response<uint32_t> get_console_cp() { return cp; }
-  virtual Response<bool_t> set_console_cp(uint32_t value) {
-    cp = Response<uint32_t>::of(value);
-    return Response<bool_t>::of(true);
-  }
-  Response<uint32_t> cp;
+  virtual Response<uint32_t> get_console_cp(bool is_output);
+  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output);
+  Response<uint32_t> input;
+  Response<uint32_t> output;
 };
+
+Response<uint32_t> CodePageBackend::get_console_cp(bool is_output) {
+  return is_output ? output : input;
+}
+
+Response<bool_t> CodePageBackend::set_console_cp(uint32_t value, bool is_output) {
+  (is_output ? output : input) = Response<uint32_t>::of(value);
+  return Response<bool_t>::of(true);
+}
+
 
 #define SKIP_IF_UNSUPPORTED(USE_REAL) do {                                     \
   if ((USE_REAL) && !DriverManager::kSupportsRealAgent)                        \
@@ -104,24 +112,24 @@ static void configure_driver(DriverManager *driver, bool use_real) {
 MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
   bool use_real = Flavor;
   SKIP_IF_UNSUPPORTED(use_real);
-  CpImpl backend;
+  CodePageBackend backend;
   DriverManager driver;
   driver.set_backend(&backend);
   configure_driver(&driver, use_real);
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.cp = Response<uint32_t>::of(82723);
+  backend.input = Response<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
   ASSERT_EQ(82723, cp0->integer_value());
 
-  backend.cp = Response<uint32_t>::of(32728);
+  backend.input = Response<uint32_t>::of(32728);
   DriverRequest cp1 = driver.get_console_cp();
   ASSERT_EQ(32728, cp1->integer_value());
 
   // For some reason positive error codes aren't propagated but negative ones
   // work.
-  backend.cp = Response<uint32_t>::error(-123);
+  backend.input = Response<uint32_t>::error(-123);
   DriverRequest cp2 = driver.get_console_cp();
   ASSERT_EQ(-123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
 
@@ -131,20 +139,50 @@ MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
 MULTITEST(agent, native_set_cp, bool, ("real", true), ("simul", false)) {
   bool use_real = Flavor;
   SKIP_IF_UNSUPPORTED(use_real);
-  CpImpl backend;
+  CodePageBackend backend;
   DriverManager driver;
   driver.set_backend(&backend);
   configure_driver(&driver, use_real);
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.cp = Response<uint32_t>::of(82723);
+  backend.input = Response<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
   ASSERT_EQ(82723, cp0->integer_value());
 
   DriverRequest cp1 = driver.set_console_cp(54643);
   ASSERT_TRUE(cp1->bool_value());
-  ASSERT_EQ(54643, backend.cp.value());
+  ASSERT_EQ(54643, backend.input.value());
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}
+
+MULTITEST(agent, native_set_output_cp, bool, ("real", true), ("simul", false)) {
+  bool use_real = Flavor;
+  SKIP_IF_UNSUPPORTED(use_real);
+  CodePageBackend backend;
+  DriverManager driver;
+  driver.set_backend(&backend);
+  configure_driver(&driver, use_real);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  backend.output = Response<uint32_t>::of(534);
+  backend.input = Response<uint32_t>::of(653);
+  DriverRequest cp0 = driver.get_console_output_cp();
+  ASSERT_EQ(534, cp0->integer_value());
+  DriverRequest cp1 = driver.get_console_cp();
+  ASSERT_EQ(653, cp1->integer_value());
+
+  DriverRequest cp2 = driver.set_console_output_cp(443);
+  ASSERT_TRUE(cp2->bool_value());
+  ASSERT_EQ(443, backend.output.value());
+
+  DriverRequest cp3 = driver.get_console_output_cp();
+  ASSERT_EQ(443, cp3->integer_value());
+  DriverRequest cp4 = driver.get_console_cp();
+  ASSERT_EQ(653, cp4->integer_value());
+
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

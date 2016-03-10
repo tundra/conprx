@@ -149,10 +149,6 @@ public:
   fat_bool_t send_request(plankton::rpc::OutgoingRequest *request,
       plankton::rpc::IncomingResponse *response_out);
 
-  // Returns true if messages with the given api number is on the list of
-  // messages to redirect through the agent.
-  bool should_redirect_lpc(ulong_t number);
-
   // If the given number represents an lpc we know about returns the string name
   // of it. Otherwise return NULL.
   static const char *get_lpc_name(ulong_t number);
@@ -197,17 +193,6 @@ private:
 
   StreamingLog *log() { return &log_; }
   StreamingLog log_;
-
-  // A bit mask that indicates which lpc calls to pass through and which to
-  // redirect.
-  static const size_t kLpcRedirectMaskBlocks = 32;
-  uint8_t lpc_redirect_mask_[kLpcRedirectMaskBlocks];
-  void add_to_lpc_redirect_mask(ushort_t dll, ushort_t api);
-
-#define __EMIT_DELEGATE_BRIDGE__(Name, name, FLAGS, SIG, PSIG)                 \
-  static SIG(GET_SIG_RET) WINAPI name##_bridge SIG(GET_SIG_PARAMS);
-  FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
-#undef __EMIT_DELEGATE_BRIDGE__
 };
 
 } // namespace conprx

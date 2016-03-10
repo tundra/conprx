@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "agent/lpc.hh"
+#include "sync/process.hh"
 #include "utils/log.hh"
 
 using namespace lpc;
@@ -31,15 +32,13 @@ static bool is_pc_within_function(void *pc, tclib::Blob fun) {
   // If it's not within the function directly it might be because that function
   // is simply a jump to another function, this is for instance the case with
   // incremental linking. So we check if it is.
-  address_t addr = reinterpret_cast<address_t>(start);
-  if (addr[0] != 0xE9)
-    // First instruction is not a jump so we're done.
+  void *resolved = NativeProcess::resolve_jump_thunk(start);
+  if (resolved == start)
+    // The function was not a jump thunk so we're done.
     return false;
   // Grab the destination of the jump and try again. This will not terminate if
   // there is a cycle but why would there be?
-  int32_t offset = reinterpret_cast<int32_t*>(addr + 1)[0];
-  void *new_start = addr + 5 + offset;
-  Blob new_fun(new_start, fun.size());
+  Blob new_fun(resolved, fun.size());
   return is_pc_within_function(pc, new_fun);
 }
 
@@ -123,6 +122,32 @@ fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
 Message::Message(message_data_t *data, AddressXform *xform)
   : data_(data)
   , capbuf_(data->capture_buffer, xform, data) {
+}
+
+static void dump_blob(tclib::OutStream *out, tclib::Blob data) {
+  CHECK_TRUE("unaligned message", (data.size() % sizeof(int32_t)) == 0);
+  int32_t *start = static_cast<int32_t*>(data.start());
+  size_t size = data.size() / sizeof(int32_t);
+  for (size_t i = 0; i < size; i++) {
+    if ((i > 0) && ((i % 4) == 0))
+      out->printf("\n");
+    out->printf("%08x (%8i) ", start[i], start[i]);
+  }
+}
+
+void Message::dump(tclib::OutStream *out) {
+  size_t total_size = this->total_size();
+  size_t data_size = this->data_size();
+  size_t header_size = total_size - data_size;
+  out->printf("--- message[size: %i, data: %i]\n", total_size, data_size);
+  address_t start = reinterpret_cast<address_t>(data_);
+  tclib::Blob header(start, header_size);
+  dump_blob(out, header);
+  out->printf("\n--- data ---\n");
+  tclib::Blob data(start + header_size, data_size);
+  dump_blob(out, data);
+  out->printf("\n");
+  out->flush();
 }
 
 tclib::Blob CaptureBuffer::block(size_t index) {

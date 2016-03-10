@@ -10,6 +10,7 @@
 #include "agent/conapi-types.hh"
 #include "agent/protocol.hh"
 #include "c/stdc.h"
+#include "io/stream.hh"
 #include "utils/callback.hh"
 
 #define FOR_EACH_LPC_FUNCTION(F)                                               \
@@ -219,8 +220,9 @@ struct capture_buffer_data_t {
 };
 
 struct get_console_cp_m {
-  uint64_t code_page_id;
-  bool_t output;
+  ONLY_64_BIT(uint32_t padding);
+  uint32_t code_page_id;
+  bool_t is_output;
 };
 
 typedef get_console_cp_m set_console_cp_m;
@@ -289,6 +291,8 @@ public:
   message_data_t *data() { return data_; }
 
   message_payload_t *payload() { return &data_->payload; }
+
+  void dump(tclib::OutStream *out);
 
   // Returns a pointer to the capture buffer stored in the message.
   CaptureBuffer *capture_buffer() { return &capbuf_; }

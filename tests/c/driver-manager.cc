@@ -83,6 +83,14 @@ Variant DriverRequest::set_console_cp(uint32_t value) {
   return send("set_console_cp", value);
 }
 
+Variant DriverRequest::get_console_output_cp() {
+  return send("get_console_output_cp");
+}
+
+Variant DriverRequest::set_console_output_cp(uint32_t value) {
+  return send("set_console_output_cp", value);
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_fulfilled());

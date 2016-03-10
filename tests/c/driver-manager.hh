@@ -179,14 +179,10 @@ public:
 
   // Currently the agent doesn't work on fully-optimized 32-bit windows so we
   // force-disable it. This needs to be fixed ASAP.
-  #ifdef _DEBUG
-  #  define kForceDisableRealAgent false
-  #else
-  #  define kForceDisableRealAgent IF_MSVC(kIs32Bit, false)
-  #endif
+#  define kForceDisableRealAgent (kIs32Bit && (!kIsDebugCodegen))
 
   // Constant that's true when the real agent can work.
-  static const bool kSupportsRealAgent = kIsMsvc && !kIsDebugCodegen && (!kForceDisableRealAgent);
+  static const bool kSupportsRealAgent = kIsMsvc && !kForceDisableRealAgent;
 
   // Shorthands for requests that don't need the request object before sending
   // the message.
@@ -241,8 +237,8 @@ private:
 class DummyConsoleBackend : public ConsoleBackend {
 public:
   virtual Response<int64_t> on_poke(int64_t value) { return Response<int64_t>::error(1); }
-  virtual Response<uint32_t> get_console_cp() { return Response<uint32_t>::error(1); }
-  virtual Response<bool_t> set_console_cp(uint32_t value) { return Response<bool_t>::error(1); }
+  virtual Response<uint32_t> get_console_cp(bool is_output) { return Response<uint32_t>::error(1); }
+  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) { return Response<bool_t>::error(1); }
 };
 
 } // namespace conprx

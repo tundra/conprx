@@ -67,11 +67,19 @@ bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_cp() {
-  return connector()->get_console_cp().flush(0, &last_error_);
+  return connector()->get_console_cp(false).flush(0, &last_error_);
 }
 
 bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value) {
-  return connector()->set_console_cp(value).flush(false, &last_error_);
+  return connector()->set_console_cp(value, false).flush(false, &last_error_);
+}
+
+uint32_t SimulatingConsoleFrontend::get_console_output_cp() {
+  return connector()->get_console_cp(true).flush(0, &last_error_);
+}
+
+bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
+  return connector()->set_console_cp(value, true).flush(false, &last_error_);
 }
 
 dword_t SimulatingConsoleFrontend::get_last_error() {

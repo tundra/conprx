@@ -60,29 +60,7 @@ bool StreamingLog::record(log_entry_t *entry) {
 
 ConsoleAgent::ConsoleAgent()
   : agent_in_(NULL)
-  , agent_out_(NULL) {
-  // Clear the redirect mask.
-  memset(lpc_redirect_mask_, 0, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
-#define __SET_LPC_MASK__(Name, name, DLL, API) add_to_lpc_redirect_mask((DLL), (API));
-  FOR_EACH_LPC_TO_INTERCEPT(__SET_LPC_MASK__)
-#undef __SET_LPC_MASK__
-}
-
-void ConsoleAgent::add_to_lpc_redirect_mask(ushort_t dll, ushort_t api) {
-  uint32_t index = CALC_API_NUMBER(dll, api);
-  uint32_t block_index = index >> 3;
-  uint8_t bit_index = index & 7;
-  CHECK_REL("index too big", block_index, <, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
-  uint8_t *block = lpc_redirect_mask_ + block_index;
-  *block = *block | static_cast<uint8_t>(1 << bit_index);
-}
-
-bool ConsoleAgent::should_redirect_lpc(ulong_t number) {
-  uint32_t block_index = number >> 3;
-  uint8_t bit_index = number & 7;
-  CHECK_REL("index too big", block_index, <, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
-  return (lpc_redirect_mask_[block_index] & (1 << bit_index)) != 0;
-}
+  , agent_out_(NULL) { }
 
 const char *ConsoleAgent::get_lpc_name(ulong_t number) {
   switch (number) {
@@ -109,14 +87,15 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
 }
 
 fat_bool_t ConsoleAgent::on_get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
-  Response<uint32_t> resp = connector()->get_console_cp();
+  Response<uint32_t> resp = connector()->get_console_cp(data->is_output);
   req->data()->return_value = static_cast<ulong_t>(resp.error());
   data->code_page_id = (resp.has_error() ? 0 : resp.value());
   return F_TRUE;
 }
 
 fat_bool_t ConsoleAgent::on_set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
-  Response<bool_t> resp = connector()->set_console_cp(static_cast<uint32_t>(data->code_page_id));
+  Response<bool_t> resp = connector()->set_console_cp(
+      static_cast<uint32_t>(data->code_page_id), data->is_output);
   req->data()->return_value = static_cast<ulong_t>(resp.error());
   return F_TRUE;
 }

@@ -110,6 +110,8 @@ class ConsoleConnector;
   F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool,             psigAnsiCStrToVariant) \
   F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 psigVoidToDWord)       \
   F(SetConsoleCP,               set_console_cp,                 (X), sigUIntToBool,                 psigUIntToBool)        \
+  F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 psigVoidToDWord)       \
+  F(SetConsoleOutputCP,         set_console_output_cp,          (X), sigUIntToBool,                 psigUIntToBool)        \
 
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
