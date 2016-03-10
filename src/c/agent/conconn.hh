@@ -9,11 +9,11 @@
 #ifndef _AGENT_CONSOLE_CONNECTOR_HH
 #define _AGENT_CONSOLE_CONNECTOR_HH
 
+#include "agent/lpc.hh"
 #include "conapi-types.hh"
 #include "io/stream.hh"
 #include "plankton-inl.hh"
 #include "rpc.hh"
-#include "agent/response.hh"
 
 namespace conprx {
 

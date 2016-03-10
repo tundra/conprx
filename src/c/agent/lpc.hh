@@ -8,6 +8,7 @@
 
 #include "agent/binpatch.hh"
 #include "agent/conapi-types.hh"
+#include "agent/protocol.hh"
 #include "c/stdc.h"
 #include "utils/callback.hh"
 
@@ -217,16 +218,17 @@ struct capture_buffer_data_t {
   ulong_t *message_pointer_offsets[1];
 };
 
-struct get_cp_m {
+struct get_console_cp_m {
   uint64_t code_page_id;
   bool_t output;
 };
 
-typedef get_cp_m set_cp_m;
+typedef get_console_cp_m set_console_cp_m;
 
 union message_payload_t {
-  get_cp_m get_cp;
-  set_cp_m set_cp;
+#define __EMIT_ENTRY__(Name, name, DLL, API) name##_m name;
+  FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
+#undef __EMIT_ENTRY__
 };
 
 // A console api message, a superset of a port message.
@@ -264,6 +266,9 @@ private:
   message_data_t *message_;
   message_data_t *message() { return message_; }
 };
+
+// Computes the joint api number given a dll and an api index.
+#define CALC_API_NUMBER(DLL, API) (((DLL) << 16) | (API))
 
 // A wrapper around an LPC message that encapsulates access to the various
 // fields of interest.

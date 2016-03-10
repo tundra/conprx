@@ -4,7 +4,7 @@
 #ifndef _CONPRX_AGENT_LAUNCH
 #define _CONPRX_AGENT_LAUNCH
 
-#include "agent/response.hh"
+#include "agent/protocol.hh"
 #include "rpc.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
@@ -54,9 +54,10 @@ private:
   // passed through to the implementation.
   void on_poke(plankton::rpc::RequestData*, ResponseCallback);
 
-  void on_get_cp(plankton::rpc::RequestData*, ResponseCallback);
-
-  void on_set_cp(plankton::rpc::RequestData*, ResponseCallback);
+#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
+  void on_##name(plankton::rpc::RequestData*, ResponseCallback);
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
+#undef __GEN_HANDLER__
 
   // The fallback to call on unknown messages.
   void message_not_understood(plankton::rpc::RequestData*, ResponseCallback);

@@ -1,10 +1,18 @@
 //- Copyright 2016 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-// Type declarations used by the console api.
+// Type declarations used by both sides of the console api.
 
-#ifndef _AGENT_RESPONSE_HH
-#define _AGENT_RESPONSE_HH
+#ifndef _AGENT_PROTOCOL_HH
+#define _AGENT_PROTOCOL_HH
+
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
+  F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
+  F(SetConsoleCP,       set_console_cp,         0,      0x3D)
+
+#define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
+  F(BaseDllInitHelper,  ,                       0,      76)                    \
+  F(GetFileType,        ,                       0,      35)
 
 namespace conprx {
 
@@ -51,4 +59,4 @@ T Response<T>::flush(const T &defawlt, dword_t *error_out) {
 
 } // namespace conprx
 
-#endif // _AGENT_RESPONSE_HH
+#endif // _AGENT_PROTOCOL_HH

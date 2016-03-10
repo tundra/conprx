@@ -3,7 +3,6 @@
 
 #include "agent.hh"
 #include "agent/conconn.hh"
-#include "agent/response.hh"
 #include "async/promise-inl.hh"
 #include "binpatch.hh"
 #include "confront.hh"
@@ -64,13 +63,13 @@ ConsoleAgent::ConsoleAgent()
   , agent_out_(NULL) {
   // Clear the redirect mask.
   memset(lpc_redirect_mask_, 0, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
-#define __SET_LPC_MASK__(Name, DLL, API) add_to_lpc_redirect_mask((DLL), (API));
+#define __SET_LPC_MASK__(Name, name, DLL, API) add_to_lpc_redirect_mask((DLL), (API));
   FOR_EACH_LPC_TO_INTERCEPT(__SET_LPC_MASK__)
 #undef __SET_LPC_MASK__
 }
 
 void ConsoleAgent::add_to_lpc_redirect_mask(ushort_t dll, ushort_t api) {
-  uint32_t index = (dll << 16) | api;
+  uint32_t index = CALC_API_NUMBER(dll, api);
   uint32_t block_index = index >> 3;
   uint8_t bit_index = index & 7;
   CHECK_REL("index too big", block_index, <, sizeof(*lpc_redirect_mask_) * kLpcRedirectMaskBlocks);
@@ -87,7 +86,7 @@ bool ConsoleAgent::should_redirect_lpc(ulong_t number) {
 
 const char *ConsoleAgent::get_lpc_name(ulong_t number) {
   switch (number) {
-#define __GEN_CASE__(Name, DLL, API) case ((DLL << 16) | API): return #Name;
+#define __GEN_CASE__(Name, name, DLL, API) case ((DLL << 16) | API): return #Name;
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_CASE__)
   FOR_EACH_OTHER_KNOWN_LPC(__GEN_CASE__)
 #undef __GEN_CASE__
@@ -99,24 +98,25 @@ const char *ConsoleAgent::get_lpc_name(ulong_t number) {
 fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
     lpc::Message *request, lpc::message_data_t *incoming_reply) {
   switch (request->api_number()) {
-    case 0x3C:
-      return on_get_cp(request, &request->payload()->get_cp);
-    case 0x3D:
-      return on_set_cp(request, &request->payload()->set_cp);
+#define __EMIT_CASE__(Name, name, DLL, API)                                    \
+    case lm##Name:                                                             \
+      return on_##name(request, &request->payload()->name);
+  FOR_EACH_LPC_TO_INTERCEPT(__EMIT_CASE__)
+#undef __EMIT_CASE__
     default:
       return F_FALSE;
   }
 }
 
-fat_bool_t ConsoleAgent::on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp) {
+fat_bool_t ConsoleAgent::on_get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
   Response<uint32_t> resp = connector()->get_console_cp();
   req->data()->return_value = static_cast<ulong_t>(resp.error());
-  get_cp->code_page_id = (resp.has_error() ? 0 : resp.value());
+  data->code_page_id = (resp.has_error() ? 0 : resp.value());
   return F_TRUE;
 }
 
-fat_bool_t ConsoleAgent::on_set_cp(lpc::Message *req, lpc::set_cp_m *set_cp) {
-  Response<bool_t> resp = connector()->set_console_cp(static_cast<uint32_t>(set_cp->code_page_id));
+fat_bool_t ConsoleAgent::on_set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
+  Response<bool_t> resp = connector()->set_console_cp(static_cast<uint32_t>(data->code_page_id));
   req->data()->return_value = static_cast<ulong_t>(resp.error());
   return F_TRUE;
 }

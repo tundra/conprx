@@ -21,8 +21,12 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
   register_method("is_ready", new_callback(&AgentOwnerService::on_is_ready, this));
   register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
   register_method("poke", new_callback(&AgentOwnerService::on_poke, this));
-  register_method("get_cp", new_callback(&AgentOwnerService::on_get_cp, this));
-  register_method("set_cp", new_callback(&AgentOwnerService::on_set_cp, this));
+
+#define __GEN_REGISTER__(Name, name, DLL, API)                                 \
+  register_method(#name, new_callback(&AgentOwnerService::on_##name, this));
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_REGISTER__)
+#undef __GEN_REGISTER__
+
   set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
 }
 
@@ -73,11 +77,11 @@ void AgentOwnerService::on_poke(rpc::RequestData *data, ResponseCallback resp) {
   forward_response(launcher()->backend()->on_poke(value), resp);
 }
 
-void AgentOwnerService::on_get_cp(rpc::RequestData *data, ResponseCallback resp) {
+void AgentOwnerService::on_get_console_cp(rpc::RequestData *data, ResponseCallback resp) {
   forward_response(launcher()->backend()->get_cp(), resp);
 }
 
-void AgentOwnerService::on_set_cp(rpc::RequestData *data, ResponseCallback resp) {
+void AgentOwnerService::on_set_console_cp(rpc::RequestData *data, ResponseCallback resp) {
   uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
   forward_response(launcher()->backend()->set_cp(value), resp);
 }

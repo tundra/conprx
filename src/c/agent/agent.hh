@@ -165,6 +165,13 @@ public:
 
   virtual ConsoleConnector *connector() { return NULL; }
 
+  enum lpc_method_key_t {
+    lmFirst
+#define __GEN_KEY_ENUM__(Name, name, DLL, API) , lm##Name = CALC_API_NUMBER(DLL, API)
+    FOR_EACH_LPC_TO_INTERCEPT(__GEN_KEY_ENUM__)
+#undef __GEN_KEY_ENUM__
+  };
+
 protected:
   // Perform the platform-specific part of the agent installation.
   virtual fat_bool_t install_agent_platform() = 0;
@@ -178,9 +185,10 @@ private:
 
   fat_bool_t send_is_done();
 
-  fat_bool_t on_get_cp(lpc::Message *req, lpc::get_cp_m *get_cp);
-
-  fat_bool_t on_set_cp(lpc::Message *req, lpc::set_cp_m *set_cp);
+#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
+  fat_bool_t on_##name(lpc::Message *req, lpc::name##_m *data);
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
+#undef __GEN_HANDLER__
 
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
@@ -201,13 +209,5 @@ private:
   FOR_EACH_CONAPI_FUNCTION(__EMIT_DELEGATE_BRIDGE__)
 #undef __EMIT_DELEGATE_BRIDGE__
 };
-
-#define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
-  F(GetConsoleTitle,    0,      36)                                            \
-  F(SetConsoleTitle,    0,      37)
-
-#define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
-  F(BaseDllInitHelper,  0,      76)                                            \
-  F(GetFileType,        0,      35)
 
 } // namespace conprx
