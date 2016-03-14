@@ -13,7 +13,7 @@ Interceptor::Interceptor(handler_t handler)
   : handler_(handler)
   , patches_(Platform::get(), Vector<PatchRequest>(patch_requests_, kPatchRequestCount))
   , enabled_(true)
-  , enable_special_handlers_(false)
+  , one_shot_special_handler_(false)
   , is_locating_cccs_(false)
   , locate_cccs_result_(F_FALSE)
   , console_client_call_server_(NULL)
@@ -38,13 +38,16 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   // optimizing compiler made the call into a jump, which is good in general but
   // not what we want here.
   Interceptor *inter = current();
-  if (inter->enable_special_handlers_) {
+  if (inter->one_shot_special_handler_) {
+    inter->one_shot_special_handler_ = false;
     if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
       void *scratch[kLocateCCCSStackCaptureSize];
       Vector<void*> stack(scratch, kLocateCCCSStackCaptureSize);
       memset(stack.start(), 0, stack.size_bytes());
       if (!inter->capture_stacktrace(stack))
-        return 0;
+        // If we can't capture the stack we just clear out the variable and
+        // keep going.
+        stack = Vector<void*>();
       inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
       return 0;
     } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
@@ -62,11 +65,10 @@ ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *incoming_reply) {
   if (enabled_ && port_handle == console_server_port_handle_) {
     lpc::Message message(request, port_xform());
-    fat_bool_t result = handler_(this, &message, incoming_reply);
-    return result ? 0 : 1;
-  } else {
-    return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
+    if (handler_(this, &message, incoming_reply))
+      return 0;
   }
+  return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
 }
 
 fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
@@ -139,9 +141,9 @@ fat_bool_t Interceptor::calibrate(Interceptor *inter) {
   // First try to locate ConsoleClientCallServer. The result variables start out
   // F_FALSE so if for some reason we don't hit the calibration handlers they'll
   // not be set to F_TRUE and we'll fail below.
-  inter->enable_special_handlers_ = inter->is_locating_cccs_ = true;
+  inter->one_shot_special_handler_ = inter->is_locating_cccs_ = true;
   GetConsoleCP();
-  inter->enable_special_handlers_ = inter->is_locating_cccs_ = false;
+  inter->is_locating_cccs_ = false;
   F_TRY(inter->locate_cccs_result_);
 
   // From here on we don't need to be in a static function so we let a method
@@ -151,21 +153,19 @@ fat_bool_t Interceptor::calibrate(Interceptor *inter) {
 
 fat_bool_t Interceptor::infer_calibration_from_cccs() {
   // Then send the artificial calibration message.
-  message_data_t message;
+  lpc::message_data_t message;
   struct_zero_fill(message);
-  capture_buffer_data_t capture_buffer;
-  struct_zero_fill(capture_buffer);
-  enable_special_handlers_ = is_calibrating_ = true;
-  (console_client_call_server_)(&message, &capture_buffer, kCalibrationApiNumber,
-      0);
-  enable_special_handlers_ = is_calibrating_ = false;
+  one_shot_special_handler_ = is_calibrating_ = true;
+  (cccs_)(reinterpret_cast<lpc::message_data_t*>(message), NULL,
+      kCalibrationApiNumber, sizeof(message.payload.get_console_cp));
+  is_calibrating_ = false;
   F_TRY(calibrate_result_);
 
   // The calibration message appears to have gone well. Now we have the info we
   // need to calibration.
-  address_t local_address = reinterpret_cast<address_t>(&capture_buffer);
-  address_t remote_address = reinterpret_cast<address_t>(calibration_capture_buffer_);
-  port_xform()->initialize(local_address - remote_address);
+  // address_t local_address = reinterpret_cast<address_t>(&capture_buffer);
+  // address_t remote_address = reinterpret_cast<address_t>(calibration_capture_buffer_);
+  // port_xform()->initialize(local_address - remote_address);
   console_server_port_handle_ = locate_cccs_port_handle_;
 
   return F_TRUE;
@@ -185,17 +185,50 @@ int32_t Interceptor::infer_stack_direction() {
 fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
     Vector<void*> stack_trace) {
   locate_cccs_port_handle_ = port_handle;
-  tclib::Blob expected_stack[kLocateCCCSStackTemplateSize] = {
-      tclib::Blob(nt_request_wait_reply_port_bridge, 256),
-      tclib::Blob(NULL /* ConsoleClientCallServer */, 256),
-      tclib::Blob(GetConsoleCP, 256),
-      tclib::Blob(calibrate, 256)
-  };
+  tclib::Blob gccp = tclib::Blob(GetConsoleCP, 256);
+  // We always try to infer the address in two different ways because both are
+  // somewhat unreliable so together they'll still be unreliable but should be
+  // less so. First infer from a stack trace if we have one.
   void *guided_cccs = NULL;
-  F_TRY(infer_address_guided(Vector<tclib::Blob>(expected_stack, kLocateCCCSStackTemplateSize),
-      stack_trace, &guided_cccs));
-  console_client_call_server_ = reinterpret_cast<console_client_call_server_f>(guided_cccs);
-  return F_TRUE;
+  fat_bool_t guided_result;
+  if (stack_trace.is_empty()) {
+    guided_result = F_FALSE;
+  } else {
+    tclib::Blob expected_stack_blobs[kLocateCCCSStackTemplateSize] = {
+        tclib::Blob(nt_request_wait_reply_port_bridge, 256),
+        tclib::Blob(NULL /* ConsoleClientCallServer */, 256),
+        gccp,
+        tclib::Blob(calibrate, 256)
+    };
+    Vector<tclib::Blob> expected_stack = Vector<tclib::Blob>(expected_stack_blobs,
+        kLocateCCCSStackTemplateSize);
+    guided_result = infer_address_guided(expected_stack, stack_trace, &guided_cccs);
+  }
+  // Then infer from the body of GetConsoleCP. On 64 bit we can be a little
+  // stricter and look for a unique 32-bit call because in practice there's
+  // only one in the case we're interested in, whereas on 32 bits all calls are
+  // like that so we have to make do with getting the first one.
+  void *caller_cccs = NULL;
+  fat_bool_t caller_result = infer_address_from_caller(gccp, &caller_cccs, kIs32Bit);
+  if (guided_result) {
+    if (caller_result && (guided_cccs != caller_cccs)) {
+      // If both inferred an address but they landed at different ones that's
+      // a bad sign so we abort. Most likely the guided one is correct but
+      // still, better be on the safe side. Also, this provides some herd
+      // immunity because it indicates that there's a problem in the caller
+      // inference which is useful to know for platforms where the guided
+      // inference isn't available.
+      return F_FALSE;
+    }
+    cccs_ = reinterpret_cast<cccs_f>(guided_cccs);
+    return F_TRUE;
+  } else if (caller_result) {
+    cccs_ = reinterpret_cast<cccs_f>(caller_cccs);
+    return F_TRUE;
+  } else {
+    // If they both failed we can only return one so return this one.
+    return caller_result;
+  }
 }
 
 fat_bool_t Interceptor::process_calibration_message(handle_t port_handle,

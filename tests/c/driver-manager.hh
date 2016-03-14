@@ -177,12 +177,8 @@ public:
   // Sets the backend to eventually pass to the launcher once it's been created.
   void set_backend(ConsoleBackend *backend) { backend_ = backend; }
 
-  // Currently the agent doesn't work on fully-optimized 32-bit windows so we
-  // force-disable it. This needs to be fixed ASAP.
-#  define kForceDisableRealAgent (kIs32Bit && (!kIsDebugCodegen))
-
   // Constant that's true when the real agent can work.
-  static const bool kSupportsRealAgent = kIsMsvc && !kForceDisableRealAgent;
+  static const bool kSupportsRealAgent = kIsMsvc;
 
   // Shorthands for requests that don't need the request object before sending
   // the message.

@@ -13,6 +13,14 @@
 #include "io/stream.hh"
 #include "utils/callback.hh"
 
+// List all the lpc functions to patch. Note that the calling conventions are
+// important here -- if you find your code crashing immediately after calls to
+// these or their imposters (including stack cookie checks) you may want to look
+// into whether it's because they're declared with the wrong calling convention.
+// In particular, if crashes only happen on fully-optimized 32-bit windows and
+// it turns out ESP ends up with an incorrect value, this is a good candidate
+// for what the cause it. If you can call into the function in question you can
+// tell its calling convention by how the name is mangled.
 #define FOR_EACH_LPC_FUNCTION(F)                                               \
   F(NtRequestWaitReplyPort, nt_request_wait_reply_port, ntstatus_t,            \
      (handle_t port_handle, lpc::message_data_t *request, lpc::message_data_t *incoming_reply), \
@@ -87,13 +95,24 @@ public:
   static fat_bool_t infer_address_guided(Vector<tclib::Blob> functions,
       Vector<void*> stack_trace, void **result_out);
 
+  // Given a function that is assumed to call a function we're interested in,
+  // scan over the code of the function and return the address of that function.
+  // Only returns true if it's fairly sure it's found the call, if if returns
+  // false the state of the out parameter is undefined. If return_first is true
+  // it will be less strict and just return the first call, otherwise it will
+  // try to ensure that it's the only 32-bit relative call.
+  static fat_bool_t infer_address_from_caller(tclib::Blob function,
+      void **result_out, bool return_first);
+
   // Capture the current stack trace, storing it in the given buffer. Returns
   // true iff enough stack could be captured to fill the buffer.
   static fat_bool_t capture_stacktrace(Vector<void*> buffer);
 
 private:
-  typedef ntstatus_t (*console_client_call_server_f)(void *message,
-      void *capture_buffer, ulong_t api_number, ulong_t request_length);
+  // The type of ConsoleClientCallServer. Should really be called
+  // console_client_call_server_f but that's just sooo verbose.
+  typedef ntstatus_t (MSVC_STDCALL *cccs_f)(void *message, void *capture_buffer,
+      ulong_t api_number, ulong_t request_length);
 
   // Sends the calibration message through the built-in message system to set
   // the internal state of the console properly. This must be a static function;
@@ -137,7 +156,7 @@ private:
   // Declare the state and functions used to interact with each function to
   // patch.
 #define __DECLARE_REPLACEMENT_FUNCTION__(Name, name, RET, SIG, ARGS)           \
-  typedef RET (*name##_f) SIG;                                                 \
+  typedef RET (MSVC_STDCALL *name##_f) SIG;                                    \
   static RET NTAPI name##_bridge SIG;                                          \
   RET NTAPI name SIG;                                                          \
   conprx::PatchRequest *name##_patch() { return &patch_requests_[pr##Name]; }  \
@@ -151,12 +170,16 @@ private:
 
   handler_t handler_;
   bool enabled_;
-  bool enable_special_handlers_;
+
+  // Setting this to true enables the special message handling but only for
+  // the next call -- the variable will be set back to false as soon as it has
+  // been used.
+  bool one_shot_special_handler_;
 
   // Data associated with locating ConsoleClientCallServer.
   bool is_locating_cccs_;
   fat_bool_t locate_cccs_result_;
-  console_client_call_server_f console_client_call_server_;
+  cccs_f cccs_;
   handle_t locate_cccs_port_handle_;
 
   // Data associated with the calibration message.

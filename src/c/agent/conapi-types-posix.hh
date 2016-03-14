@@ -3,6 +3,8 @@
 
 // Posix-specific type declarations used by the console api.
 
+#define MSVC_STDCALL
+
 // CONSOLE_CURSOR_INFO
 struct console_cursor_info_t {
   dword_t dwSize;

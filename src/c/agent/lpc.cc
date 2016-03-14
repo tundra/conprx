@@ -42,12 +42,7 @@ static bool is_pc_within_function(void *pc, tclib::Blob fun) {
   return is_pc_within_function(pc, new_fun);
 }
 
-static bool extract_destination_from_return_pc(address_t caller_pc, void **result_out) {
-  // Then we step backwards over the 32-bit relative call instruction we assume
-  // will be there. We can in principle check that the functions aren't more
-  // than 32 bits apart because we know both pcs but that can be added later if
-  // necessary.
-  address_t call_pc = caller_pc - 5;
+static bool extract_destination_from_call_pc(address_t call_pc, void **result_out) {
   // Check that it looks like a call. This may give false positives since it
   // might be a different instruction that happened to have an E8 in its
   // payload. But most likely it's not.
@@ -62,6 +57,14 @@ static bool extract_destination_from_return_pc(address_t caller_pc, void **resul
   // above has gone wrong and it's not a call this is likely to catch it, but
   // it's not airtight.
   return true;
+}
+
+static bool extract_destination_from_return_pc(address_t caller_pc, void **result_out) {
+  // Step backwards over the 32-bit relative call instruction we assume
+  // will be here. We can in principle check that the functions aren't more
+  // than 32 bits apart because we know both pcs but that can be added later if
+  // necessary.
+  return extract_destination_from_call_pc(caller_pc - 5, result_out);
 }
 
 fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
@@ -118,6 +121,44 @@ fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
   *result_out = result;
   return F_TRUE;
 }
+
+fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
+    void **result_out, bool return_first) {
+  address_t ptr = static_cast<address_t>(function.start());
+  fat_bool_t result_on_ret = F_FALSE;
+  bool seen_result = false;
+  for (size_t i = 0; i < function.size(); i++) {
+    if (ptr[i] == 0xC3)
+      // Return -- we can't scan on past this point so if we haven't found it
+      // we're not going to.
+      return result_on_ret;
+    if (ptr[i] == 0xE8) {
+      void *dest = NULL;
+      if (extract_destination_from_call_pc(ptr + i, &dest)) {
+        if (seen_result) {
+          // This is the second plausible call we've seen and it's impossible
+          // to know which is the right one. So we have to give up.
+          return F_FALSE;
+        } else {
+          *result_out = dest;
+          if (return_first) {
+            return F_TRUE;
+          } else {
+            // This is the first match we've seen, hopefully the only. Record it
+            // and keep going.
+            seen_result = true;
+            result_on_ret = F_TRUE;
+          }
+        }
+      }
+    }
+  }
+  // We never saw a return so whether we found a result or not, if we haven't
+  // seen the end of the function we don't know if the result is unique so we
+  // have to bail.
+  return F_FALSE;
+}
+
 
 Message::Message(message_data_t *data, AddressXform *xform)
   : data_(data)
