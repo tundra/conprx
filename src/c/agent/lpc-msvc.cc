@@ -156,7 +156,7 @@ fat_bool_t Interceptor::infer_calibration_from_cccs() {
   lpc::message_data_t message;
   struct_zero_fill(message);
   one_shot_special_handler_ = is_calibrating_ = true;
-  (cccs_)(reinterpret_cast<lpc::message_data_t*>(message), NULL,
+  (cccs_)(reinterpret_cast<lpc::message_data_t*>(&message), NULL,
       kCalibrationApiNumber, sizeof(message.payload.get_console_cp));
   is_calibrating_ = false;
   F_TRY(calibrate_result_);
