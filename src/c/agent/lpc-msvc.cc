@@ -49,10 +49,10 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
         // keep going.
         stack = Vector<void*>();
       inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
-      return 0;
+      return ntSuccess;
     } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
       inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
-      return 0;
+      return ntSuccess;
     } else {
       return inter->nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
     }
@@ -66,7 +66,7 @@ ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
   if (enabled_ && port_handle == console_server_port_handle_) {
     lpc::Message message(request, port_xform());
     if (handler_(this, &message, incoming_reply))
-      return 0;
+      return ntSuccess;
   }
   return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
 }
