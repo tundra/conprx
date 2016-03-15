@@ -76,13 +76,26 @@ const char *ConsoleAgent::get_lpc_name(ulong_t number) {
 fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
     lpc::Message *request, lpc::message_data_t *incoming_reply) {
   switch (request->api_number()) {
+    // The messages we want to handle.
 #define __EMIT_CASE__(Name, name, DLL, API)                                    \
     case lm##Name:                                                             \
-      return on_##name(request, &request->payload()->name);
+      return on_##name(request, &request->data()->payload.name);
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_CASE__)
 #undef __EMIT_CASE__
-    default:
+    // The messages we know about but don't want to handle.
+#define __EMIT_CASE__(Name, name, DLL, API)                                    \
+    case CALC_API_NUMBER(DLL, API):
       return F_FALSE;
+  FOR_EACH_OTHER_KNOWN_LPC(__EMIT_CASE__)
+#undef __EMIT_CASE__
+    // Unknown messages.
+    default: {
+      if (kDumpUnknownMessages) {
+        lpc::Interceptor::Disable disable(interceptor);
+        request->dump(FileSystem::native()->std_out());
+      }
+      return F_FALSE;
+    }
   }
 }
 
@@ -96,6 +109,14 @@ fat_bool_t ConsoleAgent::on_get_console_cp(lpc::Message *req, lpc::get_console_c
 fat_bool_t ConsoleAgent::on_set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
   Response<bool_t> resp = connector()->set_console_cp(
       static_cast<uint32_t>(data->code_page_id), data->is_output);
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
+  return F_TRUE;
+}
+
+fat_bool_t ConsoleAgent::on_set_console_title(lpc::Message *req, lpc::set_console_title_m *data) {
+  void *start = req->translate(data->title);
+  tclib::Blob blob(start, data->length);
+  Response<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
   req->data()->return_value = static_cast<ulong_t>(resp.error());
   return F_TRUE;
 }

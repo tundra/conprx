@@ -8,7 +8,8 @@
 
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
   F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
-  F(SetConsoleCP,       set_console_cp,         0,      0x3D)
+  F(SetConsoleCP,       set_console_cp,         0,      0x3D)                  \
+  F(SetConsoleTitle,    set_console_title,      0,      0x25)
 
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
   F(BaseDllInitHelper,  ,                       0,      76)                    \

@@ -63,7 +63,8 @@ dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
 }
 
 bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
-  return false;
+  tclib::Blob strblob(const_cast<ansi_str_t>(str), strlen(str));
+  return connector()->set_console_title(strblob, false).flush(false, &last_error_);
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_cp() {

@@ -186,7 +186,7 @@ private:
   static const ulong_t kCalibrationApiNumber = 0xDECADE;
   bool is_calibrating_;
   fat_bool_t calibrate_result_;
-  capture_buffer_data_t *calibration_capture_buffer_;
+  capture_buffer_data_t *calibration_capbuf_;
 
   // The transform to apply when sending addresses through the console port.
   AddressXform port_xform_;
@@ -242,29 +242,46 @@ struct capture_buffer_data_t {
   ulong_t *message_pointer_offsets[1];
 };
 
+// A platform integer.
+typedef IF_32_BIT(int32_t, int64_t) intn_t;
+
+// How these are actually declared in the windows implementation I have no idea
+// but using 4-packing seems to produce a struct packing that matches the data
+// we get passed both on 32- and 64-bit.
+#ifdef IS_MSVC
+#  pragma pack(push, 4)
+#endif
+
 struct get_console_cp_m {
-  ONLY_64_BIT(uint32_t padding);
   uint32_t code_page_id;
   bool_t is_output;
 };
 
 typedef get_console_cp_m set_console_cp_m;
 
-union message_payload_t {
-#define __EMIT_ENTRY__(Name, name, DLL, API) name##_m name;
-  FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
-#undef __EMIT_ENTRY__
+struct set_console_title_m {
+  intn_t length;
+  void *title;
+  bool is_unicode;
 };
 
 // A console api message, a superset of a port message.
 struct message_data_t {
   port_message_data_t header;
   capture_buffer_data_t *capture_buffer;
-  ulong_t api_number;
+  uint32_t api_number;
   int32_t return_value;
-  ulong_t reserved;
-  message_payload_t payload;
+  intn_t reserved;
+  union {
+#define __EMIT_ENTRY__(Name, name, DLL, API) name##_m name;
+  FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
+#undef __EMIT_ENTRY__
+  } payload;
 };
+
+#ifdef IS_MSVC
+#  pragma pack(pop)
+#endif
 
 // A wrapper around a capture buffer. Unlike the underlying data you can always
 // get a capture buffer wrapper for a message because the wrapper checks for the
@@ -282,7 +299,7 @@ public:
   // Returns the index'th block of data within this buffer.
   tclib::Blob block(size_t index);
 
-private:
+public:
   capture_buffer_data_t *remote_data_;
   capture_buffer_data_t *remote_data() { return remote_data_; }
   capture_buffer_data_t *local_data() { return xform()->remote_to_local(remote_data()); }
@@ -313,16 +330,26 @@ public:
 
   message_data_t *data() { return data_; }
 
-  message_payload_t *payload() { return &data_->payload; }
+  template <typename T>
+  T *translate(T *remote) { return xform()->remote_to_local(remote); }
 
-  void dump(tclib::OutStream *out);
+  enum dump_style_t {
+    dsPlain = 0,
+    dsInts = 1,
+    dsAscii = 2
+  };
+
+  void dump(tclib::OutStream *out, dump_style_t style = dsPlain);
 
   // Returns a pointer to the capture buffer stored in the message.
   CaptureBuffer *capture_buffer() { return &capbuf_; }
 
+  AddressXform *xform() { return xform_; }
+
 private:
   message_data_t *data_;
   CaptureBuffer capbuf_;
+  AddressXform *xform_;
 };
 
 } // namespace lpc

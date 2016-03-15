@@ -109,6 +109,8 @@ static void configure_driver(DriverManager *driver, bool use_real) {
   }
 }
 
+#include "agent/lpc.hh"
+
 MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
   bool use_real = Flavor;
   SKIP_IF_UNSUPPORTED(use_real);
@@ -183,6 +185,70 @@ MULTITEST(agent, native_set_output_cp, bool, ("real", true), ("simul", false)) {
   DriverRequest cp4 = driver.get_console_cp();
   ASSERT_EQ(653, cp4->integer_value());
 
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}
+
+class TitleBackend : public DummyConsoleBackend {
+public:
+  TitleBackend() : is_unicode(false) { }
+  ~TitleBackend();
+  virtual Response<bool_t> set_console_title(tclib::Blob title, bool is_unicode);
+  void set_title(const char *new_title, bool new_is_unicode);
+  utf8_t c_str();
+
+  tclib::Blob title;
+  bool is_unicode;
+};
+
+static tclib::Blob clone_blob(tclib::Blob blob) {
+  tclib::Blob result = allocator_default_malloc(blob.size());
+  blob_copy_to(blob, result);
+  return result;
+}
+
+TitleBackend::~TitleBackend() {
+  allocator_default_free(title);
+}
+
+void TitleBackend::set_title(const char *new_title, bool new_is_unicode) {
+  set_console_title(tclib::Blob(new_title, strlen(new_title)), new_is_unicode);
+}
+
+utf8_t TitleBackend::c_str() {
+  return new_string(static_cast<char*>(title.start()), title.size());
+}
+
+Response<bool_t> TitleBackend::set_console_title(tclib::Blob new_title, bool new_is_unicode) {
+  allocator_default_free(title);
+  is_unicode = new_is_unicode;
+  title = clone_blob(new_title);
+  return Response<bool_t>::of(true);
+}
+
+MULTITEST(agent, native_set_title, bool, ("real", true), ("simul", false)) {
+  bool use_real = Flavor;
+  SKIP_IF_UNSUPPORTED(use_real);
+  TitleBackend backend;
+  DriverManager driver;
+  configure_driver(&driver, use_real);
+  driver.set_backend(&backend);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  backend.set_title("First", true);
+  ASSERT_STREQ(new_c_string("First"), backend.c_str());
+  ASSERT_TRUE(backend.is_unicode);
+
+  DriverRequest st0 = driver.set_console_title_a("Second");
+  ASSERT_TRUE(st0->bool_value());
+  ASSERT_STREQ(new_c_string("Second"), backend.c_str());
+  ASSERT_FALSE(backend.is_unicode);
+
+  DriverRequest st1 = driver.set_console_title_a("Third");
+  ASSERT_TRUE(st1->bool_value());
+  ASSERT_STREQ(new_c_string("Third"), backend.c_str());
+  ASSERT_FALSE(backend.is_unicode);
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

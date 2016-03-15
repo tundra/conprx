@@ -20,7 +20,7 @@ Interceptor::Interceptor(handler_t handler)
   , locate_cccs_port_handle_(INVALID_HANDLE_VALUE)
   , is_calibrating_(false)
   , calibrate_result_(F_FALSE)
-  , calibration_capture_buffer_(NULL)
+  , calibration_capbuf_(NULL)
   , console_server_port_handle_(INVALID_HANDLE_VALUE) {
   CHECK_EQ("stack grows up", -1, infer_stack_direction());
 }
@@ -155,17 +155,19 @@ fat_bool_t Interceptor::infer_calibration_from_cccs() {
   // Then send the artificial calibration message.
   lpc::message_data_t message;
   struct_zero_fill(message);
+  lpc::capture_buffer_data_t capbuf;
+  struct_zero_fill(capbuf);
   one_shot_special_handler_ = is_calibrating_ = true;
-  (cccs_)(reinterpret_cast<lpc::message_data_t*>(&message), NULL,
+  (cccs_)(reinterpret_cast<lpc::message_data_t*>(&message), &capbuf,
       kCalibrationApiNumber, sizeof(message.payload.get_console_cp));
   is_calibrating_ = false;
   F_TRY(calibrate_result_);
 
   // The calibration message appears to have gone well. Now we have the info we
   // need to calibration.
-  // address_t local_address = reinterpret_cast<address_t>(&capture_buffer);
-  // address_t remote_address = reinterpret_cast<address_t>(calibration_capture_buffer_);
-  // port_xform()->initialize(local_address - remote_address);
+  address_t local_address = reinterpret_cast<address_t>(&capbuf);
+  address_t remote_address = reinterpret_cast<address_t>(calibration_capbuf_);
+  port_xform()->initialize(local_address - remote_address);
   console_server_port_handle_ = locate_cccs_port_handle_;
 
   return F_TRUE;
@@ -237,7 +239,7 @@ fat_bool_t Interceptor::process_calibration_message(handle_t port_handle,
     // Definitely both of these messages should be going to the same port so
     // if they're not something is not right and we abort.
     return F_FALSE;
-  calibration_capture_buffer_ = message->capture_buffer;
+  calibration_capbuf_ = message->capture_buffer;
   return F_TRUE;
 }
 

@@ -162,31 +162,42 @@ fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
 
 Message::Message(message_data_t *data, AddressXform *xform)
   : data_(data)
-  , capbuf_(data->capture_buffer, xform, data) {
+  , capbuf_(data->capture_buffer, xform, data)
+  , xform_(xform) {
 }
 
-static void dump_blob(tclib::OutStream *out, tclib::Blob data) {
-  CHECK_TRUE("unaligned message", (data.size() % sizeof(int32_t)) == 0);
+static void dump_blob(tclib::OutStream *out, tclib::Blob data, Message::dump_style_t style) {
+  size_t blocksize = sizeof(int32_t);
   int32_t *start = static_cast<int32_t*>(data.start());
-  size_t size = data.size() / sizeof(int32_t);
-  for (size_t i = 0; i < size; i++) {
-    if ((i > 0) && ((i % 4) == 0))
+  for (size_t i = 0; i < data.size(); i += blocksize) {
+    size_t index = (i / blocksize);
+    if ((i > 0) && ((index % 4) == 0))
       out->printf("\n");
-    out->printf("%08x (%8i) ", start[i], start[i]);
+    int32_t word = start[index];
+    out->printf("%08x ", word);
+    if (style & Message::dsInts)
+      out->printf("(%8i) ", word);
+    if (style & Message::dsAscii) {
+      out->printf("\"");
+      byte_t *chars = reinterpret_cast<byte_t*>(start + index);
+      for (size_t ic = 0; ic < 4; ic++)
+        out->printf("%c", chars[ic]);
+      out->printf("\" ");
+    }
   }
 }
 
-void Message::dump(tclib::OutStream *out) {
+void Message::dump(tclib::OutStream *out, dump_style_t style) {
   size_t total_size = this->total_size();
   size_t data_size = this->data_size();
   size_t header_size = total_size - data_size;
-  out->printf("--- message[size: %i, data: %i]\n", total_size, data_size);
+  out->printf("--- message %x [size: %i, data: %i]\n", api_number(), total_size, data_size);
   address_t start = reinterpret_cast<address_t>(data_);
   tclib::Blob header(start, header_size);
-  dump_blob(out, header);
+  dump_blob(out, header, style);
   out->printf("\n--- data ---\n");
   tclib::Blob data(start + header_size, data_size);
-  dump_blob(out, data);
+  dump_blob(out, data, style);
   out->printf("\n");
   out->flush();
 }

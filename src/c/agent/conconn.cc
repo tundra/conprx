@@ -82,6 +82,17 @@ Response<bool_t> PrpcConsoleConnector::set_console_cp(uint32_t value, bool is_ou
   return send_request_default<bool_t>(&req, &resp);
 }
 
+Response<bool_t> PrpcConsoleConnector::set_console_title(tclib::Blob data,
+    bool is_unicode) {
+  Variant args[2] = {
+      Variant::blob(data.start(), static_cast<uint32_t>(data.size())),
+      Variant::boolean(is_unicode)
+  };
+  rpc::OutgoingRequest req(Variant::null(), "set_console_title", 2, args);
+  rpc::IncomingResponse resp;
+  return send_request_default<bool_t>(&req, &resp);
+}
+
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(
     rpc::MessageSocket *socket, plankton::InputSocket *in) {
   return pass_def_ref_t<ConsoleConnector>(new (kDefaultAlloc) PrpcConsoleConnector(socket, in));

@@ -16,7 +16,8 @@ using namespace conprx;
 using namespace plankton;
 
 AgentOwnerService::AgentOwnerService(Launcher *launcher)
-  : launcher_(launcher) {
+  : launcher_(launcher)
+  , trace_(false) {
   register_method("log", new_callback(&AgentOwnerService::on_log, this));
   register_method("is_ready", new_callback(&AgentOwnerService::on_is_ready, this));
   register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
@@ -28,6 +29,16 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
 #undef __GEN_REGISTER__
 
   set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
+}
+
+void AgentOwnerService::on_request(plankton::rpc::IncomingRequest *request,
+    ResponseCallback response) {
+  if (trace_) {
+    TextWriter writer;
+    writer.write(request->selector());
+    INFO("Agent owner message: %s", *writer);
+  }
+  return Service::on_request(request, response);
 }
 
 void AgentOwnerService::on_log(rpc::RequestData *data, ResponseCallback resp) {
@@ -86,6 +97,13 @@ void AgentOwnerService::on_set_console_cp(rpc::RequestData *data, ResponseCallba
   uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
   bool is_output = data->argument(1).bool_value();
   forward_response(launcher()->backend()->set_console_cp(value, is_output), resp);
+}
+
+void AgentOwnerService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {
+  plankton::Blob pchars = data->argument(0);
+  tclib::Blob chars(pchars.data(), pchars.size());
+  bool is_unicode = data->argument(1).bool_value();
+  forward_response(launcher()->backend()->set_console_title(chars, is_unicode), resp);
 }
 
 void AgentOwnerService::message_not_understood(rpc::RequestData *data,

@@ -25,9 +25,16 @@ public:
   // Send a debug/test poke to this backend.
   virtual Response<int64_t> poke(int64_t value) = 0;
 
+  // Return one of the console code pages, input or output.
   virtual Response<uint32_t> get_console_cp(bool is_output) = 0;
 
+  // Set one of the console code pages, input or output.
   virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
+
+  // Set the console title. The blob contains the raw character data, ascii if
+  // is_unicode is false, wide if true. The blob is not guaranteed to contain a
+  // null terminator so don't assume it does.
+  virtual Response<bool_t> set_console_title(tclib::Blob data, bool is_unicode) = 0;
 };
 
 // Concrete console connector that is implemented by sending messages over
@@ -39,6 +46,7 @@ public:
   virtual Response<int64_t> poke(int64_t value);
   virtual Response<uint32_t> get_console_cp(bool is_output);
   virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output);
+  virtual Response<bool_t> set_console_title(tclib::Blob data, bool is_unicode);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);

@@ -186,6 +186,8 @@ private:
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 
+  static const bool kDumpUnknownMessages = false;
+
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
   tclib::InStream *agent_in_;

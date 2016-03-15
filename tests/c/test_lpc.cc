@@ -45,3 +45,16 @@ TEST(lpc, infer_unguided_successful) {
   if (guided_result)
     ASSERT_PTREQ(CODE_UPCAST(fun_two), guided_out);
 }
+
+#define FOFF(FIELD) offsetof(lpc::message_data_t, payload.FIELD)
+
+TEST(lpc, offsets) {
+  if (!kIsMsvc)
+    SKIP_TEST("msvc only");
+  // Various offsets of the different data structures that have been known to
+  // work. These failing is a convenient way to catch the struct packing getting
+  // messed up, rather than just seeing operations subtly failing.
+  ASSERT_EQ(IF_32_BIT(40, 64), FOFF(get_console_cp));
+  ASSERT_EQ(IF_32_BIT(44, 68), FOFF(get_console_cp.is_output));
+  ASSERT_EQ(IF_32_BIT(44, 72), FOFF(set_console_title.title));
+}

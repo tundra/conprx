@@ -235,6 +235,7 @@ public:
   virtual Response<int64_t> on_poke(int64_t value) { return Response<int64_t>::error(1); }
   virtual Response<uint32_t> get_console_cp(bool is_output) { return Response<uint32_t>::error(1); }
   virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) { return Response<bool_t>::error(1); }
+  virtual Response<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return Response<bool_t>::error(1); }
 };
 
 } // namespace conprx
