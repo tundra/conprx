@@ -221,6 +221,7 @@ private:
   ClientChannel *channel() { return *channel_; }
 
   DriverFrontendType frontend_type_;
+  ssize_t port_delta_;
 
   // If we're faking an agent this is the channel the fake agent will be using.
   // This is only for testing.
@@ -237,6 +238,7 @@ ConsoleDriverMain::ConsoleDriverMain()
   : silence_log_(false)
   , channel_name_(string_empty())
   , frontend_type_(dfDummy)
+  , port_delta_(0)
   , fake_agent_channel_name_(string_empty()) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
@@ -268,6 +270,10 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
     frontend_type_ = dfDummy;
   else if (frontend_type == Variant::string("simulating"))
     frontend_type_ = dfSimulating;
+
+  Variant port_delta = cmdline->option("port-delta");
+  port_delta_ = static_cast<ssize_t>(port_delta.integer_value());
+
   return true;
 }
 
@@ -302,6 +308,7 @@ bool ConsoleDriverMain::run() {
   connector.set_default_type_registry(ConsoleProxy::registry());
   def_ref_t<ConsoleFrontend> frontend;
   def_ref_t<ConsoleConnector> conconn;
+  def_ref_t<ConsoleAdaptor> condapt;
   switch (frontend_type_) {
     case dfNative:
       CHECK_TRUE("native frontend not supported", kIsMsvc);
@@ -317,7 +324,8 @@ bool ConsoleDriverMain::run() {
       CHECK_TRUE("fake agent required", use_fake_agent());
       conconn = PrpcConsoleConnector::create(fake_agent()->owner()->socket(),
           fake_agent()->owner()->input());
-      frontend = ConsoleFrontend::new_simulating(*conconn);
+      condapt = new (kDefaultAlloc) ConsoleAdaptor(*conconn);
+      frontend = ConsoleFrontend::new_simulating(*condapt, port_delta_);
       break;
   }
   ConsoleFrontendService driver(*frontend);

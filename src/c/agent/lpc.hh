@@ -32,14 +32,37 @@ struct message_data_t;
 struct capture_buffer_data_t;
 class Message;
 
+// A tranformation that turns local addresses into remote ones (or back) based
+// on a fixed delta.
 class AddressXform {
 public:
-  AddressXform() : delta_(0) { }
-  void initialize(ssize_t tdelta) { delta_ = tdelta; }
-  template <typename T> T *remote_to_local(T *arg) { return (arg == NULL) ? NULL : reinterpret_cast<T*>(reinterpret_cast<address_arith_t>(arg) + delta_); }
+  AddressXform(ssize_t delta = 0) : delta_(delta) { }
+
+  // Given a pointer in the remote address space, returns it in the local. Null
+  // pointers are left null.
+  template <typename T> T *remote_to_local(T *arg);
+
+  // Given a pointer in the local address space, returns it in the remote. Null
+  // pointers are left null.
+  template <typename T> T *local_to_remote(T *arg);
+
 private:
   ssize_t delta_;
 };
+
+template <typename T>
+T *AddressXform::remote_to_local(T *arg) {
+  return (arg == NULL)
+      ? NULL
+      : reinterpret_cast<T*>(reinterpret_cast<address_arith_t>(arg) + delta_);
+}
+
+template <typename T>
+T *AddressXform::local_to_remote(T *arg) {
+  return (arg == NULL)
+      ? NULL
+      : reinterpret_cast<T*>(reinterpret_cast<address_arith_t>(arg) - delta_);
+}
 
 // The amount of stack to look at to try to determine the location of
 // ConsoleClientCallServer. It's 4 because the stack is expected to look like
@@ -190,7 +213,7 @@ private:
 
   // The transform to apply when sending addresses through the console port.
   AddressXform port_xform_;
-  AddressXform *port_xform() { return &port_xform_; }
+  AddressXform port_xform() { return port_xform_; }
   handle_t console_server_port_handle_;
 
   conprx::PatchSet *patches() { return &patches_; }
@@ -283,32 +306,6 @@ struct message_data_t {
 #  pragma pack(pop)
 #endif
 
-// A wrapper around a capture buffer. Unlike the underlying data you can always
-// get a capture buffer wrapper for a message because the wrapper checks for the
-// there-is-none case explicitly and returns sensible values.
-class CaptureBuffer {
-public:
-  CaptureBuffer(capture_buffer_data_t *remote_data, AddressXform *xform, message_data_t *message)
-    : remote_data_(remote_data)
-    , xform_(xform)
-    , message_(message) { }
-
-  // Returns the number of blocks that have been allocated within this buffer.
-  ulong_t count() { return remote_data_ == NULL ? 0 : local_data()->count_message_pointers; }
-
-  // Returns the index'th block of data within this buffer.
-  tclib::Blob block(size_t index);
-
-public:
-  capture_buffer_data_t *remote_data_;
-  capture_buffer_data_t *remote_data() { return remote_data_; }
-  capture_buffer_data_t *local_data() { return xform()->remote_to_local(remote_data()); }
-  AddressXform *xform_;
-  AddressXform *xform() { return xform_; }
-  message_data_t *message_;
-  message_data_t *message() { return message_; }
-};
-
 // Computes the joint api number given a dll and an api index.
 #define CALC_API_NUMBER(DLL, API) (((DLL) << 16) | (API))
 
@@ -316,7 +313,7 @@ public:
 // fields of interest.
 class Message {
 public:
-  Message(message_data_t *data, AddressXform *xform);
+  Message(message_data_t *data, AddressXform xform);
 
   // The total size of the message data, including header and full payload.
   size_t total_size() { return data()->header.u1.s1.total_length; }
@@ -330,9 +327,6 @@ public:
 
   message_data_t *data() { return data_; }
 
-  template <typename T>
-  T *translate(T *remote) { return xform()->remote_to_local(remote); }
-
   enum dump_style_t {
     dsPlain = 0,
     dsInts = 1,
@@ -341,15 +335,11 @@ public:
 
   void dump(tclib::OutStream *out, dump_style_t style = dsPlain);
 
-  // Returns a pointer to the capture buffer stored in the message.
-  CaptureBuffer *capture_buffer() { return &capbuf_; }
-
-  AddressXform *xform() { return xform_; }
+  AddressXform xform() { return xform_; }
 
 private:
   message_data_t *data_;
-  CaptureBuffer capbuf_;
-  AddressXform *xform_;
+  AddressXform xform_;
 };
 
 } // namespace lpc

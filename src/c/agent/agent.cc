@@ -79,7 +79,7 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
     // The messages we want to handle.
 #define __EMIT_CASE__(Name, name, DLL, API)                                    \
     case lm##Name:                                                             \
-      return on_##name(request, &request->data()->payload.name);
+      return adaptor()->name(request, &request->data()->payload.name);
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_CASE__)
 #undef __EMIT_CASE__
     // The messages we know about but don't want to handle.
@@ -97,28 +97,6 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
       return F_FALSE;
     }
   }
-}
-
-fat_bool_t ConsoleAgent::on_get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
-  Response<uint32_t> resp = connector()->get_console_cp(data->is_output);
-  req->data()->return_value = static_cast<ulong_t>(resp.error());
-  data->code_page_id = (resp.has_error() ? 0 : resp.value());
-  return F_TRUE;
-}
-
-fat_bool_t ConsoleAgent::on_set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
-  Response<bool_t> resp = connector()->set_console_cp(
-      static_cast<uint32_t>(data->code_page_id), data->is_output);
-  req->data()->return_value = static_cast<ulong_t>(resp.error());
-  return F_TRUE;
-}
-
-fat_bool_t ConsoleAgent::on_set_console_title(lpc::Message *req, lpc::set_console_title_m *data) {
-  void *start = req->translate(data->title);
-  tclib::Blob blob(start, data->length);
-  Response<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
-  req->data()->return_value = static_cast<ulong_t>(resp.error());
-  return F_TRUE;
 }
 
 fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,

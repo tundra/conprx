@@ -167,7 +167,7 @@ fat_bool_t Interceptor::infer_calibration_from_cccs() {
   // need to calibration.
   address_t local_address = reinterpret_cast<address_t>(&capbuf);
   address_t remote_address = reinterpret_cast<address_t>(calibration_capbuf_);
-  port_xform()->initialize(local_address - remote_address);
+  port_xform_ = AddressXform(local_address - remote_address);
   console_server_port_handle_ = locate_cccs_port_handle_;
 
   return F_TRUE;

@@ -34,10 +34,11 @@ public:
 
   static WindowsConsoleAgent *get() { return instance_; }
 
-  virtual ConsoleConnector *connector() { return *connector_; }
+  virtual ConsoleAdaptor *adaptor() { return *adaptor_; }
 
 private:
   def_ref_t<ConsoleConnector> connector_;
+  def_ref_t<ConsoleAdaptor> adaptor_;
 
   lpc::Interceptor interceptor_;
   lpc::Interceptor *interceptor() { return &interceptor_; }
@@ -119,6 +120,7 @@ fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
   F_TRY(install_agent(agent_in(), agent_out()));
 
   connector_ = PrpcConsoleConnector::create(owner()->socket(), owner()->input());
+  adaptor_ = new (kDefaultAlloc) ConsoleAdaptor(*connector_);
   return F_TRUE;
 }
 

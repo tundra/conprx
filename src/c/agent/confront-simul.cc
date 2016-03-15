@@ -18,7 +18,7 @@ using namespace tclib;
 // that they can be used for testing.
 class SimulatingConsoleFrontend : public ConsoleFrontend {
 public:
-  SimulatingConsoleFrontend(ConsoleConnector *connector);
+  SimulatingConsoleFrontend(ConsoleAdaptor *adaptor, lpc::AddressXform xform);
   ~SimulatingConsoleFrontend();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
@@ -27,26 +27,34 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
+  uint32_t get_console_cp(bool is_output);
+  bool_t set_console_cp(uint32_t value, bool is_output);
+
   virtual dword_t get_last_error();
 
   virtual int64_t poke_backend(int64_t value);
 
+  lpc::AddressXform xform() { return xform_; }
+
 private:
-  ConsoleConnector *connector() { return connector_; }
-  ConsoleConnector *connector_;
+  ConsoleAdaptor *adaptor() { return adaptor_; }
+  ConsoleAdaptor *adaptor_;
+  lpc::AddressXform xform_;
   dword_t last_error_;
 
 };
 
-SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleConnector *connector)
-  : connector_(connector)
+SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAdaptor *adaptor,
+    lpc::AddressXform xform)
+  : adaptor_(adaptor)
+  , xform_(xform)
   , last_error_(0) { }
 
 SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 }
 
 int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
-  return connector()->poke(value).flush(0, &last_error_);
+  return adaptor()->poke(value).flush(0, &last_error_);
 }
 
 handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n_std_handle) {
@@ -62,31 +70,75 @@ dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
   return 0;
 }
 
-bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
-  tclib::Blob strblob(const_cast<ansi_str_t>(str), strlen(str));
-  return connector()->set_console_title(strblob, false).flush(false, &last_error_);
+// Convenience class for constructing simulated messages.
+class SimulatedMessage {
+public:
+  SimulatedMessage(SimulatingConsoleFrontend *frontend);
+  lpc::Message *message() { return &message_; }
+  lpc::message_data_t *operator->() { return &data_; }
+private:
+  lpc::message_data_t data_;
+  lpc::Message message_;
+};
+
+SimulatedMessage::SimulatedMessage(SimulatingConsoleFrontend *frontend)
+  : message_(&data_, frontend->xform()) {
+  struct_zero_fill(data_);
+}
+
+uint32_t SimulatingConsoleFrontend::get_console_cp(bool is_output) {
+  SimulatedMessage message(this);
+  lpc::get_console_cp_m *data = &message->payload.get_console_cp;
+  data->is_output = is_output;
+  adaptor()->get_console_cp(message.message(), data);
+  last_error_ = message->return_value;
+  return data->code_page_id;
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_cp() {
-  return connector()->get_console_cp(false).flush(0, &last_error_);
-}
-
-bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value) {
-  return connector()->set_console_cp(value, false).flush(false, &last_error_);
+  return get_console_cp(false);
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_output_cp() {
-  return connector()->get_console_cp(true).flush(0, &last_error_);
+  return get_console_cp(true);
 }
 
+bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value, bool is_output) {
+  SimulatedMessage message(this);
+  lpc::set_console_cp_m *data = &message->payload.get_console_cp;
+  data->is_output = is_output;
+  data->code_page_id = value;
+  adaptor()->set_console_cp(message.message(), data);
+  last_error_ = message->return_value;
+  return true;
+}
+
+bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value) {
+  return set_console_cp(value, false);
+}
+
+
 bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
-  return connector()->set_console_cp(value, true).flush(false, &last_error_);
+  return set_console_cp(value, true);
+}
+
+bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
+  SimulatedMessage message(this);
+  lpc::set_console_title_m *data = &message->payload.set_console_title;
+  size_t length = strlen(str);
+  data->length = length;
+  data->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
+  adaptor()->set_console_title(message.message(), data);
+  last_error_ = message->return_value;
+  return true;
 }
 
 dword_t SimulatingConsoleFrontend::get_last_error() {
   return last_error_;
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleConnector *connector) {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) SimulatingConsoleFrontend(connector));
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAdaptor *adaptor,
+    ssize_t delta) {
+  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) SimulatingConsoleFrontend(adaptor,
+      lpc::AddressXform(delta)));
 }

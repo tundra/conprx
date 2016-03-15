@@ -17,6 +17,32 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
+fat_bool_t ConsoleAdaptor::get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
+  Response<uint32_t> resp = connector()->get_console_cp(data->is_output);
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
+  data->code_page_id = (resp.has_error() ? 0 : resp.value());
+  return F_TRUE;
+}
+
+fat_bool_t ConsoleAdaptor::set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
+  Response<bool_t> resp = connector()->set_console_cp(
+      static_cast<uint32_t>(data->code_page_id), data->is_output);
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
+  return F_TRUE;
+}
+
+fat_bool_t ConsoleAdaptor::set_console_title(lpc::Message *req, lpc::set_console_title_m *data) {
+  void *start = req->xform().remote_to_local(data->title);
+  tclib::Blob blob(start, data->length);
+  Response<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
+  req->data()->return_value = static_cast<ulong_t>(resp.error());
+  return F_TRUE;
+}
+
+Response<int64_t> ConsoleAdaptor::poke(int64_t value) {
+  return connector()->poke(value);
+}
+
 // Specializations of this class defines the default conversions for various
 // types.
 template <typename T>

@@ -194,6 +194,7 @@ fat_bool_t DriverManager::start() {
   builder.add_option("frontend-type", frontend_type_name);
   if (silence_log_)
     builder.add_option("silence-log", Variant::yes());
+  builder.add_option("port-delta", 90000);
   F_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();

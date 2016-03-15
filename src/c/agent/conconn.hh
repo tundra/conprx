@@ -37,6 +37,26 @@ public:
   virtual Response<bool_t> set_console_title(tclib::Blob data, bool is_unicode) = 0;
 };
 
+// A console adaptor converts raw lpc messages into plankton messages to send
+// through a connector.
+class ConsoleAdaptor : public tclib::DefaultDestructable {
+public:
+  ConsoleAdaptor(ConsoleConnector *connector) : connector_(connector) { }
+  virtual ~ConsoleAdaptor() { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
+#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
+  fat_bool_t name(lpc::Message *req, lpc::name##_m *data);
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
+#undef __GEN_HANDLER__
+
+  Response<int64_t> poke(int64_t value);
+
+private:
+  ConsoleConnector *connector() { return connector_; }
+  ConsoleConnector *connector_;
+};
+
 // Concrete console connector that is implemented by sending messages over
 // plankton rpc.
 class PrpcConsoleConnector : public ConsoleConnector {

@@ -160,9 +160,8 @@ fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
 }
 
 
-Message::Message(message_data_t *data, AddressXform *xform)
+Message::Message(message_data_t *data, AddressXform xform)
   : data_(data)
-  , capbuf_(data->capture_buffer, xform, data)
   , xform_(xform) {
 }
 
@@ -200,10 +199,6 @@ void Message::dump(tclib::OutStream *out, dump_style_t style) {
   dump_blob(out, data, style);
   out->printf("\n");
   out->flush();
-}
-
-tclib::Blob CaptureBuffer::block(size_t index) {
-  return tclib::Blob();
 }
 
 #ifdef IS_MSVC

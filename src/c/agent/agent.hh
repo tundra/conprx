@@ -159,7 +159,7 @@ public:
 
   StreamServiceConnector *owner() { return *owner_; }
 
-  virtual ConsoleConnector *connector() { return NULL; }
+  virtual ConsoleAdaptor *adaptor() { return NULL; }
 
   enum lpc_method_key_t {
     lmFirst
@@ -180,11 +180,6 @@ private:
   fat_bool_t send_is_ready();
 
   fat_bool_t send_is_done();
-
-#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
-  fat_bool_t on_##name(lpc::Message *req, lpc::name##_m *data);
-  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
-#undef __GEN_HANDLER__
 
   // Set to true to make the message handler print any messages it doesn't
   // understand.

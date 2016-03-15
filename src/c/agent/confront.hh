@@ -20,7 +20,7 @@
 
 namespace conprx {
 
-class ConsoleConnector;
+class ConsoleAdaptor;
 
 #define GET_SIG_RET(RET, PARAMS, ARGS) RET
 #define GET_SIG_PARAMS(RET, PARAMS, ARGS) PARAMS
@@ -168,7 +168,7 @@ public:
   // Returns a new simulating console frontend that simulates interaction with
   // the given backend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(
-      ConsoleConnector *connector);
+      ConsoleAdaptor *adaptor, ssize_t delta = 0);
 };
 
 } // conprx
