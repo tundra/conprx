@@ -186,6 +186,8 @@ private:
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 
+  // Set to true to make the message handler print any messages it doesn't
+  // understand.
   static const bool kDumpUnknownMessages = false;
 
   // A connection to the owner of the agent.
