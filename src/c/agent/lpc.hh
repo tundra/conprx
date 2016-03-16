@@ -282,11 +282,13 @@ struct get_console_cp_m {
 
 typedef get_console_cp_m set_console_cp_m;
 
-struct set_console_title_m {
+struct get_console_title_m {
   intn_t length;
   void *title;
   bool is_unicode;
 };
+
+typedef get_console_title_m set_console_title_m;
 
 // A console api message, a superset of a port message.
 struct message_data_t {

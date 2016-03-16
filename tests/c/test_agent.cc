@@ -5,8 +5,9 @@
 #include "test.hh"
 
 BEGIN_C_INCLUDES
-#include "utils/string-inl.h"
+#include "utils/misc-inl.h"
 #include "utils/strbuf.h"
+#include "utils/string-inl.h"
 END_C_INCLUDES
 
 using namespace tclib;
@@ -47,13 +48,13 @@ TEST(agent, inject_fail) {
 class PokeCounter : public DummyConsoleBackend {
 public:
   PokeCounter()  : poke_count(0) { }
-  virtual Response<int64_t> on_poke(int64_t value);
+  virtual response_t<int64_t> on_poke(int64_t value);
   size_t poke_count;
 };
 
-Response<int64_t> PokeCounter::on_poke(int64_t value) {
+response_t<int64_t> PokeCounter::on_poke(int64_t value) {
   poke_count++;
-  return Response<int64_t>::of(value + 257);
+  return response_t<int64_t>::of(value + 257);
 }
 
 TEST(agent, simulate_roundtrip) {
@@ -78,19 +79,19 @@ TEST(agent, simulate_roundtrip) {
 
 class CodePageBackend : public DummyConsoleBackend {
 public:
-  virtual Response<uint32_t> get_console_cp(bool is_output);
-  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output);
-  Response<uint32_t> input;
-  Response<uint32_t> output;
+  virtual response_t<uint32_t> get_console_cp(bool is_output);
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
+  response_t<uint32_t> input;
+  response_t<uint32_t> output;
 };
 
-Response<uint32_t> CodePageBackend::get_console_cp(bool is_output) {
+response_t<uint32_t> CodePageBackend::get_console_cp(bool is_output) {
   return is_output ? output : input;
 }
 
-Response<bool_t> CodePageBackend::set_console_cp(uint32_t value, bool is_output) {
-  (is_output ? output : input) = Response<uint32_t>::of(value);
-  return Response<bool_t>::of(true);
+response_t<bool_t> CodePageBackend::set_console_cp(uint32_t value, bool is_output) {
+  (is_output ? output : input) = response_t<uint32_t>::of(value);
+  return response_t<bool_t>::yes();
 }
 
 
@@ -121,17 +122,17 @@ MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.input = Response<uint32_t>::of(82723);
+  backend.input = response_t<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
   ASSERT_EQ(82723, cp0->integer_value());
 
-  backend.input = Response<uint32_t>::of(32728);
+  backend.input = response_t<uint32_t>::of(32728);
   DriverRequest cp1 = driver.get_console_cp();
   ASSERT_EQ(32728, cp1->integer_value());
 
   // For some reason positive error codes aren't propagated but negative ones
   // work.
-  backend.input = Response<uint32_t>::error(-123);
+  backend.input = response_t<uint32_t>::error(-123);
   DriverRequest cp2 = driver.get_console_cp();
   ASSERT_EQ(-123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
 
@@ -148,7 +149,7 @@ MULTITEST(agent, native_set_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.input = Response<uint32_t>::of(82723);
+  backend.input = response_t<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
   ASSERT_EQ(82723, cp0->integer_value());
 
@@ -169,8 +170,8 @@ MULTITEST(agent, native_set_output_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.output = Response<uint32_t>::of(534);
-  backend.input = Response<uint32_t>::of(653);
+  backend.output = response_t<uint32_t>::of(534);
+  backend.input = response_t<uint32_t>::of(653);
   DriverRequest cp0 = driver.get_console_output_cp();
   ASSERT_EQ(534, cp0->integer_value());
   DriverRequest cp1 = driver.get_console_cp();
@@ -193,7 +194,8 @@ class TitleBackend : public DummyConsoleBackend {
 public:
   TitleBackend() : is_unicode(false) { }
   ~TitleBackend();
-  virtual Response<bool_t> set_console_title(tclib::Blob title, bool is_unicode);
+  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode);
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode);
   void set_title(const char *new_title, bool new_is_unicode);
   utf8_t c_str();
 
@@ -219,12 +221,22 @@ utf8_t TitleBackend::c_str() {
   return new_string(static_cast<char*>(title.start()), title.size());
 }
 
-Response<bool_t> TitleBackend::set_console_title(tclib::Blob new_title, bool new_is_unicode) {
+response_t<bool_t> TitleBackend::set_console_title(tclib::Blob new_title, bool new_is_unicode) {
   allocator_default_free(title);
   is_unicode = new_is_unicode;
   title = clone_blob(new_title);
-  return Response<bool_t>::of(true);
+  return response_t<bool_t>::of(true);
 }
+
+response_t<uint32_t> TitleBackend::get_console_title(tclib::Blob buffer, bool is_unicode) {
+  uint32_t len = static_cast<uint32_t>(min_size(buffer.size(), title.size()));
+  tclib::Blob data(title.start(), len);
+  blob_copy_to(data, buffer);
+  return response_t<uint32_t>::of(len);
+}
+
+#define ASSERT_V_STREQ(C_STR, VAR)                                             \
+  ASSERT_STREQ(new_c_string(C_STR), new_string((VAR).string_chars(), (VAR).string_length()))
 
 MULTITEST(agent, native_set_title, bool, ("real", true), ("simul", false)) {
   bool use_real = Flavor;
@@ -240,15 +252,24 @@ MULTITEST(agent, native_set_title, bool, ("real", true), ("simul", false)) {
   ASSERT_STREQ(new_c_string("First"), backend.c_str());
   ASSERT_TRUE(backend.is_unicode);
 
+  DriverRequest gt0 = driver.get_console_title_a(256);
+  ASSERT_V_STREQ("First", *gt0);
+
   DriverRequest st0 = driver.set_console_title_a("Second");
   ASSERT_TRUE(st0->bool_value());
   ASSERT_STREQ(new_c_string("Second"), backend.c_str());
   ASSERT_FALSE(backend.is_unicode);
 
+  DriverRequest gt1 = driver.get_console_title_a(256);
+  ASSERT_V_STREQ("Second", *gt1);
+
   DriverRequest st1 = driver.set_console_title_a("Third");
   ASSERT_TRUE(st1->bool_value());
   ASSERT_STREQ(new_c_string("Third"), backend.c_str());
   ASSERT_FALSE(backend.is_unicode);
+
+  DriverRequest gt2 = driver.get_console_title_a(256);
+  ASSERT_V_STREQ("Third", *gt2);
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

@@ -66,10 +66,6 @@ bool_t SimulatingConsoleFrontend::write_console_a(handle_t console_output, const
   return false;
 }
 
-dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
-  return 0;
-}
-
 // Convenience class for constructing simulated messages.
 class SimulatedMessage {
 public:
@@ -131,6 +127,16 @@ bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   adaptor()->set_console_title(message.message(), data);
   last_error_ = message->return_value;
   return true;
+}
+
+dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
+  SimulatedMessage message(this);
+  lpc::get_console_title_m *data = &message->payload.get_console_title;
+  data->length = n;
+  data->title = xform().local_to_remote(str);
+  adaptor()->get_console_title(message.message(), data);
+  last_error_ = message->return_value;
+  return data->length;
 }
 
 dword_t SimulatingConsoleFrontend::get_last_error() {

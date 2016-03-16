@@ -199,6 +199,8 @@ fat_bool_t DriverManager::start() {
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
   F_TRY(launcher()->start(exec, 1, &args));
+  if (trace_)
+    tracer_.install(launcher()->socket());
   if (!use_agent())
     return F_TRUE;
   launcher()->agent_monitor_done()->raise();
@@ -216,11 +218,10 @@ fat_bool_t DriverManager::connect() {
 
 IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
   if (trace_) {
-    TextWriter subjw, selw, argsw;
-    subjw.write(req->subject());
+    TextWriter selw, argsw;
     selw.write(req->selector());
     argsw.write(req->arguments());
-    LOG_INFO("%s->%s%s", *subjw, *selw, *argsw);
+    LOG_INFO("DR |> %s %s", *selw, *argsw);
   }
   IncomingResponse resp = connector()->socket()->send_request(req);
   bool keep_going = true;
@@ -230,11 +231,11 @@ IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
     if (resp->is_fulfilled()) {
       TextWriter resw;
       resw.write(resp->peek_value(Variant::null()));
-      LOG_INFO("<- %s", *resw);
+      LOG_INFO("DR <| %s", *resw);
     } else if (resp->is_rejected()) {
       TextWriter resw;
       resw.write(resp->peek_error(Variant::null()));
-      LOG_INFO("<! %s", *resw);
+      LOG_INFO("DR <! %s", *resw);
     }
   }
   return resp;
@@ -295,4 +296,21 @@ fat_bool_t FakeAgentLauncher::start_connect_to_agent() {
 fat_bool_t NoAgentLauncher::start_connect_to_agent() {
   UNREACHABLE("NoAgentLauncher::start_connect_to_agent");
   return F_FALSE;
+}
+
+void TracingMessageSocketObserver::on_incoming_request(rpc::IncomingRequest *request,
+      uint64_t serial) {
+  TextWriter selw;
+  selw.write(request->selector());
+  TextWriter argw;
+  argw.write(request->arguments());
+  INFO("BE <%i| %s %s", static_cast<uint32_t>(serial), *selw, *argw);
+}
+
+void TracingMessageSocketObserver::on_outgoing_response(rpc::OutgoingResponse response,
+      uint64_t serial) {
+  TextWriter payw;
+  payw.write(response.payload());
+  INFO("BE %s%i> %s", (response.is_success() ? "|" : "!"),
+      static_cast<uint32_t>(serial), *payw);
 }

@@ -16,8 +16,7 @@ using namespace conprx;
 using namespace plankton;
 
 AgentOwnerService::AgentOwnerService(Launcher *launcher)
-  : launcher_(launcher)
-  , trace_(false) {
+  : launcher_(launcher) {
   register_method("log", new_callback(&AgentOwnerService::on_log, this));
   register_method("is_ready", new_callback(&AgentOwnerService::on_is_ready, this));
   register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
@@ -29,16 +28,6 @@ AgentOwnerService::AgentOwnerService(Launcher *launcher)
 #undef __GEN_REGISTER__
 
   set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
-}
-
-void AgentOwnerService::on_request(plankton::rpc::IncomingRequest *request,
-    ResponseCallback response) {
-  if (trace_) {
-    TextWriter writer;
-    writer.write(request->selector());
-    INFO("Agent owner message: %s", *writer);
-  }
-  return Service::on_request(request, response);
 }
 
 void AgentOwnerService::on_log(rpc::RequestData *data, ResponseCallback resp) {
@@ -75,9 +64,9 @@ public:
 };
 
 template <typename T>
-static void forward_response(Response<T> resp, rpc::Service::ResponseCallback callback) {
+static void forward_response(response_t<T> resp, rpc::Service::ResponseCallback callback) {
   if (resp.has_error()) {
-    callback(rpc::OutgoingResponse::failure(Variant::integer(resp.error())));
+    callback(rpc::OutgoingResponse::failure(Variant::integer(resp.error_code())));
   } else {
     callback(rpc::OutgoingResponse::success(VariantDefaultConverter<T>::convert(resp.value())));
   }
@@ -97,6 +86,21 @@ void AgentOwnerService::on_set_console_cp(rpc::RequestData *data, ResponseCallba
   uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
   bool is_output = data->argument(1).bool_value();
   forward_response(launcher()->backend()->set_console_cp(value, is_output), resp);
+}
+
+void AgentOwnerService::on_get_console_title(rpc::RequestData *data, ResponseCallback resp) {
+  uint32_t length = static_cast<uint32_t>(data->argument(0).integer_value());
+  bool is_unicode = data->argument(1).bool_value();
+  plankton::Blob scratch_blob = data->factory()->new_blob(length);
+  tclib::Blob scratch(scratch_blob.mutable_data(), length);
+  blob_fill(scratch, 0);
+  response_t<uint32_t> result = launcher()->backend()->get_console_title(scratch, is_unicode);
+  if (result.has_error()) {
+    resp(rpc::OutgoingResponse::failure(Variant::integer(result.error_code())));
+  } else {
+    plankton::Blob response_blob = Variant::blob(scratch_blob.data(), result.value());
+    resp(rpc::OutgoingResponse::success(response_blob));
+  }
 }
 
 void AgentOwnerService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {

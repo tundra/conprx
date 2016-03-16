@@ -102,7 +102,7 @@ void ConsoleFrontendService::write_console_a(rpc::RequestData *data, ResponseCal
 
 void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
   dword_t chars_to_read = to_dword(data->argument(0));
-  ansi_char_t *buf = new ansi_char_t[chars_to_read];
+  ansi_char_t *buf = new ansi_char_t[chars_to_read + 1];
   dword_t len = frontend()->get_console_title_a(buf, chars_to_read);
   if (len == 0) {
     callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));

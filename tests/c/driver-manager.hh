@@ -125,6 +125,16 @@ protected:
 
 };
 
+// A message socket observer that simply logs requests coming in and responses
+// going out.
+class TracingMessageSocketObserver : public plankton::rpc::MessageSocketObserver {
+public:
+  virtual void on_incoming_request(plankton::rpc::IncomingRequest *request,
+      uint64_t serial);
+  virtual void on_outgoing_response(plankton::rpc::OutgoingResponse response,
+      uint64_t serial);
+};
+
 // A manager that manages the lifetime of the driver, including starting it up,
 // and allows communication with it.
 class DriverManager {
@@ -217,6 +227,7 @@ private:
 
   bool silence_log_;
   bool trace_;
+  TracingMessageSocketObserver tracer_;
   utf8_t agent_path_;
   utf8_t agent_path();
   AgentType agent_type_;
@@ -232,10 +243,11 @@ private:
 
 class DummyConsoleBackend : public ConsoleBackend {
 public:
-  virtual Response<int64_t> on_poke(int64_t value) { return Response<int64_t>::error(1); }
-  virtual Response<uint32_t> get_console_cp(bool is_output) { return Response<uint32_t>::error(1); }
-  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) { return Response<bool_t>::error(1); }
-  virtual Response<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return Response<bool_t>::error(1); }
+  virtual response_t<int64_t> on_poke(int64_t value) { return response_t<int64_t>::error(1); }
+  virtual response_t<uint32_t> get_console_cp(bool is_output) { return response_t<uint32_t>::error(1); }
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return response_t<bool_t>::error(1); }
+  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return response_t<bool_t>::error(1); }
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) { return response_t<uint32_t>::error(1); }
 };
 
 } // namespace conprx

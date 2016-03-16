@@ -84,7 +84,7 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
 #undef __EMIT_CASE__
     // The messages we know about but don't want to handle.
 #define __EMIT_CASE__(Name, name, DLL, API)                                    \
-    case CALC_API_NUMBER(DLL, API):
+    case CALC_API_NUMBER(DLL, API):                                            \
       return F_FALSE;
   FOR_EACH_OTHER_KNOWN_LPC(__EMIT_CASE__)
 #undef __EMIT_CASE__

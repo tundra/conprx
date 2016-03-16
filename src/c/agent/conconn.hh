@@ -23,18 +23,21 @@ public:
   virtual ~ConsoleConnector() { }
 
   // Send a debug/test poke to this backend.
-  virtual Response<int64_t> poke(int64_t value) = 0;
+  virtual response_t<int64_t> poke(int64_t value) = 0;
 
   // Return one of the console code pages, input or output.
-  virtual Response<uint32_t> get_console_cp(bool is_output) = 0;
+  virtual response_t<uint32_t> get_console_cp(bool is_output) = 0;
 
   // Set one of the console code pages, input or output.
-  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 
   // Set the console title. The blob contains the raw character data, ascii if
   // is_unicode is false, wide if true. The blob is not guaranteed to contain a
   // null terminator so don't assume it does.
-  virtual Response<bool_t> set_console_title(tclib::Blob data, bool is_unicode) = 0;
+  virtual response_t<bool_t> set_console_title(tclib::Blob data, bool is_unicode) = 0;
+
+  // Read the title of the console and store it in the given buffer.
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -50,7 +53,7 @@ public:
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 
-  Response<int64_t> poke(int64_t value);
+  response_t<int64_t> poke(int64_t value);
 
 private:
   ConsoleConnector *connector() { return connector_; }
@@ -63,10 +66,11 @@ class PrpcConsoleConnector : public ConsoleConnector {
 public:
   PrpcConsoleConnector(plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
-  virtual Response<int64_t> poke(int64_t value);
-  virtual Response<uint32_t> get_console_cp(bool is_output);
-  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output);
-  virtual Response<bool_t> set_console_title(tclib::Blob data, bool is_unicode);
+  virtual response_t<int64_t> poke(int64_t value);
+  virtual response_t<uint32_t> get_console_cp(bool is_output);
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
+  virtual response_t<bool_t> set_console_title(tclib::Blob data, bool is_unicode);
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);
@@ -75,13 +79,13 @@ private:
   // Send a request through the socket and wait for a response, converting it
   // to an API response of the given type using the given converter.
   template <typename T, typename C>
-  Response<T> send_request(plankton::rpc::OutgoingRequest *request,
+  response_t<T> send_request(plankton::rpc::OutgoingRequest *request,
       plankton::rpc::IncomingResponse *response_out);
 
   // Works the same way as send_request but uses the default converter for the
   // type T instead of requiring one to be specified.
   template <typename T>
-  Response<T> send_request_default(plankton::rpc::OutgoingRequest *request,
+  response_t<T> send_request_default(plankton::rpc::OutgoingRequest *request,
       plankton::rpc::IncomingResponse *response_out);
 
   plankton::rpc::MessageSocket *socket_;

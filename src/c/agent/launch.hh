@@ -30,13 +30,15 @@ public:
   virtual ~ConsoleBackend() { }
 
   // Debug/test call.
-  virtual Response<int64_t> on_poke(int64_t value) = 0;
+  virtual response_t<int64_t> on_poke(int64_t value) = 0;
 
-  virtual Response<uint32_t> get_console_cp(bool is_output) = 0;
+  virtual response_t<uint32_t> get_console_cp(bool is_output) = 0;
 
-  virtual Response<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 
-  virtual Response<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
+
+  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
 };
 
 // The service the driver will call back to when it wants to access the manager.
@@ -44,7 +46,7 @@ class AgentOwnerService : public plankton::rpc::Service {
 public:
   AgentOwnerService(Launcher *launcher);
   virtual ~AgentOwnerService() { }
-  virtual void on_request(plankton::rpc::IncomingRequest *request, ResponseCallback response);
+  void on_request(plankton::rpc::IncomingRequest *request, ResponseCallback response);
 
 private:
   // Handles logs entries logged by the agent.
@@ -68,7 +70,6 @@ private:
 
   Launcher *launcher_;
   Launcher *launcher() { return launcher_; }
-  bool trace_;
 };
 
 // Encapsulates launching a child process and injecting the agent dll.
@@ -119,6 +120,9 @@ public:
   // connection which causes the agent to wind down and then wait for this
   // to be lowered.
   tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
+
+  // Returns the raw message socket used to communicate with the agent.
+  plankton::rpc::MessageSocket *socket() { return agent()->socket(); }
 
 protected:
   // Override this to do any work that needs to be performed before the process
