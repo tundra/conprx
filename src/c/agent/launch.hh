@@ -46,7 +46,6 @@ class AgentOwnerService : public plankton::rpc::Service {
 public:
   AgentOwnerService(Launcher *launcher);
   virtual ~AgentOwnerService() { }
-  void on_request(plankton::rpc::IncomingRequest *request, ResponseCallback response);
 
 private:
   // Handles logs entries logged by the agent.

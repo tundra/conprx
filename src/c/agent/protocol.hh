@@ -54,6 +54,7 @@ T generic_response_t<T>::flush(const T &defawlt, dword_t *error_out) {
   return has_error() ? defawlt : value_;
 }
 
+// A general response with no extra behavior.
 template <typename T>
 class response_t : public generic_response_t<T> {
 public:
@@ -62,6 +63,7 @@ public:
   // Returns an error response value with the given error code.
   static response_t<T> error(dword_t error) { return response_t<T>(error, T()); }
 
+  // Converts an error response of one type to another.
   template <typename S>
   static response_t<T> error(const response_t<S> &that) { return error(that.error_code()); }
 
@@ -84,6 +86,7 @@ public:
   // Returns an error response value with the given error code.
   static response_t<bool_t> error(dword_t error) { return response_t<bool_t>(error, false); }
 
+  // Converts an error response of one type to another.
   template <typename T>
   static response_t<bool_t> error(const response_t<T> &that) { return error(that.error_code()); }
 

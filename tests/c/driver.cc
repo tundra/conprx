@@ -21,6 +21,28 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
+template <typename T>
+class TempBuffer {
+public:
+  TempBuffer(size_t size);
+  ~TempBuffer();
+
+  T *operator*() { return static_cast<T*>(memory_.start); }
+
+private:
+  blob_t memory_;
+};
+
+template <typename T>
+TempBuffer<T>::TempBuffer(size_t size) {
+  memory_ = allocator_default_malloc(size * sizeof(T));
+}
+
+template <typename T>
+TempBuffer<T>::~TempBuffer() {
+  allocator_default_free(memory_);
+}
+
 // A service wrapping a console frontend.
 class ConsoleFrontendService : public rpc::Service {
 public:
@@ -102,12 +124,12 @@ void ConsoleFrontendService::write_console_a(rpc::RequestData *data, ResponseCal
 
 void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
   dword_t chars_to_read = to_dword(data->argument(0));
-  ansi_char_t *buf = new ansi_char_t[chars_to_read + 1];
-  dword_t len = frontend()->get_console_title_a(buf, chars_to_read);
+  TempBuffer<ansi_char_t> scratch(chars_to_read + 1);
+  dword_t len = frontend()->get_console_title_a(*scratch, chars_to_read);
   if (len == 0) {
     callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
   } else {
-    String result = data->factory()->new_string(buf, static_cast<uint32_t>(len));
+    String result = data->factory()->new_string(*scratch, static_cast<uint32_t>(len));
     callback(rpc::OutgoingResponse::success(result));
   }
 }

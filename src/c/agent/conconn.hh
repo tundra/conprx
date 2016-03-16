@@ -34,7 +34,7 @@ public:
   // Set the console title. The blob contains the raw character data, ascii if
   // is_unicode is false, wide if true. The blob is not guaranteed to contain a
   // null terminator so don't assume it does.
-  virtual response_t<bool_t> set_console_title(tclib::Blob data, bool is_unicode) = 0;
+  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
 
   // Read the title of the console and store it in the given buffer.
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;

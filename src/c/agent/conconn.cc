@@ -32,7 +32,8 @@ fat_bool_t ConsoleAdaptor::set_console_cp(lpc::Message *req, lpc::set_console_cp
   return F_TRUE;
 }
 
-fat_bool_t ConsoleAdaptor::set_console_title(lpc::Message *req, lpc::set_console_title_m *data) {
+fat_bool_t ConsoleAdaptor::set_console_title(lpc::Message *req,
+    lpc::set_console_title_m *data) {
   void *start = req->xform().remote_to_local(data->title);
   tclib::Blob blob(start, data->length);
   response_t<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
@@ -40,10 +41,11 @@ fat_bool_t ConsoleAdaptor::set_console_title(lpc::Message *req, lpc::set_console
   return F_TRUE;
 }
 
-fat_bool_t ConsoleAdaptor::get_console_title(lpc::Message *req, lpc::get_console_title_m *data) {
+fat_bool_t ConsoleAdaptor::get_console_title(lpc::Message *req,
+    lpc::get_console_title_m *data) {
   void *start = req->xform().remote_to_local(data->title);
-  tclib::Blob blob(start, data->length);
-  response_t<uint32_t> resp = connector()->get_console_title(blob, data->is_unicode);
+  tclib::Blob scratch(start, data->length);
+  response_t<uint32_t> resp = connector()->get_console_title(scratch, data->is_unicode);
   req->data()->return_value = static_cast<ulong_t>(resp.error_code());
   data->length = resp.value();
   return F_TRUE;
@@ -140,9 +142,8 @@ response_t<uint32_t> PrpcConsoleConnector::get_console_title(tclib::Blob buffer,
     return response_t<uint32_t>::error(result);
   plankton::Blob presult = result.value();
   uint32_t amount = static_cast<uint32_t>(min_size(presult.size(), buffer.size()));
-  tclib::Blob tresult(presult.data(), amount);
   blob_fill(buffer, 0);
-  blob_copy_to(tresult, buffer);
+  blob_copy_to(tclib::Blob(presult.data(), amount), buffer);
   return response_t<uint32_t>::of(amount);
 }
 
