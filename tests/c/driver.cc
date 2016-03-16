@@ -26,21 +26,20 @@ class TempBuffer {
 public:
   TempBuffer(size_t size);
   ~TempBuffer();
-
-  T *operator*() { return static_cast<T*>(memory_.start); }
+  T *operator*() { return memory_; }
 
 private:
-  blob_t memory_;
+  T *memory_;
 };
 
 template <typename T>
 TempBuffer<T>::TempBuffer(size_t size) {
-  memory_ = allocator_default_malloc(size * sizeof(T));
+  memory_ = new T[size];
 }
 
 template <typename T>
 TempBuffer<T>::~TempBuffer() {
-  allocator_default_free(memory_);
+  delete[] memory_;
 }
 
 // A service wrapping a console frontend.
