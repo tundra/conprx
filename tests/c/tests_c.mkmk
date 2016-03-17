@@ -7,6 +7,7 @@ filenames = [
   "test_agent.cc",
   "test_binpatch.cc",
   "test_conapi.cc",
+  "test_conback.cc",
   "test_driver.cc",
   "test_lpc.cc",
   "test_vector.cc",
@@ -21,6 +22,7 @@ def compile_test_file(source):
   source.add_include(get_root().get_child("src", "c"))
   source.add_include(get_dep("tclib").get_child("src", "c"))
   source.add_include(get_dep("plankton").get_child("src", "c"))
+  source.add_include(get_dep("plankton").get_child("tests", "c"))
   return source.get_object()
 
 driver_common = get_group("driver-common")
@@ -52,6 +54,7 @@ test_main.add_object(get_dep_external("tclib", "src", "c", "test", "library"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "test", "log-fail"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "async", "library"))
+test_main.add_object(get_dep_external("plankton", "tests", "c", "library"))
 test_main.add_object(get_external("src", "objects"))
 test_main.add_object(get_external("src", "c", "server", "server"))
 test_main.add_object(driver_common)

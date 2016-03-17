@@ -240,15 +240,6 @@ private:
   static utf8_t default_agent_path();
 };
 
-class DummyConsoleBackend : public ConsoleBackend {
-public:
-  virtual response_t<int64_t> poke(int64_t value) { return response_t<int64_t>::error(1); }
-  virtual response_t<uint32_t> get_console_cp(bool is_output) { return response_t<uint32_t>::error(1); }
-  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return response_t<bool_t>::error(1); }
-  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return response_t<bool_t>::error(1); }
-  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) { return response_t<uint32_t>::error(1); }
-};
-
 } // namespace conprx
 
 #endif // _CONPRX_DRIVER_MANAGER_HH

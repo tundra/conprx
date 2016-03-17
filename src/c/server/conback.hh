@@ -29,13 +29,43 @@ public:
   // Debug/test call.
   virtual response_t<int64_t> poke(int64_t value) = 0;
 
+  // Return either the input or output code page.
   virtual response_t<uint32_t> get_console_cp(bool is_output) = 0;
 
+  // Set either the input or output code page.
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 
+  // Fill the given buffer with the title.
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
 
+  // Set the title to the contents of the given buffer.
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
+};
+
+// A complete implementation of a console backend.
+class BasicConsoleBackend : public ConsoleBackend {
+public:
+  BasicConsoleBackend();
+  virtual ~BasicConsoleBackend();
+  virtual response_t<int64_t> poke(int64_t value);
+  virtual response_t<uint32_t> get_console_cp(bool is_output);
+  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer,
+      bool is_unicode);
+  virtual response_t<bool_t> set_console_title(tclib::Blob title,
+      bool is_unicode);
+
+  // Returns the value of the last poke that was sent.
+  int64_t last_poke() { return last_poke_; }
+
+  // The current title encoded as utf-8.
+  utf8_t title() { return title_; }
+
+private:
+  int64_t last_poke_;
+  uint32_t input_codepage_;
+  uint32_t output_codepage_;
+  utf8_t title_;
 };
 
 // The service the driver will call back to when it wants to access the manager.

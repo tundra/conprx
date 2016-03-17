@@ -45,7 +45,7 @@ TEST(agent, inject_fail) {
   ASSERT_EQ(1, exit_code);
 }
 
-class PokeCounter : public DummyConsoleBackend {
+class PokeCounter : public BasicConsoleBackend {
 public:
   PokeCounter()  : poke_count(0) { }
   virtual response_t<int64_t> poke(int64_t value);
@@ -77,7 +77,7 @@ TEST(agent, simulate_roundtrip) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
-class CodePageBackend : public DummyConsoleBackend {
+class CodePageBackend : public BasicConsoleBackend {
 public:
   virtual response_t<uint32_t> get_console_cp(bool is_output);
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
@@ -190,7 +190,7 @@ MULTITEST(agent, native_set_output_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
-class TitleBackend : public DummyConsoleBackend {
+class TitleBackend : public BasicConsoleBackend {
 public:
   TitleBackend() : is_unicode(false) { }
   ~TitleBackend();
@@ -225,7 +225,7 @@ response_t<bool_t> TitleBackend::set_console_title(tclib::Blob new_title, bool n
   allocator_default_free(title);
   is_unicode = new_is_unicode;
   title = clone_blob(new_title);
-  return response_t<bool_t>::of(true);
+  return response_t<bool_t>::yes();
 }
 
 response_t<uint32_t> TitleBackend::get_console_title(tclib::Blob buffer, bool is_unicode) {

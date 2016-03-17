@@ -6,6 +6,7 @@
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
+#include "utils/misc-inl.h"
 #include "utils/string-inl.h"
 END_C_INCLUDES
 
@@ -29,6 +30,46 @@ ConsoleBackendService::ConsoleBackendService()
 #undef __GEN_REGISTER__
 
   set_fallback(new_callback(&ConsoleBackendService::message_not_understood, this));
+}
+
+BasicConsoleBackend::BasicConsoleBackend()
+  : last_poke_(0)
+  , input_codepage_(0)
+  , output_codepage_(0)
+  , title_(string_empty()) { }
+
+BasicConsoleBackend::~BasicConsoleBackend() {
+  string_default_delete(title_);
+}
+
+response_t<int64_t> BasicConsoleBackend::poke(int64_t value) {
+  int64_t response = last_poke_;
+  last_poke_ = value;
+  return response_t<int64_t>::of(response);
+}
+
+response_t<uint32_t> BasicConsoleBackend::get_console_cp(bool is_output) {
+  return response_t<uint32_t>::of(is_output ? output_codepage_ : input_codepage_);
+}
+
+response_t<bool_t> BasicConsoleBackend::set_console_cp(uint32_t value, bool is_output) {
+  (is_output ? output_codepage_ : input_codepage_) = value;
+  return response_t<bool_t>::yes();
+}
+
+response_t<uint32_t> BasicConsoleBackend::get_console_title(tclib::Blob buffer,
+    bool is_unicode) {
+  size_t amount = min_size(buffer.size(), title().size);
+  blob_copy_to(tclib::Blob(title().chars, amount), buffer);
+  return response_t<uint32_t>::of(static_cast<uint32_t>(amount));
+}
+
+response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
+    bool is_unicode) {
+  string_default_delete(title_);
+  utf8_t new_title = new_string(static_cast<char*>(title.start()), title.size());
+  title_ = string_default_dup(new_title);
+  return response_t<bool_t>::yes();
 }
 
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
