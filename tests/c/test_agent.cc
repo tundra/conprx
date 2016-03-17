@@ -48,11 +48,11 @@ TEST(agent, inject_fail) {
 class PokeCounter : public DummyConsoleBackend {
 public:
   PokeCounter()  : poke_count(0) { }
-  virtual response_t<int64_t> on_poke(int64_t value);
+  virtual response_t<int64_t> poke(int64_t value);
   size_t poke_count;
 };
 
-response_t<int64_t> PokeCounter::on_poke(int64_t value) {
+response_t<int64_t> PokeCounter::poke(int64_t value) {
   poke_count++;
   return response_t<int64_t>::of(value + 257);
 }

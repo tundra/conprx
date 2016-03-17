@@ -4,6 +4,7 @@
 include("c", "utils", "src_c_utils.mkmk")
 include("c", "disass", "src_c_disass.mkmk")
 include("c", "agent", "src_c_agent.mkmk")
+include("c", "server", "src_c_server.mkmk")
 include("py", "src_py.mkmk")
 
 objects = get_group("objects")

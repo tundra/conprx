@@ -34,6 +34,7 @@
 #include "utils/alloc.hh"
 #include "utils/blob.hh"
 #include "utils/fatbool.hh"
+#include "utils/types.hh"
 #include "utils/vector.hh"
 
 BEGIN_C_INCLUDES
@@ -52,10 +53,6 @@ class ProximityAllocator;
 // 13 bytes the worst case it where the last instruction which starts at byte
 // 12 is really long; this leaves room for it to be 20b which should be plenty.
 #define kMaxPreambleSizeBytes 32
-
-// This is just another name for a dword_t but can be used without including the
-// full nightmare that is windows.h.
-typedef uint32_t standalone_dword_t;
 
 #define REPORT_MESSAGE(sink, ...) (sink)->report(__FILE__, __LINE__, __VA_ARGS__)
 

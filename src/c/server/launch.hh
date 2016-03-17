@@ -1,11 +1,12 @@
 //- Copyright 2015 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#ifndef _CONPRX_AGENT_LAUNCH
-#define _CONPRX_AGENT_LAUNCH
+#ifndef _CONPRX_SERVER_LAUNCH
+#define _CONPRX_SERVER_LAUNCH
 
-#include "agent/protocol.hh"
 #include "rpc.hh"
+#include "server/conback.hh"
+#include "share/protocol.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
 #include "sync/thread.hh"
@@ -20,56 +21,6 @@ using plankton::Arena;
 using plankton::rpc::OutgoingRequest;
 using plankton::rpc::IncomingResponse;
 using plankton::rpc::StreamServiceConnector;
-
-class Launcher;
-
-// Virtual type, implementations of which can be used as the implementation of
-// a console.
-class ConsoleBackend {
-public:
-  virtual ~ConsoleBackend() { }
-
-  // Debug/test call.
-  virtual response_t<int64_t> on_poke(int64_t value) = 0;
-
-  virtual response_t<uint32_t> get_console_cp(bool is_output) = 0;
-
-  virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
-
-  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
-
-  virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
-};
-
-// The service the driver will call back to when it wants to access the manager.
-class AgentOwnerService : public plankton::rpc::Service {
-public:
-  AgentOwnerService(Launcher *launcher);
-  virtual ~AgentOwnerService() { }
-
-private:
-  // Handles logs entries logged by the agent.
-  void on_log(plankton::rpc::RequestData*, ResponseCallback);
-
-  // Called when the agent has completed its setup.
-  void on_is_ready(plankton::rpc::RequestData*, ResponseCallback);
-  void on_is_done(plankton::rpc::RequestData*, ResponseCallback);
-
-  // For testing and debugging -- a call that doesn't do anything but is just
-  // passed through to the implementation.
-  void on_poke(plankton::rpc::RequestData*, ResponseCallback);
-
-#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
-  void on_##name(plankton::rpc::RequestData*, ResponseCallback);
-  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
-#undef __GEN_HANDLER__
-
-  // The fallback to call on unknown messages.
-  void message_not_understood(plankton::rpc::RequestData*, ResponseCallback);
-
-  Launcher *launcher_;
-  Launcher *launcher() { return launcher_; }
-};
 
 // Encapsulates launching a child process and injecting the agent dll.
 class Launcher : public tclib::DefaultDestructable {
@@ -104,7 +55,7 @@ public:
 
   // Sets the backend the owner agent will delegate calls to when it receives
   // them from the agent.
-  void set_backend(ConsoleBackend *backend) { backend_ = backend; }
+  void set_backend(ConsoleBackend *backend);
 
   // Returns the custom backend backing this launcher.
   ConsoleBackend *backend() { return backend_; }
@@ -174,14 +125,12 @@ private:
   friend class AgentOwnerService;
   tclib::NativeProcess process_;
 
-  bool agent_is_ready_;
-  bool agent_is_done_;
   State state_;
 
   tclib::def_ref_t<StreamServiceConnector> agent_;
   StreamServiceConnector *agent() { return *agent_; }
-  AgentOwnerService service_;
-  AgentOwnerService *service() { return &service_; }
+  ConsoleBackendService service_;
+  ConsoleBackendService *service() { return &service_; }
   tclib::Drawbridge agent_monitor_done_;
 
   ConsoleBackend *backend_;
@@ -228,4 +177,4 @@ private:
 
 } // namespace conprx
 
-#endif // _CONPRX_AGENT_LAUNCH
+#endif // _CONPRX_SERVER_LAUNCH

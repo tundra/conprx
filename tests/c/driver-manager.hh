@@ -8,14 +8,13 @@
 #define _CONPRX_DRIVER_MANAGER_HH
 
 #include "agent/confront.hh"
-
-#include "agent/launch.hh"
 #include "async/promise-inl.hh"
 #include "driver.hh"
 #include "io/iop.hh"
 #include "marshal-inl.hh"
 #include "plankton-inl.hh"
 #include "rpc.hh"
+#include "server/launch.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
 #include "sync/thread.hh"
@@ -243,7 +242,7 @@ private:
 
 class DummyConsoleBackend : public ConsoleBackend {
 public:
-  virtual response_t<int64_t> on_poke(int64_t value) { return response_t<int64_t>::error(1); }
+  virtual response_t<int64_t> poke(int64_t value) { return response_t<int64_t>::error(1); }
   virtual response_t<uint32_t> get_console_cp(bool is_output) { return response_t<uint32_t>::error(1); }
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return response_t<bool_t>::error(1); }
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return response_t<bool_t>::error(1); }

@@ -8,9 +8,9 @@
 
 #include "agent/binpatch.hh"
 #include "agent/conapi-types.hh"
-#include "agent/protocol.hh"
 #include "c/stdc.h"
 #include "io/stream.hh"
+#include "share/protocol.hh"
 #include "utils/callback.hh"
 
 // List all the lpc functions to patch. Note that the calling conventions are

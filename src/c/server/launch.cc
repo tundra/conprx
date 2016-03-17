@@ -1,128 +1,20 @@
 //- Copyright 2015 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#include "agent/agent.hh"
-#include "agent/launch.hh"
 #include "async/promise-inl.hh"
+#include "server/launch.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
 #include "utils/string-inl.h"
-#include "utils/trybool.h"
 END_C_INCLUDES
 
 using namespace tclib;
 using namespace conprx;
 using namespace plankton;
 
-AgentOwnerService::AgentOwnerService(Launcher *launcher)
-  : launcher_(launcher) {
-  register_method("log", new_callback(&AgentOwnerService::on_log, this));
-  register_method("is_ready", new_callback(&AgentOwnerService::on_is_ready, this));
-  register_method("is_done", new_callback(&AgentOwnerService::on_is_done, this));
-  register_method("poke", new_callback(&AgentOwnerService::on_poke, this));
-
-#define __GEN_REGISTER__(Name, name, DLL, API)                                 \
-  register_method(#name, new_callback(&AgentOwnerService::on_##name, this));
-  FOR_EACH_LPC_TO_INTERCEPT(__GEN_REGISTER__)
-#undef __GEN_REGISTER__
-
-  set_fallback(new_callback(&AgentOwnerService::message_not_understood, this));
-}
-
-void AgentOwnerService::on_log(rpc::RequestData *data, ResponseCallback resp) {
-  TextWriter writer;
-  writer.write(data->argument(0));
-  INFO("AGENT LOG: %s", *writer);
-  resp(rpc::OutgoingResponse::success(Variant::null()));
-}
-
-void AgentOwnerService::on_is_ready(rpc::RequestData *data, ResponseCallback resp) {
-  launcher()->agent_is_ready_ = true;
-  resp(rpc::OutgoingResponse::success(Variant::null()));
-}
-
-void AgentOwnerService::on_is_done(rpc::RequestData *data, ResponseCallback resp) {
-  launcher()->agent_is_done_ = true;
-  resp(rpc::OutgoingResponse::success(Variant::null()));
-}
-
-template <typename T>
-class VariantDefaultConverter {
-public:
-  static Variant convert(T value) {
-    return Variant(value);
-  }
-};
-
-template <>
-class VariantDefaultConverter<bool_t> {
-public:
-  static Variant convert(bool_t value) {
-    return Variant::boolean(value);
-  }
-};
-
-template <typename T>
-static void forward_response(response_t<T> resp, rpc::Service::ResponseCallback callback) {
-  if (resp.has_error()) {
-    callback(rpc::OutgoingResponse::failure(Variant::integer(resp.error_code())));
-  } else {
-    callback(rpc::OutgoingResponse::success(VariantDefaultConverter<T>::convert(resp.value())));
-  }
-}
-
-void AgentOwnerService::on_poke(rpc::RequestData *data, ResponseCallback resp) {
-  int64_t value = data->argument(0).integer_value();
-  forward_response(launcher()->backend()->on_poke(value), resp);
-}
-
-void AgentOwnerService::on_get_console_cp(rpc::RequestData *data, ResponseCallback resp) {
-  bool is_output = data->argument(0).bool_value();
-  forward_response(launcher()->backend()->get_console_cp(is_output), resp);
-}
-
-void AgentOwnerService::on_set_console_cp(rpc::RequestData *data, ResponseCallback resp) {
-  uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
-  bool is_output = data->argument(1).bool_value();
-  forward_response(launcher()->backend()->set_console_cp(value, is_output), resp);
-}
-
-void AgentOwnerService::on_get_console_title(rpc::RequestData *data, ResponseCallback resp) {
-  uint32_t length = static_cast<uint32_t>(data->argument(0).integer_value());
-  bool is_unicode = data->argument(1).bool_value();
-  plankton::Blob scratch_blob = data->factory()->new_blob(length);
-  tclib::Blob scratch(scratch_blob.mutable_data(), length);
-  blob_fill(scratch, 0);
-  response_t<uint32_t> result = launcher()->backend()->get_console_title(scratch, is_unicode);
-  if (result.has_error()) {
-    resp(rpc::OutgoingResponse::failure(Variant::integer(result.error_code())));
-  } else {
-    plankton::Blob response_blob = Variant::blob(scratch_blob.data(), result.value());
-    resp(rpc::OutgoingResponse::success(response_blob));
-  }
-}
-
-void AgentOwnerService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {
-  plankton::Blob pchars = data->argument(0);
-  tclib::Blob chars(pchars.data(), pchars.size());
-  bool is_unicode = data->argument(1).bool_value();
-  forward_response(launcher()->backend()->set_console_title(chars, is_unicode), resp);
-}
-
-void AgentOwnerService::message_not_understood(rpc::RequestData *data,
-    ResponseCallback resp) {
-  TextWriter writer;
-  writer.write(data->selector());
-  WARN("Unknown agent message %s", *writer);
-  resp(rpc::OutgoingResponse::failure(Variant::null()));
-}
-
 Launcher::Launcher()
-  : agent_is_ready_(false)
-  , agent_is_done_(false)
-  , state_(lsConstructed)
-  , service_(this)
+  : state_(lsConstructed)
   , agent_monitor_done_(Drawbridge::dsLowered)
   , backend_(NULL) {
   process_.set_flags(pfStartSuspendedOnWindows);
@@ -137,7 +29,7 @@ fat_bool_t InjectingLauncher::prepare_start() {
 fat_bool_t InjectingLauncher::start_connect_to_agent() {
   // Set up the connection data to pass into the dll.
   connect_data_t data;
-  data.magic = ConsoleAgent::kConnectDataMagic;
+  data.magic = connect_data_t::kMagic;
   data.parent_process_id = IF_MSVC(GetCurrentProcessId(), 0);
   data.agent_in_handle = down_.in()->to_raw_handle();
   data.agent_out_handle = up_.out()->to_raw_handle();
@@ -241,7 +133,7 @@ fat_bool_t Launcher::abort_agent_service() {
 }
 
 fat_bool_t Launcher::ensure_agent_service_ready() {
-  while (!agent_is_ready_)
+  while (!service()->agent_is_ready())
     F_TRY(agent()->input()->process_next_instruction(NULL));
   return F_TRUE;
 }
@@ -258,6 +150,11 @@ fat_bool_t Launcher::connect_service() {
   return F_TRUE;
 }
 
+void Launcher::set_backend(ConsoleBackend *backend) {
+  backend_ = backend;
+  service()->set_backend(backend);
+}
+
 opaque_t Launcher::monitor_agent() {
   if (agent_monitor_done()->pass(Duration::instant()))
     return f2o(F_FALSE);
@@ -272,7 +169,7 @@ opaque_t Launcher::monitor_agent() {
 
 fat_bool_t Launcher::process_messages() {
   CHECK_EQ("launch interaction out of order", lsStarted, state_);
-  while (!agent_is_done_) {
+  while (!service()->agent_is_done()) {
     InputSocket::ProcessInstrStatus status;
     F_TRY(agent()->input()->process_next_instruction(&status));
     F_TRY(F_BOOL(!status.is_error()));

@@ -3,6 +3,8 @@
 
 // Type declarations used by both sides of the console api.
 
+#include "utils/types.hh"
+
 #ifndef _AGENT_PROTOCOL_HH
 #define _AGENT_PROTOCOL_HH
 
@@ -17,6 +19,18 @@
   F(GetFileType,        ,                       0,      35)
 
 namespace conprx {
+
+// The block of data passed through to the agent's dll connector.
+struct connect_data_t {
+  int32_t magic;
+  standalone_dword_t parent_process_id;
+  tclib::naked_file_handle_t agent_in_handle;
+  tclib::naked_file_handle_t agent_out_handle;
+
+  // The magic value we expect to find in the magic field if it has been
+  // transferred correctly.
+  static const int32_t kMagic = 0xFABACAEA;
+};
 
 // The result of a windows-like call: either a successful value or an nonzero
 // error code indicating a problem.
