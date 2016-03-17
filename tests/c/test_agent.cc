@@ -14,8 +14,7 @@ using namespace tclib;
 using namespace plankton;
 using namespace conprx;
 
-MULTITEST(agent, simple, bool, ("fake", true), ("real", false)) {
-  bool use_fake = Flavor;
+MULTITEST(agent, simple, bool, use_fake, ("fake", true), ("real", false)) {
   if (!use_fake && !DriverManager::kSupportsRealAgent)
     SKIP_TEST(kIsMsvc ? "debug codegen" : "msvc only");
   DriverManager driver;
@@ -112,8 +111,7 @@ static void configure_driver(DriverManager *driver, bool use_real) {
 
 #include "agent/lpc.hh"
 
-MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
-  bool use_real = Flavor;
+MULTITEST(agent, native_get_cp, bool, use_real, ("real", true), ("simul", false)) {
   SKIP_IF_UNSUPPORTED(use_real);
   CodePageBackend backend;
   DriverManager driver;
@@ -139,8 +137,7 @@ MULTITEST(agent, native_get_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
-MULTITEST(agent, native_set_cp, bool, ("real", true), ("simul", false)) {
-  bool use_real = Flavor;
+MULTITEST(agent, native_set_cp, bool, use_real, ("real", true), ("simul", false)) {
   SKIP_IF_UNSUPPORTED(use_real);
   CodePageBackend backend;
   DriverManager driver;
@@ -160,8 +157,7 @@ MULTITEST(agent, native_set_cp, bool, ("real", true), ("simul", false)) {
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
-MULTITEST(agent, native_set_output_cp, bool, ("real", true), ("simul", false)) {
-  bool use_real = Flavor;
+MULTITEST(agent, native_set_output_cp, bool, use_real, ("real", true), ("simul", false)) {
   SKIP_IF_UNSUPPORTED(use_real);
   CodePageBackend backend;
   DriverManager driver;
@@ -238,8 +234,7 @@ response_t<uint32_t> TitleBackend::get_console_title(tclib::Blob buffer, bool is
 #define ASSERT_V_STREQ(C_STR, VAR)                                             \
   ASSERT_STREQ(new_c_string(C_STR), new_string((VAR).string_chars(), (VAR).string_length()))
 
-MULTITEST(agent, native_set_title, bool, ("real", true), ("simul", false)) {
-  bool use_real = Flavor;
+MULTITEST(agent, native_set_title, bool, use_real, ("real", true), ("simul", false)) {
   SKIP_IF_UNSUPPORTED(use_real);
   TitleBackend backend;
   DriverManager driver;

@@ -74,8 +74,10 @@ public:
   ConsoleBackendService();
   virtual ~ConsoleBackendService() { }
 
+  // Returns true once the agent has reported that it's ready.
   bool agent_is_ready() { return agent_is_ready_; }
 
+  // Returns true once the agent has reported that it's done.
   bool agent_is_done() { return agent_is_done_; }
 
   void set_backend(ConsoleBackend *backend) { backend_ = backend; }
