@@ -20,6 +20,13 @@
 
 namespace conprx {
 
+// A small subset of code pages.
+enum code_page_t {
+  cpMsDos = 437,
+  cpUtf8 = 65001,
+  cpUsAscii = 20127
+};
+
 // The block of data passed through to the agent's dll connector.
 struct connect_data_t {
   int32_t magic;

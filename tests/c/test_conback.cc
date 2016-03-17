@@ -137,21 +137,19 @@ TEST(conback, simulated) {
 MULTITEST(conback, set_cp, bool_t, use_native, ("native", true), ("basic", false)) {
   if (use_native && !kIsMsvc)
     SKIP_TEST("msvc only");
-  uint32_t us_ascii_cp = 20127;
-  uint32_t utf8_cp = 65001;
   FrontendMultiplexer frontend(use_native);
   ASSERT_F_TRUE(frontend.initialize());
 
-  ASSERT_TRUE(frontend->set_console_cp(utf8_cp));
-  ASSERT_TRUE(frontend->set_console_output_cp(utf8_cp));
-  ASSERT_EQ(utf8_cp, frontend->get_console_cp());
-  ASSERT_EQ(utf8_cp, frontend->get_console_output_cp());
+  ASSERT_TRUE(frontend->set_console_cp(cpUtf8));
+  ASSERT_TRUE(frontend->set_console_output_cp(cpUtf8));
+  ASSERT_EQ(cpUtf8, frontend->get_console_cp());
+  ASSERT_EQ(cpUtf8, frontend->get_console_output_cp());
 
-  ASSERT_TRUE(frontend->set_console_cp(us_ascii_cp));
-  ASSERT_EQ(us_ascii_cp, frontend->get_console_cp());
-  ASSERT_EQ(utf8_cp, frontend->get_console_output_cp());
+  ASSERT_TRUE(frontend->set_console_cp(cpUsAscii));
+  ASSERT_EQ(cpUsAscii, frontend->get_console_cp());
+  ASSERT_EQ(cpUtf8, frontend->get_console_output_cp());
 
-  ASSERT_TRUE(frontend->set_console_output_cp(us_ascii_cp));
-  ASSERT_EQ(us_ascii_cp, frontend->get_console_cp());
-  ASSERT_EQ(us_ascii_cp, frontend->get_console_output_cp());
+  ASSERT_TRUE(frontend->set_console_output_cp(cpUsAscii));
+  ASSERT_EQ(cpUsAscii, frontend->get_console_cp());
+  ASSERT_EQ(cpUsAscii, frontend->get_console_output_cp());
 }

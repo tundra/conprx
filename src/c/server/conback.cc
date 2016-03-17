@@ -34,8 +34,8 @@ ConsoleBackendService::ConsoleBackendService()
 
 BasicConsoleBackend::BasicConsoleBackend()
   : last_poke_(0)
-  , input_codepage_(0)
-  , output_codepage_(0)
+  , input_codepage_(cpUtf8)
+  , output_codepage_(cpUtf8)
   , title_(string_empty()) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
