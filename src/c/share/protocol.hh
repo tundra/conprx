@@ -5,8 +5,8 @@
 
 #include "utils/types.hh"
 
-#ifndef _AGENT_PROTOCOL_HH
-#define _AGENT_PROTOCOL_HH
+#ifndef _CONPRX_SHARE_PROTOCOL_HH
+#define _CONPRX_SHARE_PROTOCOL_HH
 
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
   F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
@@ -115,4 +115,4 @@ private:
 
 } // namespace conprx
 
-#endif // _AGENT_PROTOCOL_HH
+#endif // _CONPRX_SHARE_PROTOCOL_HH
