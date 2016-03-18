@@ -59,9 +59,22 @@ response_t<bool_t> BasicConsoleBackend::set_console_cp(uint32_t value, bool is_o
 
 response_t<uint32_t> BasicConsoleBackend::get_console_title(tclib::Blob buffer,
     bool is_unicode) {
-  size_t amount = min_size(buffer.size(), title().size);
-  blob_copy_to(tclib::Blob(title().chars, amount), buffer);
-  return response_t<uint32_t>::of(static_cast<uint32_t>(amount));
+  size_t length = title().size;
+  if (buffer.size() < length) {
+    // We refuse to return less than the full title if the buffer is too small.
+    // Still null-terminate though.
+    if (buffer.size() > 0)
+      static_cast<byte_t*>(buffer.start())[0] = 0;
+    return response_t<uint32_t>::of(0);
+  }
+  blob_copy_to(tclib::Blob(title().chars, length), buffer);
+  // There's a weird corner case here where we'll allow a buffer that's the
+  // null terminator too short to hold the complete terminated title -- but we
+  // return the title anyway and overwrite the last character with the
+  // terminator.
+  size_t term_index = (buffer.size() == length) ? (length - 1) : length;
+  static_cast<char*>(buffer.start())[term_index] = '\0';
+  return response_t<uint32_t>::of(static_cast<uint32_t>(length));
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,

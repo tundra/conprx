@@ -58,36 +58,49 @@ fat_bool_t SimulatedFrontendAdaptor::initialize() {
   return F_TRUE;
 }
 
-// Records all relevant state about a frontend (within reason) and restores it
-// on destruction.
-class FrontendSaveRestore {
+// Records all relevant state about a frontend (within reason) by querying the
+// frontend and can restore the state.
+class FrontendSnapshot {
 public:
-  FrontendSaveRestore();
-  ~FrontendSaveRestore();
+  FrontendSnapshot();
+
+  // Records the state of the given frontend into this snapshot.
   void save(ConsoleFrontend *frontend);
 
-private:
-  ConsoleFrontend *frontend_;
-  ConsoleFrontend *frontend() { return frontend_; }
+  // Updates the state of the given frontend to match this snapshot.
+  void restore(ConsoleFrontend *frontend);
 
+  // Print the state of this snapshot on the given stream.
+  void dump(OutStream *out);
+
+private:
   uint32_t input_codepage_;
   uint32_t output_codepage_;
+  char title_[1024];
 };
 
-FrontendSaveRestore::FrontendSaveRestore()
-  : frontend_(NULL) { }
-
-void FrontendSaveRestore::save(ConsoleFrontend *frontend) {
-  frontend_ = frontend;
-  input_codepage_ = frontend->get_console_cp();
-  output_codepage_ = frontend->get_console_output_cp();
+FrontendSnapshot::FrontendSnapshot()
+  : input_codepage_(0)
+  , output_codepage_(0) {
+  struct_zero_fill(title_);
 }
 
-FrontendSaveRestore::~FrontendSaveRestore() {
-  if (frontend() == NULL)
-    return;
-  frontend()->set_console_cp(input_codepage_);
-  frontend()->set_console_output_cp(output_codepage_);
+void FrontendSnapshot::save(ConsoleFrontend *frontend) {
+  input_codepage_ = frontend->get_console_cp();
+  output_codepage_ = frontend->get_console_output_cp();
+  frontend->get_console_title_a(title_, 1024);
+}
+
+void FrontendSnapshot::restore(ConsoleFrontend *frontend) {
+  frontend->set_console_cp(input_codepage_);
+  frontend->set_console_output_cp(output_codepage_);
+  frontend->set_console_title_a(title_);
+}
+
+void FrontendSnapshot::dump(OutStream *out) {
+  out->printf("input_codepage: %i\n", input_codepage_);
+  out->printf("output_codepage: %i\n", output_codepage_);
+  out->printf("title: [%s]\n", title_);
 }
 
 // A class that holds a frontend, either a native one (only on windows) or a
@@ -99,6 +112,7 @@ public:
   FrontendMultiplexer(bool use_native)
     : use_native_(use_native)
     , frontend_(NULL) { }
+  ~FrontendMultiplexer();
   ConsoleFrontend *operator->() { return frontend_; }
   fat_bool_t initialize();
 
@@ -108,7 +122,7 @@ private:
   BasicConsoleBackend backend_;
   def_ref_t<SimulatedFrontendAdaptor> fake_;
   def_ref_t<ConsoleFrontend> native_;
-  FrontendSaveRestore save_restore_;
+  FrontendSnapshot initial_state_;
 };
 
 fat_bool_t FrontendMultiplexer::initialize() {
@@ -120,8 +134,12 @@ fat_bool_t FrontendMultiplexer::initialize() {
     F_TRY(fake_->initialize());
     frontend_ = fake_->frontend();
   }
-  save_restore_.save(frontend_);
+  initial_state_.save(frontend_);
   return F_TRUE;
+}
+
+FrontendMultiplexer::~FrontendMultiplexer() {
+  initial_state_.restore(frontend_);
 }
 
 TEST(conback, simulated) {
@@ -134,9 +152,17 @@ TEST(conback, simulated) {
   ASSERT_EQ(374, backend.last_poke());
 }
 
-MULTITEST(conback, set_cp, bool_t, use_native, ("native", true), ("basic", false)) {
-  if (use_native && !kIsMsvc)
-    SKIP_TEST("msvc only");
+// Declare a console backend test that runs both the same tests against the
+// native and basic backend.
+#define CONBACK_TEST(NAME) MULTITEST(conback, NAME, bool_t, use_native, ("native", true), ("basic", false))
+
+#define SKIP_IF_UNSUPPORTED() do {                                             \
+  if (use_native && !kIsMsvc)                                                  \
+    SKIP_TEST("msvc only");                                                    \
+} while (false)
+
+CONBACK_TEST(cp) {
+  SKIP_IF_UNSUPPORTED();
   FrontendMultiplexer frontend(use_native);
   ASSERT_F_TRUE(frontend.initialize());
 
@@ -152,4 +178,38 @@ MULTITEST(conback, set_cp, bool_t, use_native, ("native", true), ("basic", false
   ASSERT_TRUE(frontend->set_console_output_cp(cpUsAscii));
   ASSERT_EQ(cpUsAscii, frontend->get_console_cp());
   ASSERT_EQ(cpUsAscii, frontend->get_console_output_cp());
+}
+
+CONBACK_TEST(title) {
+  SKIP_IF_UNSUPPORTED();
+  FrontendMultiplexer frontend(use_native);
+  ASSERT_F_TRUE(frontend.initialize());
+
+  const char *letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  ASSERT_TRUE(frontend->set_console_title_a(letters));
+  char buf[1024];
+  tclib::Blob bufblob(buf, 1024);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_a(buf, 1024));
+  ASSERT_C_STREQ(letters, buf);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(0, frontend->get_console_title_a(buf, 0));
+  ASSERT_EQ(-1, buf[0]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(0, frontend->get_console_title_a(buf, 16));
+  ASSERT_EQ(0, buf[0]);
+  bufblob.fill(-1);
+  ASSERT_EQ(0, frontend->get_console_title_a(buf, 25));
+  ASSERT_EQ(0, buf[0]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_a(buf, 26));
+  ASSERT_C_STREQ("ABCDEFGHIJKLMNOPQRSTUVWXY", buf);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_a(buf, 27));
+  ASSERT_C_STREQ(letters, buf);
 }
