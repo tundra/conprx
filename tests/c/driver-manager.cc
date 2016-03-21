@@ -91,6 +91,14 @@ Variant DriverRequest::set_console_output_cp(uint32_t value) {
   return send("set_console_output_cp", value);
 }
 
+Variant DriverRequest::get_console_mode(Handle handle) {
+  return send("get_console_mode", factory()->new_native(&handle));
+}
+
+Variant DriverRequest::set_console_mode(Handle handle, uint32_t mode) {
+  return send("set_console_mode", factory()->new_native(&handle), mode);
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_fulfilled());
@@ -110,6 +118,12 @@ Variant DriverRequest::send(Variant selector) {
 
 Variant DriverRequest::send(Variant selector, Variant arg) {
   OutgoingRequest req(Variant::null(), selector, 1, &arg);
+  return send_request(&req);
+}
+
+Variant DriverRequest::send(Variant selector, Variant arg0, Variant arg1) {
+  Variant argv[2] = {arg0, arg1};
+  OutgoingRequest req(Variant::null(), selector, 2, argv);
   return send_request(&req);
 }
 

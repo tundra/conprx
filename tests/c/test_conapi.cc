@@ -8,7 +8,7 @@
 using namespace conprx;
 
 TEST(conapi, datatypes) {
-  ASSERT_EQ(sizeof(long), sizeof(dword_t));
+  ASSERT_EQ(sizeof(uint32_t), sizeof(dword_t));
   ASSERT_EQ(sizeof(void*), sizeof(handle_t));
 }
 

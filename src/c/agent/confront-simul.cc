@@ -57,8 +57,13 @@ int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
   return adaptor()->poke(value).flush(0, &last_error_);
 }
 
-handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n_std_handle) {
-  return NULL;
+handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n) {
+  int32_t sn = static_cast<int32_t>(n);
+  if (-12 <= sn && sn <= -10) {
+    return reinterpret_cast<handle_t>(static_cast<size_t>(100 - sn));
+  } else {
+    return reinterpret_cast<handle_t>(IF_32_BIT(-1, -1LL));
+  }
 }
 
 bool_t SimulatingConsoleFrontend::write_console_a(handle_t console_output, const void *buffer,
@@ -136,7 +141,28 @@ dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
   data->title = xform().local_to_remote(str);
   adaptor()->get_console_title(message.message(), data);
   last_error_ = message->return_value;
-  return data->length;
+  return static_cast<uint32_t>(data->length);
+}
+
+bool_t SimulatingConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {
+  SimulatedMessage message(this);
+  lpc::get_console_mode_m *data = &message->payload.get_console_mode;
+  data->handle = handle;
+  data->mode = 0;
+  adaptor()->get_console_mode(message.message(), data);
+  last_error_ = message->return_value;
+  *mode_out = data->mode;
+  return true;
+}
+
+bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
+  SimulatedMessage message(this);
+  lpc::set_console_mode_m *data = &message->payload.set_console_mode;
+  data->handle = handle;
+  data->mode = mode;
+  adaptor()->set_console_mode(message.message(), data);
+  last_error_ = message->return_value;
+  return true;
 }
 
 dword_t SimulatingConsoleFrontend::get_last_error() {

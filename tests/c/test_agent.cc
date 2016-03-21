@@ -268,3 +268,23 @@ MULTITEST(agent, native_set_title, bool, use_real, ("real", true), ("simul", fal
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
+
+MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)) {
+  SKIP_IF_UNSUPPORTED(use_real);
+  BasicConsoleBackend backend;
+  DriverManager driver;
+  configure_driver(&driver, use_real);
+  driver.set_backend(&backend);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  DriverRequest gsh0 = driver.get_std_handle(conprx::kStdInputHandle);
+  Handle input = *gsh0->native_as<Handle>();
+  DriverRequest gcm0 = driver.get_console_mode(input);
+  ASSERT_TRUE(gcm0->is_integer());
+
+  ASSERT_TRUE(driver.set_console_mode(input, 0xF00B00)->bool_value());
+  ASSERT_EQ(0xF00B00, driver.get_console_mode(input)->integer_value());
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}

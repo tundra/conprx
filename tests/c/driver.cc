@@ -174,6 +174,30 @@ void ConsoleFrontendService::set_console_output_cp(rpc::RequestData *data, Respo
       : rpc::OutgoingResponse::failure(new_console_error(data->factory())));
 }
 
+void ConsoleFrontendService::get_console_mode(rpc::RequestData *data, ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle != NULL) {
+    dword_t mode = 0;
+    if (frontend()->get_console_mode(handle->ptr(), &mode)) {
+      callback(rpc::OutgoingResponse::success(Variant::integer(mode)));
+      return;
+    }
+  }
+  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
+}
+
+void ConsoleFrontendService::set_console_mode(rpc::RequestData *data, ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle != NULL) {
+    dword_t mode = static_cast<dword_t>(data->argument(1).integer_value());
+    if (frontend()->set_console_mode(handle->ptr(), mode)) {
+      callback(rpc::OutgoingResponse::success(Variant::yes()));
+      return;
+    }
+  }
+  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
+}
+
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
   Handle *handle = new (factory) Handle(raw_handle);
   return factory->new_native(handle);

@@ -121,6 +121,7 @@ fat_bool_t Launcher::attach_agent_service() {
   tclib::OutStream *oout = owner_out();
   CHECK_FALSE("no owner out", oout == NULL);
   agent_ = new (kDefaultAlloc) StreamServiceConnector(oin, oout);
+  agent()->set_default_type_registry(service()->registry());
   return agent()->init(service()->handler());
 }
 

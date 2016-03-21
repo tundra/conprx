@@ -41,9 +41,10 @@ DummyConsoleFrontend::~DummyConsoleFrontend() {
   string_default_delete(title_);
 }
 
-handle_t DummyConsoleFrontend::get_std_handle(dword_t n_std_handle) {
-  ssize_t result = (-12UL <= n_std_handle && n_std_handle <= -10UL)
-      ? n_std_handle + 18
+handle_t DummyConsoleFrontend::get_std_handle(dword_t n) {
+  int32_t sn = static_cast<int32_t>(n);
+  ssize_t result = (-12 <= sn && sn <= -10)
+      ? sn + 18
       : IF_32_BIT(-1, -1LL);
   return reinterpret_cast<handle_t>(result);
 }
@@ -84,6 +85,14 @@ uint32_t DummyConsoleFrontend::get_console_output_cp() {
 }
 
 bool_t DummyConsoleFrontend::set_console_output_cp(uint32_t value) {
+  return false;
+}
+
+bool_t DummyConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {
+  return false;
+}
+
+bool_t DummyConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
   return false;
 }
 

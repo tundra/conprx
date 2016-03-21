@@ -122,7 +122,6 @@ private:
   // Does the work of connecting the agent.
   fat_bool_t connect_agent();
 
-  friend class AgentOwnerService;
   tclib::NativeProcess process_;
 
   State state_;

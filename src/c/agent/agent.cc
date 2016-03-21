@@ -7,6 +7,7 @@
 #include "binpatch.hh"
 #include "confront.hh"
 #include "marshal-inl.hh"
+#include "sync/thread.hh"
 #include "utils/log.hh"
 
 BEGIN_C_INCLUDES
@@ -16,6 +17,11 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace plankton;
 using namespace tclib;
+
+// Set to true to make the message handler print any messages it doesn't
+// understand.
+static const bool kDumpUnknownMessages = false;
+static const bool kSuspendOnUnknownMessages = false;
 
 LogEntry::LogEntry() {
   log_entry_default_init(&entry_, llInfo, NULL, 0, string_empty(), string_empty());
@@ -93,6 +99,9 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
       if (kDumpUnknownMessages) {
         lpc::Interceptor::Disable disable(interceptor);
         request->dump(FileSystem::native()->std_out());
+      }
+      if (kSuspendOnUnknownMessages) {
+        NativeThread::sleep(Duration::seconds(30));
       }
       return F_FALSE;
     }

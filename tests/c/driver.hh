@@ -40,46 +40,6 @@ public:
   static plankton::TypeRegistry *registry();
 };
 
-// A wrapper around a native handle. A handle can either be valid and have a
-// non-negative id or invalid.
-class Handle {
-public:
-  // Initializes an invalid handle.
-  Handle() : id_(kInvalidHandleValue) { }
-
-  // Initializes a handle with the given id.
-  explicit Handle(int64_t id) : id_(id) { }
-
-  // Initializes a handle with an id corresponding to the given pointer.
-  explicit Handle(void *raw) : id_(reinterpret_cast<int64_t>(raw)) { }
-
-  // Is this a valid handle?
-  bool is_valid() { return id_ != kInvalidHandleValue; }
-
-  // The seed type for handles.
-  static plankton::SeedType<Handle> *seed_type() { return &kSeedType; }
-
-  // Returns an invalid handle.
-  static Handle invalid() { return Handle(); }
-
-  int64_t id() { return id_; }
-
-  void *ptr() { return reinterpret_cast<void*>(id_); }
-
-private:
-  template <typename T> friend class plankton::DefaultSeedType;
-
-  plankton::Variant to_seed(plankton::Factory *factory);
-  static Handle *new_instance(plankton::Variant header, plankton::Factory *factory);
-  void init(plankton::Seed payload, plankton::Factory *factory);
-
-  // This must match the invalid handle value from windows.
-  static const int64_t kInvalidHandleValue = -1;
-
-  static plankton::DefaultSeedType<Handle> kSeedType;
-  int64_t id_;
-};
-
 // An object that indicates a problem interacting with the console api.
 class ConsoleError {
 public:

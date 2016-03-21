@@ -72,6 +72,7 @@ private:
 
   Variant send(Variant selector);
   Variant send(Variant selector, Variant arg0);
+  Variant send(Variant selector, Variant arg0, Variant arg1);
   Variant send(Variant selector, Variant arg0, Variant arg1, Variant arg2);
   Variant send_request(OutgoingRequest *req);
 

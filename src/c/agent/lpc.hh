@@ -275,12 +275,12 @@ typedef IF_32_BIT(int32_t, int64_t) intn_t;
 #  pragma pack(push, 4)
 #endif
 
-struct get_console_cp_m {
-  uint32_t code_page_id;
-  bool_t is_output;
+struct get_console_mode_m {
+  void *handle;
+  uint32_t mode;
 };
 
-typedef get_console_cp_m set_console_cp_m;
+typedef get_console_mode_m set_console_mode_m;
 
 struct get_console_title_m {
   intn_t length;
@@ -289,6 +289,13 @@ struct get_console_title_m {
 };
 
 typedef get_console_title_m set_console_title_m;
+
+struct get_console_cp_m {
+  uint32_t code_page_id;
+  bool_t is_output;
+};
+
+typedef get_console_cp_m set_console_cp_m;
 
 // A console api message, a superset of a port message.
 struct message_data_t {

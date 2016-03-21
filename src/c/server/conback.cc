@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "async/promise-inl.hh"
+#include "marshal-inl.hh"
 #include "server/conback.hh"
 
 BEGIN_C_INCLUDES
@@ -18,6 +19,8 @@ ConsoleBackendService::ConsoleBackendService()
   : backend_(NULL)
   , agent_is_ready_(false)
   , agent_is_done_(false) {
+
+  registry()->register_type<Handle>();
 
   register_method("log", new_callback(&ConsoleBackendService::on_log, this));
   register_method("is_ready", new_callback(&ConsoleBackendService::on_is_ready, this));
@@ -36,7 +39,8 @@ BasicConsoleBackend::BasicConsoleBackend()
   : last_poke_(0)
   , input_codepage_(cpUtf8)
   , output_codepage_(cpUtf8)
-  , title_(string_empty()) { }
+  , title_(string_empty())
+  , mode_(0) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
   string_default_delete(title_);
@@ -82,6 +86,15 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
   string_default_delete(title_);
   utf8_t new_title = new_string(static_cast<char*>(title.start()), title.size());
   title_ = string_default_dup(new_title);
+  return response_t<bool_t>::yes();
+}
+
+response_t<uint32_t> BasicConsoleBackend::get_console_mode(Handle handle) {
+  return response_t<uint32_t>::of(mode_);
+}
+
+response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t mode) {
+  mode_ = mode;
   return response_t<bool_t>::yes();
 }
 
@@ -163,6 +176,25 @@ void ConsoleBackendService::on_set_console_title(rpc::RequestData *data, Respons
   tclib::Blob chars(pchars.data(), pchars.size());
   bool is_unicode = data->argument(1).bool_value();
   forward_response(backend()->set_console_title(chars, is_unicode), resp);
+}
+
+void ConsoleBackendService::on_set_console_mode(rpc::RequestData *data, ResponseCallback resp) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL) {
+    resp(rpc::OutgoingResponse::failure(7));
+    return;
+  }
+  uint32_t mode = static_cast<uint32_t>(data->argument(1).integer_value());
+  forward_response(backend()->set_console_mode(*handle, mode), resp);
+}
+
+void ConsoleBackendService::on_get_console_mode(rpc::RequestData *data, ResponseCallback resp) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL) {
+    resp(rpc::OutgoingResponse::failure(6));
+    return;
+  }
+  forward_response(backend()->get_console_mode(*handle), resp);
 }
 
 void ConsoleBackendService::message_not_understood(rpc::RequestData *data,

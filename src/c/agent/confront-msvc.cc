@@ -53,6 +53,14 @@ bool_t WindowsConsoleFrontend::set_console_output_cp(uint32_t value) {
   return SetConsoleOutputCP(value);
 }
 
+bool_t WindowsConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {
+  return GetConsoleMode(handle, mode_out);
+}
+
+bool_t WindowsConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
+  return SetConsoleMode(handle, mode);
+}
+
 dword_t WindowsConsoleFrontend::get_last_error() {
   return GetLastError();
 }

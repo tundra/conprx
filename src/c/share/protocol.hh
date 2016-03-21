@@ -3,16 +3,19 @@
 
 // Type declarations used by both sides of the console api.
 
+#include "rpc.hh"
 #include "utils/types.hh"
 
 #ifndef _CONPRX_SHARE_PROTOCOL_HH
 #define _CONPRX_SHARE_PROTOCOL_HH
 
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
-  F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
-  F(SetConsoleCP,       set_console_cp,         0,      0x3D)                  \
+  F(GetConsoleMode,     get_console_mode,       0,      0x08)                  \
+  F(SetConsoleMode,     set_console_mode,       0,      0x11)                  \
   F(GetConsoleTitle,    get_console_title,      0,      0x24)                  \
-  F(SetConsoleTitle,    set_console_title,      0,      0x25)
+  F(SetConsoleTitle,    set_console_title,      0,      0x25)                  \
+  F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
+  F(SetConsoleCP,       set_console_cp,         0,      0x3D)
 
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
   F(BaseDllInitHelper,  ,                       0,      76)                    \
@@ -26,6 +29,10 @@ enum code_page_t {
   cpUtf8 = 65001,
   cpUsAscii = 20127
 };
+
+static const int32_t kStdInputHandle = -10;
+static const int32_t kStdOutputHandle = -11;
+static const int32_t kStdErrorHandle = -12;
 
 // The block of data passed through to the agent's dll connector.
 struct connect_data_t {
@@ -118,6 +125,46 @@ public:
 
 private:
   response_t(dword_t error, bool_t value) : generic_response_t<bool_t>(error, value) { }
+};
+
+// A wrapper around a native handle. A handle can either be valid and have a
+// non-negative id or invalid.
+class Handle {
+public:
+  // Initializes an invalid handle.
+  Handle() : id_(kInvalidHandleValue) { }
+
+  // Initializes a handle with the given id.
+  explicit Handle(int64_t id) : id_(id) { }
+
+  // Initializes a handle with an id corresponding to the given pointer.
+  explicit Handle(void *raw) : id_(reinterpret_cast<int64_t>(raw)) { }
+
+  // Is this a valid handle?
+  bool is_valid() { return id_ != kInvalidHandleValue; }
+
+  // The seed type for handles.
+  static plankton::SeedType<Handle> *seed_type() { return &kSeedType; }
+
+  // Returns an invalid handle.
+  static Handle invalid() { return Handle(); }
+
+  int64_t id() { return id_; }
+
+  void *ptr() { return reinterpret_cast<void*>(id_); }
+
+private:
+  template <typename T> friend class plankton::DefaultSeedType;
+
+  plankton::Variant to_seed(plankton::Factory *factory);
+  static Handle *new_instance(plankton::Variant header, plankton::Factory *factory);
+  void init(plankton::Seed payload, plankton::Factory *factory);
+
+  // This must match the invalid handle value from windows.
+  static const int64_t kInvalidHandleValue = -1;
+
+  static plankton::DefaultSeedType<Handle> kSeedType;
+  int64_t id_;
 };
 
 } // namespace conprx

@@ -40,6 +40,12 @@ public:
 
   // Set the title to the contents of the given buffer.
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
+
+  // Returns the current mode of the buffer with the given handle.
+  virtual response_t<uint32_t> get_console_mode(Handle handle) = 0;
+
+  // Sets the mode of the buffer with the given handle.
+  virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -54,6 +60,8 @@ public:
       bool is_unicode);
   virtual response_t<bool_t> set_console_title(tclib::Blob title,
       bool is_unicode);
+  virtual response_t<uint32_t> get_console_mode(Handle handle);
+  virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode);
 
   // Returns the value of the last poke that was sent.
   int64_t last_poke() { return last_poke_; }
@@ -66,6 +74,9 @@ private:
   uint32_t input_codepage_;
   uint32_t output_codepage_;
   utf8_t title_;
+  // TODO: for now all handles have the same mode value. There needs to be a
+  //   more nuanced way to set those.
+  uint32_t mode_;
 };
 
 // The service the driver will call back to when it wants to access the manager.
@@ -81,6 +92,9 @@ public:
   bool agent_is_done() { return agent_is_done_; }
 
   void set_backend(ConsoleBackend *backend) { backend_ = backend; }
+
+  // Returns the type registry to use for this backend.
+  plankton::TypeRegistry *registry() { return &registry_; }
 
 private:
   // Handles logs entries logged by the agent.
@@ -104,6 +118,8 @@ private:
 
   ConsoleBackend *backend_;
   ConsoleBackend *backend() { return backend_; }
+
+  plankton::TypeRegistry registry_;
 
   bool agent_is_ready_;
   bool agent_is_done_;

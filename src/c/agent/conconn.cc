@@ -51,6 +51,22 @@ fat_bool_t ConsoleAdaptor::get_console_title(lpc::Message *req,
   return F_TRUE;
 }
 
+fat_bool_t ConsoleAdaptor::set_console_mode(lpc::Message *req,
+    lpc::set_console_mode_m *data) {
+  response_t<bool_t> resp = connector()->set_console_mode(
+      data->handle, data->mode);
+  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
+  return F_TRUE;
+}
+
+fat_bool_t ConsoleAdaptor::get_console_mode(lpc::Message *req,
+    lpc::get_console_mode_m *data) {
+  response_t<uint32_t> resp = connector()->get_console_mode(data->handle);
+  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
+  data->mode = resp.value();
+  return F_TRUE;
+}
+
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
   return connector()->poke(value);
 }
@@ -145,6 +161,25 @@ response_t<uint32_t> PrpcConsoleConnector::get_console_title(tclib::Blob buffer,
   blob_fill(buffer, 0);
   blob_copy_to(tclib::Blob(presult.data(), amount), buffer);
   return response_t<uint32_t>::of(amount);
+}
+
+response_t<uint32_t> PrpcConsoleConnector::get_console_mode(handle_t raw_handle) {
+  rpc::OutgoingRequest req(Variant::null(), "get_console_mode");
+  Handle handle(raw_handle);
+  Variant args[1] = {req.factory()->new_native(&handle)};
+  req.set_arguments(1, args);
+  rpc::IncomingResponse resp;
+  return send_request_default<uint32_t>(&req, &resp);
+}
+
+response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
+    uint32_t mode) {
+  rpc::OutgoingRequest req(Variant::null(), "set_console_mode");
+  Handle handle(raw_handle);
+  Variant args[2] = {req.factory()->new_native(&handle), mode};
+  req.set_arguments(2, args);
+  rpc::IncomingResponse resp;
+  return send_request_default<bool_t>(&req, &resp);
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

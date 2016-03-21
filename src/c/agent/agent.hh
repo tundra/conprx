@@ -173,10 +173,6 @@ private:
 
   fat_bool_t send_is_done();
 
-  // Set to true to make the message handler print any messages it doesn't
-  // understand.
-  static const bool kDumpUnknownMessages = false;
-
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;
   tclib::InStream *agent_in_;

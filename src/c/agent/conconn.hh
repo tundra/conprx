@@ -38,6 +38,9 @@ public:
 
   // Read the title of the console and store it in the given buffer.
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
+
+  virtual response_t<bool_t> set_console_mode(void *handle, uint32_t mode) = 0;
+  virtual response_t<uint32_t> get_console_mode(handle_t handle) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -71,6 +74,8 @@ public:
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
   virtual response_t<bool_t> set_console_title(tclib::Blob data, bool is_unicode);
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode);
+  virtual response_t<bool_t> set_console_mode(handle_t handle, uint32_t mode);
+  virtual response_t<uint32_t> get_console_mode(handle_t handle);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);
