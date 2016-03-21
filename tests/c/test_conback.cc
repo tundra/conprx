@@ -213,13 +213,3 @@ CONBACK_TEST(title_a) {
   ASSERT_EQ(26, frontend->get_console_title_a(buf, 27));
   ASSERT_C_STREQ(letters, buf);
 }
-
-CONBACK_TEST(mode) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
-
-  // handle_t in = frontend->get_std_handle(conprx::kStdInputHandle);
-  // handle_t out = frontend->get_std_handle(conprx::kStdOutputHandle);
-  // handle_t err = frontend->get_std_handle(conprx::kStdErrorHandle);
-}

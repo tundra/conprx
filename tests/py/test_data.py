@@ -62,7 +62,6 @@ class ConDrvDataTest(unittest.TestCase):
     self.assertEquals("&99", str(ref))
     ref.value = -1
     self.assertEquals(-1, ref.value)
-    self.assertEquals("&-1", str(ref))
 
   def test_console_cursor_info(self):
     info = condrv.ConsoleCursorInfo(10, False)
