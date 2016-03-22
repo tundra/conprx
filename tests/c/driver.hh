@@ -7,6 +7,7 @@
 #include "c/stdc.h"
 
 #include "plankton-inl.hh"
+#include "share/protocol.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string.h"
@@ -44,11 +45,11 @@ public:
 class ConsoleError {
 public:
   ConsoleError() : last_error_(0) { }
-  ConsoleError(int64_t last_error) : last_error_(last_error) { }
+  ConsoleError(NtStatus last_error) : last_error_(last_error.code()) { }
 
   static plankton::SeedType<ConsoleError> *seed_type() { return &kSeedType; }
 
-  int64_t last_error() { return last_error_; }
+  int32_t last_error() { return last_error_; }
 
 private:
   template <typename T> friend class plankton::DefaultSeedType;
@@ -57,7 +58,7 @@ private:
   plankton::Variant to_seed(plankton::Factory *factory);
   void init(plankton::Seed payload, plankton::Factory *factory);
   static plankton::DefaultSeedType<ConsoleError> kSeedType;
-  int64_t last_error_;
+  int32_t last_error_;
 };
 
 } // namespace conprx

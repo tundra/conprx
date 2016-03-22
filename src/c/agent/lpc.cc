@@ -165,6 +165,10 @@ Message::Message(message_data_t *data, AddressXform xform)
   , xform_(xform) {
 }
 
+void Message::set_return_value(conprx::NtStatus status) {
+  data_->return_value = status.to_nt();
+}
+
 static void dump_blob(tclib::OutStream *out, tclib::Blob data, Message::dump_style_t style) {
   size_t blocksize = sizeof(int32_t);
   int32_t *start = static_cast<int32_t*>(data.start());

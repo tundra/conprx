@@ -18,53 +18,47 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-fat_bool_t ConsoleAdaptor::get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
+void ConsoleAdaptor::get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
   response_t<uint32_t> resp = connector()->get_console_cp(data->is_output);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
+  req->set_return_value(NtStatus::from_response(resp));
   data->code_page_id = (resp.has_error() ? 0 : resp.value());
-  return F_TRUE;
 }
 
-fat_bool_t ConsoleAdaptor::set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
+void ConsoleAdaptor::set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
   response_t<bool_t> resp = connector()->set_console_cp(
       static_cast<uint32_t>(data->code_page_id), data->is_output);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
-  return F_TRUE;
+  req->set_return_value(NtStatus::from_response(resp));
 }
 
-fat_bool_t ConsoleAdaptor::set_console_title(lpc::Message *req,
+void ConsoleAdaptor::set_console_title(lpc::Message *req,
     lpc::set_console_title_m *data) {
   void *start = req->xform().remote_to_local(data->title);
   tclib::Blob blob(start, data->length);
   response_t<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
-  return F_TRUE;
+  req->set_return_value(NtStatus::from_response(resp));
 }
 
-fat_bool_t ConsoleAdaptor::get_console_title(lpc::Message *req,
+void ConsoleAdaptor::get_console_title(lpc::Message *req,
     lpc::get_console_title_m *data) {
   void *start = req->xform().remote_to_local(data->title);
   tclib::Blob scratch(start, data->length);
   response_t<uint32_t> resp = connector()->get_console_title(scratch, data->is_unicode);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
+  req->set_return_value(NtStatus::from_response(resp));
   data->length = resp.value();
-  return F_TRUE;
 }
 
-fat_bool_t ConsoleAdaptor::set_console_mode(lpc::Message *req,
+void ConsoleAdaptor::set_console_mode(lpc::Message *req,
     lpc::set_console_mode_m *data) {
   response_t<bool_t> resp = connector()->set_console_mode(
       data->handle, data->mode);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
-  return F_TRUE;
+  req->set_return_value(NtStatus::from_response(resp));
 }
 
-fat_bool_t ConsoleAdaptor::get_console_mode(lpc::Message *req,
+void ConsoleAdaptor::get_console_mode(lpc::Message *req,
     lpc::get_console_mode_m *data) {
   response_t<uint32_t> resp = connector()->get_console_mode(data->handle);
-  req->data()->return_value = static_cast<ulong_t>(resp.error_code());
+  req->set_return_value(NtStatus::from_response(resp));
   data->mode = resp.value();
-  return F_TRUE;
 }
 
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {

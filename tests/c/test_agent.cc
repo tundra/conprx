@@ -128,11 +128,9 @@ MULTITEST(agent, native_get_cp, bool, use_real, ("real", true), ("simul", false)
   DriverRequest cp1 = driver.get_console_cp();
   ASSERT_EQ(32728, cp1->integer_value());
 
-  // For some reason positive error codes aren't propagated but negative ones
-  // work.
-  backend.input = response_t<uint32_t>::error(-123);
+  backend.input = response_t<uint32_t>::error(123);
   DriverRequest cp2 = driver.get_console_cp();
-  ASSERT_EQ(-123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
+  ASSERT_EQ(123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
@@ -285,6 +283,80 @@ MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)
 
   ASSERT_TRUE(driver.set_console_mode(input, 0xF00B00)->bool_value());
   ASSERT_EQ(0xF00B00, driver.get_console_mode(input)->integer_value());
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}
+
+// A backend that fails on *everything*. Don't forget to add a test when you
+// add a new method.
+class FailingConsoleBackend : public ConsoleBackend {
+public:
+  FailingConsoleBackend(uint32_t a = 1, uint32_t b = 1) : a_(a), b_(b) { }
+  response_t<int64_t> poke(int64_t value) { return fail<int64_t>(); }
+  response_t<uint32_t> get_console_cp(bool is_output) { return fail<uint32_t>(); }
+  response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return fail<bool_t>(); }
+  response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) { return fail<uint32_t>(); }
+  response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
+  response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
+  response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
+
+  // Returns the next error code in the sequence.
+  uint32_t gen_error();
+
+private:
+  template <typename T>
+  response_t<T> fail() { return response_t<T>::error(gen_error()); }
+  uint32_t a_;
+  uint32_t b_;
+};
+
+uint32_t FailingConsoleBackend::gen_error() {
+  uint32_t result = a_;
+  a_ = b_;
+  b_ = result + a_;
+  return result;
+}
+
+static int64_t get_last_error(const DriverRequest &request) {
+  // Casting away the const here is super cheating but it would be sooo tedious
+  // to create a whole set of parallel const methods to be able to do this
+  // const.
+  Variant error = const_cast<DriverRequest&>(request).error();
+  return error.native_as<ConsoleError>()->last_error();
+}
+
+MULTITEST(agent, failures, bool, use_real, ("real", true), ("simul", false)) {
+  SKIP_IF_UNSUPPORTED(use_real);
+  FailingConsoleBackend backend(4, 7);
+  DriverManager driver;
+  configure_driver(&driver, use_real);
+  driver.set_backend(&backend);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  // In the simulated version the values from the backend. In the real version
+  // it's the negated arguments. In both cases the values are the same.
+  ASSERT_EQ(4, get_last_error(driver.poke_backend(-4)));
+  ASSERT_EQ(7, get_last_error(driver.poke_backend(-7)));
+
+  if (use_real) {
+    // If we're using the real console there's no backend so we need to advance
+    // it manually for the codes to match up.
+    ASSERT_EQ(4, backend.gen_error());
+    ASSERT_EQ(7, backend.gen_error());
+  }
+
+  ASSERT_EQ(11, get_last_error(driver.get_console_cp()));
+  ASSERT_EQ(18, get_last_error(driver.get_console_output_cp()));
+
+  ASSERT_EQ(29, get_last_error(driver.set_console_cp(10)));
+  ASSERT_EQ(47, get_last_error(driver.set_console_output_cp(10)));
+
+  ASSERT_EQ(76, get_last_error(driver.get_console_title_a(1)));
+  ASSERT_EQ(123, get_last_error(driver.set_console_title_a("foo")));
+  Handle dummy_handle(10);
+  ASSERT_EQ(199, get_last_error(driver.get_console_mode(dummy_handle)));
+  ASSERT_EQ(322, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

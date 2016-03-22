@@ -85,7 +85,8 @@ fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
     // The messages we want to handle.
 #define __EMIT_CASE__(Name, name, DLL, API)                                    \
     case lm##Name:                                                             \
-      return adaptor()->name(request, &request->data()->payload.name);
+      adaptor()->name(request, &request->data()->payload.name);                \
+      return F_TRUE;
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_CASE__)
 #undef __EMIT_CASE__
     // The messages we know about but don't want to handle.

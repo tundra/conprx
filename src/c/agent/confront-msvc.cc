@@ -17,8 +17,19 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
-  virtual dword_t get_last_error();
+  int64_t WindowsConsoleFrontend::poke_backend(int64_t value);
+
+  virtual NtStatus get_last_error();
 };
+
+int64_t WindowsConsoleFrontend::poke_backend(int64_t value) {
+  if (value > 0) {
+    return value;
+  } else {
+    SetLastError(-value);
+    return 0;
+  }
+}
 
 handle_t WindowsConsoleFrontend::get_std_handle(dword_t handle) {
   return GetStdHandle(handle);
@@ -61,8 +72,8 @@ bool_t WindowsConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
   return SetConsoleMode(handle, mode);
 }
 
-dword_t WindowsConsoleFrontend::get_last_error() {
-  return GetLastError();
+NtStatus WindowsConsoleFrontend::get_last_error() {
+  return NtStatus::from_nt(GetLastError());
 }
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native() {

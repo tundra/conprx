@@ -35,5 +35,7 @@ Variant ConsoleError::to_seed(Factory *factory) {
 
 void ConsoleError::init(Seed payload, Factory *factory) {
   Variant last_error = payload.get_field("last_error");
-  last_error_ = last_error.is_integer() ? last_error.integer_value() : -1;
+  last_error_ = last_error.is_integer()
+      ? static_cast<int32_t>(last_error.integer_value())
+      : -1;
 }

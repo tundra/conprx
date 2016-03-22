@@ -52,7 +52,7 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
 #define __GEN_HANDLER__(Name, name, DLL, API)                                  \
-  fat_bool_t name(lpc::Message *req, lpc::name##_m *data);
+  void name(lpc::Message *req, lpc::name##_m *data);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 

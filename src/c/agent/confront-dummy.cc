@@ -26,7 +26,7 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
-  virtual dword_t get_last_error();
+  virtual NtStatus get_last_error();
 
 private:
   utf8_t title_;
@@ -96,8 +96,8 @@ bool_t DummyConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
   return false;
 }
 
-dword_t DummyConsoleFrontend::get_last_error() {
-  return 0xFABACAEA;
+NtStatus DummyConsoleFrontend::get_last_error() {
+  return NtStatus::success();
 }
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_dummy() {

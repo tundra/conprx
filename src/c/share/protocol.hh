@@ -46,6 +46,62 @@ struct connect_data_t {
   static const int32_t kMagic = 0xFABACAEA;
 };
 
+template <typename T> class response_t;
+
+// A wrapper around an nt status code that makes it easier to dissect the value
+// and clearer how to treat it when.
+class NtStatus {
+public:
+  enum Severity {
+    nsSuccess = 0x00000000,
+    nsInfo = 0x40000000,
+    nsWarning = 0x80000000,
+    nsError = 0xC0000000
+  };
+
+  enum Origin {
+    noMs = 0x00000000,
+    noCustomer = 0x20000000
+  };
+
+  // Returns this status appropriately nt-encoded.
+  uint32_t to_nt() { return encoded_; }
+
+  // Returns the naked error code value.
+  uint32_t code() { return encoded_ & kCodeMask; }
+
+  // Given a generic response, returns the appropriate ntstatus to communicate
+  // the state of the response to the nt framwork.
+  template <typename T>
+  static NtStatus from_response(response_t<T> resp);
+
+  // Given an nt status code, returns the last_error value it represents.
+  static dword_t decode_error(int32_t ntstatus);
+
+  static NtStatus from_nt(int32_t value) { return NtStatus(value); }
+
+  static NtStatus from(Severity severity, Origin origin, uint32_t code);
+
+  static NtStatus success() { return NtStatus(0); }
+
+  bool is_success() { return (encoded_ & kFailureMask) == 0; }
+
+private:
+  NtStatus(uint32_t encoded) : encoded_(encoded) { }
+
+  uint32_t encoded_;
+
+  static const uint32_t kFailureMask = 0x80000000;
+  static const uint32_t kSeverityMask = 0xC0000000;
+  static const uint32_t kCodeMask = 0xFFFF;
+  static const uint32_t kSeveritySuccess = 0x00000000;
+};
+
+template <typename T>
+NtStatus NtStatus::from_response(response_t<T> resp) {
+  return resp.has_error() ? from(nsError, noCustomer, resp.error_code()) : success();
+}
+
 // The result of a windows-like call: either a successful value or an nonzero
 // error code indicating a problem.
 template <typename T>

@@ -17,6 +17,7 @@
 #include "sync/pipe.hh"
 #include "utils/types.hh"
 #include "utils/vector.hh"
+#include "share/protocol.hh"
 
 namespace conprx {
 
@@ -159,7 +160,7 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
-  virtual dword_t get_last_error() = 0;
+  virtual NtStatus get_last_error() = 0;
 
   virtual int64_t poke_backend(int64_t value) { return 0; }
 

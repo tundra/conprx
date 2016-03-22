@@ -26,3 +26,16 @@ void Handle::init(Seed payload, Factory *factory) {
   Variant id = payload.get_field("id");
   id_ = id.is_integer() ? id.integer_value() : kInvalidHandleValue;
 }
+
+
+NtStatus NtStatus::from(Severity severity, Origin origin, uint32_t code) {
+  // The top part, 0xE000 means severity error, custom-defined, facility 0.
+  // https://msdn.microsoft.com/en-us/library/cc231200.aspx
+  return severity | origin | (code & kCodeMask);
+}
+
+dword_t NtStatus::decode_error(int32_t ntstatus) {
+  return ((ntstatus & kSeverityMask) == kSeveritySuccess)
+      ? 0
+      : (ntstatus & kCodeMask);
+}

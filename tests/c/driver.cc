@@ -62,6 +62,10 @@ private:
   // Captures the last error and wraps it in a console error.
   Native new_console_error(Factory *factory);
 
+  // Constructs an error using the frontend's last error code and reports it
+  // through the callback.
+  void fail_request(rpc::RequestData *data, ResponseCallback callback);
+
   static Native wrap_handle(handle_t handle, Factory *factory);
   static dword_t to_dword(Variant value);
 
@@ -90,7 +94,9 @@ void ConsoleFrontendService::is_handle(rpc::RequestData *data, ResponseCallback 
 }
 
 void ConsoleFrontendService::raise_error(rpc::RequestData *data, ResponseCallback callback) {
-  int64_t last_error = data->argument(0).integer_value();
+  int64_t code = data->argument(0).integer_value();
+  NtStatus last_error = NtStatus::from(NtStatus::nsError, NtStatus::noCustomer,
+      static_cast<int32_t>(code));
   Factory *factory = data->factory();
   ConsoleError *error = new (factory) ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));
@@ -99,6 +105,8 @@ void ConsoleFrontendService::raise_error(rpc::RequestData *data, ResponseCallbac
 void ConsoleFrontendService::poke_backend(rpc::RequestData *data, ResponseCallback callback) {
   int64_t value = data->argument(0).integer_value();
   int64_t result = frontend()->poke_backend(value);
+  if (result == 0)
+    return fail_request(data, callback);
   callback(rpc::OutgoingResponse::success(result));
 }
 
@@ -113,33 +121,26 @@ void ConsoleFrontendService::write_console_a(rpc::RequestData *data, ResponseCal
   const char *buffer = data->argument(1).string_chars();
   dword_t chars_to_write = to_dword(data->argument(2));
   dword_t chars_written = 0;
-  if (frontend()->write_console_a(output, buffer, chars_to_write, &chars_written,
-      NULL)) {
-    callback(rpc::OutgoingResponse::success(chars_written));
-  } else {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
-  }
+  if (!frontend()->write_console_a(output, buffer, chars_to_write, &chars_written, NULL))
+    return fail_request(data, callback);
+  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
 }
 
 void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
   dword_t chars_to_read = to_dword(data->argument(0));
   TempBuffer<ansi_char_t> scratch(chars_to_read + 1);
   dword_t len = frontend()->get_console_title_a(*scratch, chars_to_read);
-  if (len == 0) {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
-  } else {
-    String result = data->factory()->new_string(*scratch, static_cast<uint32_t>(len));
-    callback(rpc::OutgoingResponse::success(result));
-  }
+  if (len == 0)
+    return fail_request(data, callback);
+  String result = data->factory()->new_string(*scratch, static_cast<uint32_t>(len));
+  callback(rpc::OutgoingResponse::success(result));
 }
 
 void ConsoleFrontendService::set_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
   const char *new_title = data->argument(0).string_chars();
-  if (frontend()->set_console_title_a(new_title)) {
-    callback(rpc::OutgoingResponse::success(Variant::yes()));
-  } else {
-    callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
-  }
+  if (!frontend()->set_console_title_a(new_title))
+    return fail_request(data, callback);
+  callback(rpc::OutgoingResponse::success(Variant::yes()));
 }
 
 void ConsoleFrontendService::get_console_cp(rpc::RequestData *data, ResponseCallback callback) {
@@ -195,7 +196,7 @@ void ConsoleFrontendService::set_console_mode(rpc::RequestData *data, ResponseCa
       return;
     }
   }
-  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
+  return fail_request(data, callback);
 }
 
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
@@ -204,9 +205,13 @@ Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory
 }
 
 Native ConsoleFrontendService::new_console_error(Factory *factory) {
-  dword_t last_error = frontend()->get_last_error();
+  NtStatus last_error = frontend()->get_last_error();
   ConsoleError *error = new (factory) ConsoleError(last_error);
   return factory->new_native(error);
+}
+
+void ConsoleFrontendService::fail_request(rpc::RequestData *data, ResponseCallback callback) {
+  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
 }
 
 dword_t ConsoleFrontendService::to_dword(Variant value) {

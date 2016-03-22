@@ -336,6 +336,8 @@ public:
 
   message_data_t *data() { return data_; }
 
+  void set_return_value(conprx::NtStatus status);
+
   enum dump_style_t {
     dsPlain = 0,
     dsInts = 1,

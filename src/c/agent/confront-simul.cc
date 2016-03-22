@@ -13,6 +13,8 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace tclib;
 
+class SimulatedMessage;
+
 // The fallback console is a console implementation that works on all platforms.
 // The implementation is just placeholders but they should be functional enough
 // that they can be used for testing.
@@ -30,17 +32,19 @@ public:
   uint32_t get_console_cp(bool is_output);
   bool_t set_console_cp(uint32_t value, bool is_output);
 
-  virtual dword_t get_last_error();
+  virtual NtStatus get_last_error();
 
   virtual int64_t poke_backend(int64_t value);
 
   lpc::AddressXform xform() { return xform_; }
 
+  bool update_last_error(SimulatedMessage *message);
+
 private:
   ConsoleAdaptor *adaptor() { return adaptor_; }
   ConsoleAdaptor *adaptor_;
   lpc::AddressXform xform_;
-  dword_t last_error_;
+  NtStatus last_error_;
 
 };
 
@@ -48,13 +52,21 @@ SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAdaptor *adaptor,
     lpc::AddressXform xform)
   : adaptor_(adaptor)
   , xform_(xform)
-  , last_error_(0) { }
+  , last_error_(NtStatus::success()) { }
 
 SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 }
 
 int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
-  return adaptor()->poke(value).flush(0, &last_error_);
+  response_t<int64_t> result = adaptor()->poke(value);
+  if (result.has_error()) {
+    last_error_ = NtStatus::from(NtStatus::nsError, NtStatus::noCustomer,
+        result.error_code());
+    return 0;
+  } else {
+    last_error_ = NtStatus::success();
+    return result.value();
+  }
 }
 
 handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n) {
@@ -76,11 +88,18 @@ class SimulatedMessage {
 public:
   SimulatedMessage(SimulatingConsoleFrontend *frontend);
   lpc::Message *message() { return &message_; }
-  lpc::message_data_t *operator->() { return &data_; }
+  lpc::message_data_t *operator->() { return data(); }
+  lpc::message_data_t *data() { return &data_; }
 private:
   lpc::message_data_t data_;
   lpc::Message message_;
 };
+
+bool SimulatingConsoleFrontend::update_last_error(SimulatedMessage *message) {
+  NtStatus status = NtStatus::from_nt(message->data()->return_value);
+  last_error_ = status;
+  return status.is_success();
+}
 
 SimulatedMessage::SimulatedMessage(SimulatingConsoleFrontend *frontend)
   : message_(&data_, frontend->xform()) {
@@ -92,7 +111,7 @@ uint32_t SimulatingConsoleFrontend::get_console_cp(bool is_output) {
   lpc::get_console_cp_m *data = &message->payload.get_console_cp;
   data->is_output = is_output;
   adaptor()->get_console_cp(message.message(), data);
-  last_error_ = message->return_value;
+  update_last_error(&message);
   return data->code_page_id;
 }
 
@@ -110,8 +129,7 @@ bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value, bool is_output)
   data->is_output = is_output;
   data->code_page_id = value;
   adaptor()->set_console_cp(message.message(), data);
-  last_error_ = message->return_value;
-  return true;
+  return update_last_error(&message);
 }
 
 bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value) {
@@ -130,8 +148,7 @@ bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   data->length = length;
   data->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
   adaptor()->set_console_title(message.message(), data);
-  last_error_ = message->return_value;
-  return true;
+  return update_last_error(&message);
 }
 
 dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
@@ -140,7 +157,7 @@ dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
   data->length = n;
   data->title = xform().local_to_remote(str);
   adaptor()->get_console_title(message.message(), data);
-  last_error_ = message->return_value;
+  update_last_error(&message);
   return static_cast<uint32_t>(data->length);
 }
 
@@ -150,9 +167,8 @@ bool_t SimulatingConsoleFrontend::get_console_mode(handle_t handle, dword_t *mod
   data->handle = handle;
   data->mode = 0;
   adaptor()->get_console_mode(message.message(), data);
-  last_error_ = message->return_value;
   *mode_out = data->mode;
-  return true;
+  return update_last_error(&message);
 }
 
 bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
@@ -161,11 +177,10 @@ bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode
   data->handle = handle;
   data->mode = mode;
   adaptor()->set_console_mode(message.message(), data);
-  last_error_ = message->return_value;
-  return true;
+  return update_last_error(&message);
 }
 
-dword_t SimulatingConsoleFrontend::get_last_error() {
+NtStatus SimulatingConsoleFrontend::get_last_error() {
   return last_error_;
 }
 
