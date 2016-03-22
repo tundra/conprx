@@ -38,6 +38,9 @@ public:
 
   lpc::AddressXform xform() { return xform_; }
 
+  // Sets the last_error_ field appropriate based on the state of the given
+  // message and returns true if the state was successful, making this value
+  // appropriate as a return value from any boolean console functions.
   bool update_last_error(SimulatedMessage *message);
 
 private:
@@ -60,7 +63,7 @@ SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
   response_t<int64_t> result = adaptor()->poke(value);
   if (result.has_error()) {
-    last_error_ = NtStatus::from(NtStatus::nsError, NtStatus::noCustomer,
+    last_error_ = NtStatus::from(NtStatus::nsError, NtStatus::npCustomer,
         result.error_code());
     return 0;
   } else {

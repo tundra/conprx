@@ -95,8 +95,7 @@ void ConsoleFrontendService::is_handle(rpc::RequestData *data, ResponseCallback 
 
 void ConsoleFrontendService::raise_error(rpc::RequestData *data, ResponseCallback callback) {
   int64_t code = data->argument(0).integer_value();
-  NtStatus last_error = NtStatus::from(NtStatus::nsError, NtStatus::noCustomer,
-      static_cast<int32_t>(code));
+  NtStatus last_error = NtStatus::from_nt(static_cast<uint32_t>(code));
   Factory *factory = data->factory();
   ConsoleError *error = new (factory) ConsoleError(last_error);
   callback(rpc::OutgoingResponse::failure(factory->new_native(error)));

@@ -49,8 +49,8 @@ Variant DriverRequest::is_handle(Variant value) {
   return send("is_handle", value);
 }
 
-Variant DriverRequest::raise_error(int64_t last_error) {
-  return send("raise_error", last_error);
+Variant DriverRequest::raise_error(NtStatus last_error) {
+  return send("raise_error", last_error.to_nt());
 }
 
 Variant DriverRequest::poke_backend(Variant value) {

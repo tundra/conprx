@@ -130,7 +130,7 @@ MULTITEST(agent, native_get_cp, bool, use_real, ("real", true), ("simul", false)
 
   backend.input = response_t<uint32_t>::error(123);
   DriverRequest cp2 = driver.get_console_cp();
-  ASSERT_EQ(123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->last_error()));
+  ASSERT_EQ(123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->code()));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
@@ -322,7 +322,7 @@ static int64_t get_last_error(const DriverRequest &request) {
   // to create a whole set of parallel const methods to be able to do this
   // const.
   Variant error = const_cast<DriverRequest&>(request).error();
-  return error.native_as<ConsoleError>()->last_error();
+  return error.native_as<ConsoleError>()->code();
 }
 
 MULTITEST(agent, failures, bool, use_real, ("real", true), ("simul", false)) {

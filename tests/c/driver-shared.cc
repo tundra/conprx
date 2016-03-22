@@ -29,13 +29,13 @@ ConsoleError *ConsoleError::new_instance(Variant header, Factory *factory) {
 
 Variant ConsoleError::to_seed(Factory *factory) {
   Seed result = factory->new_seed(seed_type());
-  result.set_field("last_error", last_error_);
+  result.set_field("last_error", last_error_.to_nt());
   return result;
 }
 
 void ConsoleError::init(Seed payload, Factory *factory) {
   Variant last_error = payload.get_field("last_error");
   last_error_ = last_error.is_integer()
-      ? static_cast<int32_t>(last_error.integer_value())
-      : -1;
+      ? NtStatus::from_nt(static_cast<uint32_t>(last_error.integer_value()))
+      : NtStatus::success();
 }

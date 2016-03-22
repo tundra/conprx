@@ -336,6 +336,7 @@ public:
 
   message_data_t *data() { return data_; }
 
+  // Sets the return status to the given value.
   void set_return_value(conprx::NtStatus status);
 
   enum dump_style_t {
