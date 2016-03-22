@@ -330,14 +330,19 @@ public:
   // Just the size of the payload, excluding the header size.
   ulong_t data_size() { return data()->header.u1.s1.data_length; }
 
+  // Misc accessors.
   ulong_t api_number() { return data()->api_number; }
   ushort_t dll_index() { return static_cast<ushort_t>((api_number() >> 16) & 0xFFFF); }
   ushort_t api_index() { return static_cast<ushort_t>(api_number() & 0xFFFF); }
 
+  // The raw underlying data.
   message_data_t *data() { return data_; }
 
   // Sets the return status to the given value.
   void set_return_value(conprx::NtStatus status);
+
+  void set_keep_propagating(bool value) { keep_propagating_ = value; }
+  bool keep_propagating() { return keep_propagating_; }
 
   enum dump_style_t {
     dsPlain = 0,
@@ -345,6 +350,7 @@ public:
     dsAscii = 2
   };
 
+  // Dump this message textually to the given out stream.
   void dump(tclib::OutStream *out, dump_style_t style = dsPlain);
 
   AddressXform xform() { return xform_; }
@@ -352,6 +358,7 @@ public:
 private:
   message_data_t *data_;
   AddressXform xform_;
+  bool keep_propagating_;
 };
 
 } // namespace lpc

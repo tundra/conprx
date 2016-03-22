@@ -162,7 +162,8 @@ fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
 
 Message::Message(message_data_t *data, AddressXform xform)
   : data_(data)
-  , xform_(xform) {
+  , xform_(xform)
+  , keep_propagating_(false) {
 }
 
 void Message::set_return_value(conprx::NtStatus status) {

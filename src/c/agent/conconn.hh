@@ -51,6 +51,7 @@ public:
   virtual ~ConsoleAdaptor() { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
+  // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, DLL, API)                                  \
   void name(lpc::Message *req, lpc::name##_m *data);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)

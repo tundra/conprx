@@ -65,8 +65,14 @@ ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *incoming_reply) {
   if (enabled_ && port_handle == console_server_port_handle_) {
     lpc::Message message(request, port_xform());
-    if (handler_(this, &message, incoming_reply))
-      return ntSuccess;
+    fat_bool_t result = handler_(this, &message, incoming_reply);
+    if (!result) {
+      Disable disable(this);
+      WARN("Failed to handle message %x", message.api_number());
+      return NtStatus::from(NtStatus::nsError, NtStatus::npCustomer, 3).to_nt();
+    } else if (!message.keep_propagating()) {
+      return NtStatus::success().to_nt();
+    }
   }
   return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
 }

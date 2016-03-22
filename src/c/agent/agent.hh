@@ -145,7 +145,8 @@ public:
   // of it. Otherwise return NULL.
   static const char *get_lpc_name(ulong_t number);
 
-  // Processes LPC messages.
+  // Processes LPC messages. The return value is used to decide whether to
+  // report an error or not.
   fat_bool_t on_message(lpc::Interceptor *interceptor, lpc::Message *request,
       lpc::message_data_t *incoming_reply);
 
