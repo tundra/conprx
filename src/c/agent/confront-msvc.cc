@@ -77,5 +77,5 @@ NtStatus WindowsConsoleFrontend::get_last_error() {
 }
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native() {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) WindowsConsoleFrontend());
+  return new (kDefaultAlloc) WindowsConsoleFrontend();
 }

@@ -38,7 +38,7 @@ size_t X86_32::write_imposter(PatchRequest &request, tclib::Blob memory) {
 
 fat_bool_t X86_32::create_redirection(PatchRequest *request, ProximityAllocator *alloc,
     pass_def_ref_t<Redirection> *redir_out, PreambleInfo *info) {
-  *redir_out = pass_def_ref_t<Redirection>(new (kDefaultAlloc) RelativeJump32Redirection());
+  *redir_out = new (kDefaultAlloc) RelativeJump32Redirection();
   return F_TRUE;
 }
 

@@ -178,5 +178,5 @@ response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(
     rpc::MessageSocket *socket, plankton::InputSocket *in) {
-  return pass_def_ref_t<ConsoleConnector>(new (kDefaultAlloc) PrpcConsoleConnector(socket, in));
+  return new (kDefaultAlloc) PrpcConsoleConnector(socket, in);
 }

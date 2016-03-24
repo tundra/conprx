@@ -101,5 +101,5 @@ NtStatus DummyConsoleFrontend::get_last_error() {
 }
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_dummy() {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) DummyConsoleFrontend());
+  return new (kDefaultAlloc) DummyConsoleFrontend();
 }

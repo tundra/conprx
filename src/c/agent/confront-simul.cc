@@ -189,6 +189,6 @@ NtStatus SimulatingConsoleFrontend::get_last_error() {
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAdaptor *adaptor,
     ssize_t delta) {
-  return pass_def_ref_t<ConsoleFrontend>(new (kDefaultAlloc) SimulatingConsoleFrontend(adaptor,
-      lpc::AddressXform(delta)));
+  return new (kDefaultAlloc) SimulatingConsoleFrontend(adaptor,
+      lpc::AddressXform(delta));
 }

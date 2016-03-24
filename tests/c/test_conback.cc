@@ -127,7 +127,7 @@ private:
 
 fat_bool_t FrontendMultiplexer::initialize() {
   if (use_native_) {
-    native_ = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>());
+    native_ = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>::null());
     frontend_ = *native_;
   } else {
     fake_ = new (kDefaultAlloc) SimulatedFrontendAdaptor(&backend_);

@@ -91,15 +91,14 @@ fat_bool_t X86_64::create_redirection(PatchRequest *request,
   bool allow_rel_32 = (request->flags() & PatchRequest::pfBanRel32) == 0;
   bool allow_kangaroo = (request->flags() & PatchRequest::pfBanKangaroo) == 0;
   if ((info->size() >= kAbsoluteJump64Size) && allow_abs_64) {
-    *redir_out = pass_def_ref_t<Redirection>(new (kDefaultAlloc) AbsoluteJump64Redirection());
+    *redir_out = new (kDefaultAlloc) AbsoluteJump64Redirection();
     return F_TRUE;
   } else if (info->size() < kJmpSize) {
     LOG_WARN("Not enough room to create redirection (0x%02x): %i",
         info->last_instr(), info->size());
     return F_FALSE;
   } else if (can_jump_relative_32(original, replacement) && allow_rel_32) {
-    *redir_out = pass_def_ref_t<Redirection>(
-        new (kDefaultAlloc) RelativeJump32Redirection());
+    *redir_out = new (kDefaultAlloc) RelativeJump32Redirection();
     return F_TRUE;
   } else if (allow_kangaroo) {
     return KangarooRedirection::create(request, alloc, redir_out, info);
@@ -120,8 +119,7 @@ fat_bool_t X86_64::KangarooRedirection::create(PatchRequest *request,
   if (!can_jump_relative_32(request->original(), stub_addr))
     return F_FALSE;
   write_absolute_jump_64(stub_addr, request->replacement());
-  *redir_out = pass_def_ref_t<Redirection>(
-      new (kDefaultAlloc) KangarooRedirection(stub));
+  *redir_out = new (kDefaultAlloc) KangarooRedirection(stub);
   return F_TRUE;
 }
 
