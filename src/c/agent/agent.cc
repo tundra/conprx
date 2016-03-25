@@ -70,7 +70,7 @@ ConsoleAgent::ConsoleAgent()
 
 const char *ConsoleAgent::get_lpc_name(ulong_t number) {
   switch (number) {
-#define __GEN_CASE__(Name, name, DLL, API) case ((DLL << 16) | API): return #Name;
+#define __GEN_CASE__(Name, name, NUM, FLAGS) case NUM: return #Name;
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_CASE__)
   FOR_EACH_OTHER_KNOWN_LPC(__GEN_CASE__)
 #undef __GEN_CASE__
@@ -79,35 +79,49 @@ const char *ConsoleAgent::get_lpc_name(ulong_t number) {
   }
 }
 
-fat_bool_t ConsoleAgent::on_message(lpc::Interceptor *interceptor,
-    lpc::Message *request, lpc::message_data_t *incoming_reply) {
+NtStatus ConsoleAgent::on_message(lpc::Message *request) {
   switch (request->api_number()) {
     // The messages we want to handle.
-#define __EMIT_CASE__(Name, name, DLL, API)                                    \
-    case lm##Name:                                                             \
-      adaptor()->name(request, &request->data()->payload.name);                \
-      return F_TRUE;
+#define __EMIT_CASE__(Name, name, NUM, FLAGS)                                  \
+    case lm##Name: {                                                           \
+      lfTr FLAGS (trace_before(#name, request),);                              \
+      NtStatus result = lfDa FLAGS (                                           \
+          request->send_to_backend(),                                          \
+          adaptor()->name(request, &request->data()->payload.name));           \
+      lfTr FLAGS (trace_after(#name, request, result),);                       \
+      return result;                                                           \
+    }
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_CASE__)
 #undef __EMIT_CASE__
     // The messages we know about but don't want to handle.
-#define __EMIT_CASE__(Name, name, DLL, API) case CALC_API_NUMBER(DLL, API):
+#define __EMIT_CASE__(Name, name, NUM, FLAGS) case NUM:
   FOR_EACH_OTHER_KNOWN_LPC(__EMIT_CASE__)
 #undef __EMIT_CASE__
-      request->set_keep_propagating(true);
-      return F_TRUE;
+      return request->send_to_backend();
     // Unknown messages.
     default: {
       if (kDumpUnknownMessages) {
-        lpc::Interceptor::Disable disable(interceptor);
+        lpc::Interceptor::Disable disable(request->interceptor());
         request->dump(FileSystem::native()->std_out());
       }
       if (kSuspendOnUnknownMessages) {
         NativeThread::sleep(Duration::seconds(30));
       }
-      request->set_keep_propagating(true);
-      return F_TRUE;
+      return request->send_to_backend();
     }
   }
+}
+
+void ConsoleAgent::trace_before(const char *name, lpc::Message *message) {
+  OutStream *out = FileSystem::native()->std_err();
+  out->printf("--- before %s ---\n", name);
+  message->dump(out);
+}
+
+void ConsoleAgent::trace_after(const char *name, lpc::Message *message, NtStatus status) {
+  OutStream *out = FileSystem::native()->std_err();
+  out->printf("--- after %s (= %i) ---\n", name, status.to_nt());
+  message->dump(out);
 }
 
 fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,

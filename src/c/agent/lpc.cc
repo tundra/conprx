@@ -160,14 +160,16 @@ fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
 }
 
 
-Message::Message(message_data_t *data, AddressXform xform)
-  : data_(data)
-  , xform_(xform)
-  , keep_propagating_(false) {
+Message::Message(message_data_t *request, message_data_t *reply,
+    Interceptor *interceptor, AddressXform xform)
+  : request_(request)
+  , reply_(reply)
+  , interceptor_(interceptor)
+  , xform_(xform) {
 }
 
 void Message::set_return_value(conprx::NtStatus status) {
-  data_->return_value = status.to_nt();
+  reply_->header.return_value = status.to_nt();
 }
 
 static void dump_blob(tclib::OutStream *out, tclib::Blob data, Message::dump_style_t style) {
@@ -192,11 +194,11 @@ static void dump_blob(tclib::OutStream *out, tclib::Blob data, Message::dump_sty
 }
 
 void Message::dump(tclib::OutStream *out, dump_style_t style) {
-  size_t total_size = this->total_size();
-  size_t data_size = this->data_size();
+  size_t total_size = this->total_length();
+  size_t data_size = this->data_length();
   size_t header_size = total_size - data_size;
   out->printf("--- message %x [size: %i, data: %i]\n", api_number(), total_size, data_size);
-  address_t start = reinterpret_cast<address_t>(data_);
+  address_t start = reinterpret_cast<address_t>(request_);
   tclib::Blob header(start, header_size);
   dump_blob(out, header, style);
   out->printf("\n--- data ---\n");

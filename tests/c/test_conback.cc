@@ -1,6 +1,7 @@
 //- Copyright 2016 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "agent/agent.hh"
 #include "agent/conconn.hh"
 #include "agent/confront.hh"
 #include "bytestream.hh"
@@ -16,6 +17,18 @@ END_C_INCLUDES
 using namespace tclib;
 using namespace plankton;
 using namespace conprx;
+
+class SimulatedAgent : public ConsoleAgent {
+public:
+  SimulatedAgent(ConsoleConnector *connector) : adaptor_(connector) { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  virtual fat_bool_t install_agent_platform() { return F_TRUE; }
+  virtual fat_bool_t uninstall_agent_platform() { return F_TRUE; }
+  virtual ConsoleAdaptor *adaptor() { return &adaptor_; }
+
+private:
+  ConsoleAdaptor adaptor_;
+};
 
 // An in-memory adaptor that provides a front-end backed by simulating requests
 // to the given backend. The reason for testing backends by calling a frontend
@@ -36,7 +49,7 @@ private:
   ByteBufferStream buffer_;
   rpc::StreamServiceConnector streams_;
   PrpcConsoleConnector connector_;
-  ConsoleAdaptor adaptor_;
+  SimulatedAgent agent_;
   def_ref_t<ConsoleFrontend> frontend_;
   ConsoleBackendService service_;
 };
@@ -46,8 +59,8 @@ SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
   , buffer_(1024)
   , streams_(&buffer_, &buffer_)
   , connector_(streams_.socket(), streams_.input())
-  , adaptor_(&connector_) {
-  frontend_ = ConsoleFrontend::new_simulating(&adaptor_, 0);
+  , agent_(&connector_) {
+  frontend_ = ConsoleFrontend::new_simulating(&agent_, 0);
   service_.set_backend(backend_);
 }
 

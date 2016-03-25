@@ -90,10 +90,12 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
 }
 
 response_t<uint32_t> BasicConsoleBackend::get_console_mode(Handle handle) {
+  WARN("Using stub get_console_mode(%p)", handle.ptr());
   return response_t<uint32_t>::of(mode_);
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t mode) {
+  WARN("Using stub set_console_mode(%p, %x)", handle.ptr(), mode);
   mode_ = mode;
   return response_t<bool_t>::yes();
 }
@@ -195,6 +197,11 @@ void ConsoleBackendService::on_get_console_mode(rpc::RequestData *data, Response
     return;
   }
   forward_response(backend()->get_console_mode(*handle), resp);
+}
+
+void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *data,
+    ResponseCallback resp) {
+  resp(rpc::OutgoingResponse::failure(6));
 }
 
 void ConsoleBackendService::message_not_understood(rpc::RequestData *data,

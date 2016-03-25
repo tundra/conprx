@@ -225,10 +225,16 @@ dword_t ConsoleFrontendService::to_dword(Variant value) {
 // Used for testing only.
 class FakeConsoleAgent : public ConsoleAgent {
 public:
-  FakeConsoleAgent() { }
+  FakeConsoleAgent() : adaptor_(NULL) { }
   virtual void default_destroy() { default_delete_concrete(this); }
   virtual fat_bool_t install_agent_platform() { return F_TRUE; }
   virtual fat_bool_t uninstall_agent_platform() { return F_TRUE; }
+
+  void set_adaptor(ConsoleAdaptor *adaptor) { adaptor_ = adaptor; }
+  virtual ConsoleAdaptor *adaptor() { return adaptor_; }
+
+private:
+  ConsoleAdaptor *adaptor_;
 };
 
 // A log that ignores everything.
@@ -279,8 +285,8 @@ private:
   // Returns the fake agent channel or NULL if there is none.
   ClientChannel *fake_agent_channel() { return *fake_agent_channel_; }
   bool use_fake_agent() { return !string_is_empty(fake_agent_channel_name_); }
-  def_ref_t<ConsoleAgent> fake_agent_;
-  ConsoleAgent *fake_agent() { return *fake_agent_; }
+  def_ref_t<FakeConsoleAgent> fake_agent_;
+  FakeConsoleAgent *fake_agent() { return *fake_agent_; }
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
@@ -374,7 +380,8 @@ bool ConsoleDriverMain::run() {
       conconn = PrpcConsoleConnector::create(fake_agent()->owner()->socket(),
           fake_agent()->owner()->input());
       condapt = new (kDefaultAlloc) ConsoleAdaptor(*conconn);
-      frontend = ConsoleFrontend::new_simulating(*condapt, port_delta_);
+      fake_agent()->set_adaptor(*condapt);
+      frontend = ConsoleFrontend::new_simulating(fake_agent(), port_delta_);
       break;
   }
   ConsoleFrontendService driver(*frontend);

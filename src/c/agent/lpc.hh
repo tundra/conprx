@@ -85,7 +85,7 @@ T *AddressXform::local_to_remote(T *arg) {
 // properly and an interceptor deals with all that.
 class Interceptor {
 public:
-  typedef tclib::callback_t<fat_bool_t(Interceptor*, lpc::Message*, lpc::message_data_t*)> handler_t;
+  typedef tclib::callback_t<conprx::NtStatus(lpc::Message*)> handler_t;
 
   // Creates an interceptor that will delegate intercepted calls to the given
   // handler.
@@ -132,6 +132,8 @@ public:
   static fat_bool_t capture_stacktrace(Vector<void*> buffer);
 
 private:
+  friend class Message;
+
   // The type of ConsoleClientCallServer. Should really be called
   // console_client_call_server_f but that's just sooo verbose.
   typedef ntstatus_t (MSVC_STDCALL *cccs_f)(void *message, void *capture_buffer,
@@ -233,8 +235,8 @@ typedef uint8_t client_id_t[IF_32_BIT(8, 16)];
 struct port_message_data_t {
   union {
     struct {
-      ushort_t data_length;
-      ushort_t total_length;
+      uint16_t data_length;
+      uint16_t total_length;
     } s1;
     ulong_t length;
   } u1;
@@ -278,6 +280,7 @@ typedef IF_32_BIT(int32_t, int64_t) intn_t;
 struct get_console_mode_m {
   void *handle;
   uint32_t mode;
+  ONLY_64_BIT(uint32_t padding);
 };
 
 typedef get_console_mode_m set_console_mode_m;
@@ -286,6 +289,7 @@ struct get_console_title_m {
   intn_t length;
   void *title;
   bool is_unicode;
+  ONLY_64_BIT(uint32_t padding);
 };
 
 typedef get_console_title_m set_console_title_m;
@@ -297,13 +301,29 @@ struct get_console_cp_m {
 
 typedef get_console_cp_m set_console_cp_m;
 
-// A console api message, a superset of a port message.
-struct message_data_t {
-  port_message_data_t header;
+struct get_console_screen_buffer_info_m {
+  handle_t console;
+  handle_t output;
+  coord_t size;
+  coord_t cursor_position;
+  coord_t scroll_position;
+  uint16_t attributes;
+  coord_t current_window_size;
+  coord_t maximum_window_size;
+  uint32_t mode;
+};
+
+struct message_data_header_t {
   capture_buffer_data_t *capture_buffer;
   uint32_t api_number;
   int32_t return_value;
   intn_t reserved;
+};
+
+// A console api message, a superset of a port message.
+struct message_data_t {
+  port_message_data_t port_message;
+  message_data_header_t header;
   union {
 #define __EMIT_ENTRY__(Name, name, DLL, API) name##_m name;
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
@@ -315,6 +335,17 @@ struct message_data_t {
 #  pragma pack(pop)
 #endif
 
+// Given the data size for a message returns the total length.
+static size_t total_message_length_from_data_length(size_t data_length) {
+  // I have no idea where that extra 4 bytes comes from on 32 bit. It suggests
+  // that the port message portion is larger than what can be accounted for by
+  // the struct but the header and payload are in the right place so there's
+  // no room for it to be larger. Also it doesn't seem to be alignment because
+  // all sizes are 4-aligned and those extra 4 bytes sometimes knocks it out
+  // of 8-alignment. Go figure.
+  return sizeof(lpc::port_message_data_t) + data_length + IF_32_BIT(4, 0);
+}
+
 // Computes the joint api number given a dll and an api index.
 #define CALC_API_NUMBER(DLL, API) (((DLL) << 16) | (API))
 
@@ -322,27 +353,23 @@ struct message_data_t {
 // fields of interest.
 class Message {
 public:
-  Message(message_data_t *data, AddressXform xform);
+  Message(message_data_t *request, message_data_t *reply,
+      Interceptor *interceptor, AddressXform xform);
 
   // The total size of the message data, including header and full payload.
-  size_t total_size() { return data()->header.u1.s1.total_length; }
+  uint16_t total_length() { return data()->port_message.u1.s1.total_length; }
 
   // Just the size of the payload, excluding the header size.
-  ulong_t data_size() { return data()->header.u1.s1.data_length; }
+  uint16_t data_length() { return data()->port_message.u1.s1.data_length; }
 
   // Misc accessors.
-  ulong_t api_number() { return data()->api_number; }
-  ushort_t dll_index() { return static_cast<ushort_t>((api_number() >> 16) & 0xFFFF); }
-  ushort_t api_index() { return static_cast<ushort_t>(api_number() & 0xFFFF); }
+  uint32_t api_number() { return data()->header.api_number; }
 
   // The raw underlying data.
-  message_data_t *data() { return data_; }
+  message_data_t *data() { return request_; }
 
   // Sets the return status to the given value.
   void set_return_value(conprx::NtStatus status);
-
-  void set_keep_propagating(bool value) { keep_propagating_ = value; }
-  bool keep_propagating() { return keep_propagating_; }
 
   enum dump_style_t {
     dsPlain = 0,
@@ -355,10 +382,15 @@ public:
 
   AddressXform xform() { return xform_; }
 
+  Interceptor *interceptor() { return interceptor_; }
+
+  conprx::NtStatus send_to_backend();
+
 private:
-  message_data_t *data_;
+  message_data_t *request_;
+  message_data_t *reply_;
+  Interceptor *interceptor_;
   AddressXform xform_;
-  bool keep_propagating_;
 };
 
 } // namespace lpc

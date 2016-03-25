@@ -3,8 +3,9 @@
 
 /// Console api implementation specific to the windows platform.
 
-#include "confront.hh"
-#include "conconn.hh"
+#include "agent/agent.hh"
+#include "agent/conconn.hh"
+#include "agent/confront.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -13,14 +14,14 @@ END_C_INCLUDES
 using namespace conprx;
 using namespace tclib;
 
-class SimulatedMessage;
+class AbstractSimulatedMessage;
 
 // The fallback console is a console implementation that works on all platforms.
 // The implementation is just placeholders but they should be functional enough
 // that they can be used for testing.
 class SimulatingConsoleFrontend : public ConsoleFrontend {
 public:
-  SimulatingConsoleFrontend(ConsoleAdaptor *adaptor, lpc::AddressXform xform);
+  SimulatingConsoleFrontend(ConsoleAgent *agent, lpc::AddressXform xform);
   ~SimulatingConsoleFrontend();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
@@ -41,19 +42,19 @@ public:
   // Sets the last_error_ field appropriate based on the state of the given
   // message and returns true if the state was successful, making this value
   // appropriate as a return value from any boolean console functions.
-  bool update_last_error(SimulatedMessage *message);
+  bool update_last_error(AbstractSimulatedMessage *message);
 
 private:
-  ConsoleAdaptor *adaptor() { return adaptor_; }
-  ConsoleAdaptor *adaptor_;
+  ConsoleAgent *agent() { return agent_; }
+  ConsoleAgent *agent_;
   lpc::AddressXform xform_;
   NtStatus last_error_;
 
 };
 
-SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAdaptor *adaptor,
+SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAgent *agent,
     lpc::AddressXform xform)
-  : adaptor_(adaptor)
+  : agent_(agent)
   , xform_(xform)
   , last_error_(NtStatus::success()) { }
 
@@ -61,10 +62,9 @@ SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 }
 
 int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
-  response_t<int64_t> result = adaptor()->poke(value);
+  response_t<int64_t> result = agent()->adaptor()->poke(value);
   if (result.has_error()) {
-    last_error_ = NtStatus::from(NtStatus::nsError, NtStatus::npCustomer,
-        result.error_code());
+    last_error_ = NtStatus::from_response(result);
     return 0;
   } else {
     last_error_ = NtStatus::success();
@@ -86,36 +86,71 @@ bool_t SimulatingConsoleFrontend::write_console_a(handle_t console_output, const
   return false;
 }
 
+// Static mapping from message keys to some types and functions it's convenient
+// to have bundled together.
+template <ConsoleAgent::lpc_method_key_t K> struct MessageInfo { };
+
+#define __DECLARE_MESSAGE_INFO__(Name, name, APINUM, FLAGS)                    \
+  template <> struct MessageInfo<ConsoleAgent::lm##Name> {                     \
+    typedef lpc::name##_m data_m;                                              \
+    static data_m *get_payload(lpc::message_data_t *data) { return &data->payload.name; } \
+  };
+FOR_EACH_LPC_TO_INTERCEPT(__DECLARE_MESSAGE_INFO__)
+#undef __DECLARE_MESSAGE_INFO__
+
 // Convenience class for constructing simulated messages.
-class SimulatedMessage {
+class AbstractSimulatedMessage {
 public:
-  SimulatedMessage(SimulatingConsoleFrontend *frontend);
+  AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend);
   lpc::Message *message() { return &message_; }
   lpc::message_data_t *operator->() { return data(); }
+
+  int32_t return_value() { return data()->header.return_value; }
+
+protected:
   lpc::message_data_t *data() { return &data_; }
+
 private:
   lpc::message_data_t data_;
   lpc::Message message_;
 };
 
-bool SimulatingConsoleFrontend::update_last_error(SimulatedMessage *message) {
-  NtStatus status = NtStatus::from_nt(message->data()->return_value);
+template <ConsoleAgent::lpc_method_key_t K>
+class SimulatedMessage : public AbstractSimulatedMessage {
+public:
+  SimulatedMessage(SimulatingConsoleFrontend *frontend);
+  typename MessageInfo<K>::data_m *payload() { return MessageInfo<K>::get_payload(data()); }
+private:
+};
+
+template <ConsoleAgent::lpc_method_key_t K>
+SimulatedMessage<K>::SimulatedMessage(SimulatingConsoleFrontend *frontend)
+  : AbstractSimulatedMessage(frontend) {
+  data()->header.api_number = K;
+  size_t data_length = sizeof(lpc::message_data_header_t) + sizeof(typename MessageInfo<K>::data_m);
+  data()->port_message.u1.s1.data_length = static_cast<uint16_t>(data_length);
+  size_t total_length = lpc::total_message_length_from_data_length(data_length);
+  data()->port_message.u1.s1.total_length = static_cast<uint16_t>(total_length);
+}
+
+bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *message) {
+  NtStatus status = NtStatus::from_nt(message->return_value());
   last_error_ = status;
   return status.is_success();
 }
 
-SimulatedMessage::SimulatedMessage(SimulatingConsoleFrontend *frontend)
-  : message_(&data_, frontend->xform()) {
+AbstractSimulatedMessage::AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend)
+  : message_(data(), data(), NULL, frontend->xform()) {
   struct_zero_fill(data_);
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_cp(bool is_output) {
-  SimulatedMessage message(this);
-  lpc::get_console_cp_m *data = &message->payload.get_console_cp;
-  data->is_output = is_output;
-  adaptor()->get_console_cp(message.message(), data);
+  SimulatedMessage<ConsoleAgent::lmGetConsoleCP> message(this);
+  lpc::get_console_cp_m *payload = message.payload();
+  payload->is_output = is_output;
+  agent()->on_message(message.message());
   update_last_error(&message);
-  return data->code_page_id;
+  return payload->code_page_id;
 }
 
 uint32_t SimulatingConsoleFrontend::get_console_cp() {
@@ -127,11 +162,11 @@ uint32_t SimulatingConsoleFrontend::get_console_output_cp() {
 }
 
 bool_t SimulatingConsoleFrontend::set_console_cp(uint32_t value, bool is_output) {
-  SimulatedMessage message(this);
-  lpc::set_console_cp_m *data = &message->payload.get_console_cp;
-  data->is_output = is_output;
-  data->code_page_id = value;
-  adaptor()->set_console_cp(message.message(), data);
+  SimulatedMessage<ConsoleAgent::lmSetConsoleCP> message(this);
+  lpc::set_console_cp_m *payload = message.payload();
+  payload->is_output = is_output;
+  payload->code_page_id = value;
+  agent()->on_message(message.message());
   return update_last_error(&message);
 }
 
@@ -145,41 +180,41 @@ bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
 }
 
 bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
-  SimulatedMessage message(this);
-  lpc::set_console_title_m *data = &message->payload.set_console_title;
+  SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
+  lpc::set_console_title_m *payload = message.payload();
   size_t length = strlen(str);
-  data->length = length;
-  data->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
-  adaptor()->set_console_title(message.message(), data);
+  payload->length = length;
+  payload->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
+  agent()->on_message(message.message());
   return update_last_error(&message);
 }
 
 dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
-  SimulatedMessage message(this);
-  lpc::get_console_title_m *data = &message->payload.get_console_title;
-  data->length = n;
-  data->title = xform().local_to_remote(str);
-  adaptor()->get_console_title(message.message(), data);
+  SimulatedMessage<ConsoleAgent::lmGetConsoleTitle> message(this);
+  lpc::get_console_title_m *payload = message.payload();
+  payload->length = n;
+  payload->title = xform().local_to_remote(str);
+  agent()->on_message(message.message());
   update_last_error(&message);
-  return static_cast<uint32_t>(data->length);
+  return static_cast<uint32_t>(payload->length);
 }
 
 bool_t SimulatingConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {
-  SimulatedMessage message(this);
-  lpc::get_console_mode_m *data = &message->payload.get_console_mode;
-  data->handle = handle;
-  data->mode = 0;
-  adaptor()->get_console_mode(message.message(), data);
-  *mode_out = data->mode;
+  SimulatedMessage<ConsoleAgent::lmGetConsoleMode> message(this);
+  lpc::get_console_mode_m *payload = message.payload();
+  payload->handle = handle;
+  payload->mode = 0;
+  agent()->on_message(message.message());
+  *mode_out = payload->mode;
   return update_last_error(&message);
 }
 
 bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
-  SimulatedMessage message(this);
-  lpc::set_console_mode_m *data = &message->payload.set_console_mode;
-  data->handle = handle;
-  data->mode = mode;
-  adaptor()->set_console_mode(message.message(), data);
+  SimulatedMessage<ConsoleAgent::lmSetConsoleMode> message(this);
+  lpc::set_console_mode_m *payload = message.payload();
+  payload->handle = handle;
+  payload->mode = mode;
+  agent()->on_message(message.message());
   return update_last_error(&message);
 }
 
@@ -187,8 +222,8 @@ NtStatus SimulatingConsoleFrontend::get_last_error() {
   return last_error_;
 }
 
-pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAdaptor *adaptor,
+pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAgent *agent,
     ssize_t delta) {
-  return new (kDefaultAlloc) SimulatingConsoleFrontend(adaptor,
+  return new (kDefaultAlloc) SimulatingConsoleFrontend(agent,
       lpc::AddressXform(delta));
 }

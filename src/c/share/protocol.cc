@@ -28,6 +28,7 @@ void Handle::init(Seed payload, Factory *factory) {
 }
 
 
-NtStatus NtStatus::from(Severity severity, Provider provider, uint32_t code) {
-  return severity | provider | (code & kCodeMask);
+NtStatus NtStatus::from(Severity severity, Provider provider, Facility facility,
+    uint32_t code) {
+  return severity | provider | facility | (code & kCodeMask);
 }

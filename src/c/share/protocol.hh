@@ -9,17 +9,30 @@
 #ifndef _CONPRX_SHARE_PROTOCOL_HH
 #define _CONPRX_SHARE_PROTOCOL_HH
 
+// Declares the lpc messages to intercept. The format is,
+//
+//   - Name: camel-case name of the message.
+//   - name: lower-underscore name of the message
+//   - num: api number of the message
+//   - Tr: trace the message, that is, print debugging info for each message.
+//   - Da: disable custom handling of this message.
+//
+//  Name                        name                            num   (Tr Da)
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
-  F(GetConsoleMode,     get_console_mode,       0,      0x08)                  \
-  F(SetConsoleMode,     set_console_mode,       0,      0x11)                  \
-  F(GetConsoleTitle,    get_console_title,      0,      0x24)                  \
-  F(SetConsoleTitle,    set_console_title,      0,      0x25)                  \
-  F(GetConsoleCP,       get_console_cp,         0,      0x3C)                  \
-  F(SetConsoleCP,       set_console_cp,         0,      0x3D)
+  F(GetConsoleMode,             get_console_mode,               0x08, (_, _))  \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (X, X))  \
+  F(SetConsoleMode,             set_console_mode,               0x11, (_, _))  \
+  F(GetConsoleTitle,            get_console_title,              0x24, (_, _))  \
+  F(SetConsoleTitle,            set_console_title,              0x25, (_, _))  \
+  F(GetConsoleCP,               get_console_cp,                 0x3C, (_, _))  \
+  F(SetConsoleCP,               set_console_cp,                 0x3D, (_, _))
+
+#define lfTr(TR, DA) TR
+#define lfDa(TR, DA) DA
 
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
-  F(BaseDllInitHelper,  ,                       0,      76)                    \
-  F(GetFileType,        ,                       0,      35)
+  F(BaseDllInitHelper,          ,                               76,      )     \
+  F(GetFileType,                ,                               35,      )
 
 namespace conprx {
 
@@ -48,6 +61,14 @@ struct connect_data_t {
 
 template <typename T> class response_t;
 
+// Conprx error codes. Should only be used with the nfConprx facility.
+enum conprx_error_t {
+  CONPRX_ERROR_INVALID_DATA_LENGTH = 0x0001,
+  CONPRX_ERROR_INVALID_TOTAL_LENGTH = 0x0002,
+  CONPRX_ERROR_NOT_IMPLEMENTED = 0x0003
+
+};
+
 // A wrapper around an nt status code that makes it easier to dissect the value
 // and clearer how to treat it when. See
 // https://msdn.microsoft.com/en-us/library/cc231200.aspx.
@@ -68,6 +89,13 @@ public:
     npCustomer = 0x20000000
   };
 
+  // Which component originated this kind of status?
+  enum Facility {
+    nfNone = 0x0000000,
+    nfTerminal = 0x00A0000,
+    nfConprx = 0xC0A0000
+  };
+
   // Returns this status appropriately nt-encoded.
   uint32_t to_nt() { return encoded_; }
 
@@ -80,6 +108,9 @@ public:
   // Yields this status' provider.
   Provider provider() { return static_cast<Provider>(encoded_ & kProviderMask); }
 
+  // Yields this status' facility.
+  Facility facility() { return static_cast<Facility>(encoded_ & kFacilityMask); }
+
   // Given a generic response, returns the appropriate ntstatus to communicate
   // the state of the response to the nt framwork.
   template <typename T>
@@ -89,7 +120,10 @@ public:
   static NtStatus from_nt(uint32_t value) { return NtStatus(value); }
 
   // Returns a status with the given fields.
-  static NtStatus from(Severity severity, Provider provider, uint32_t code);
+  static NtStatus from(Severity severity, Provider provider, Facility facility, uint32_t code);
+
+  // Returns a conprx-error with the given code.
+  static NtStatus from(conprx_error_t code) { return from(nsError, npCustomer, nfConprx, code); }
 
   // Returns the default successful nt status.
   static NtStatus success() { return NtStatus(0); }
@@ -106,13 +140,14 @@ private:
   static const uint32_t kFailureMask = 0x80000000;
   static const uint32_t kSeverityMask = 0xC0000000;
   static const uint32_t kProviderMask = 0x20000000;
-  static const uint32_t kCodeMask = 0xFFFF;
+  static const uint32_t kFacilityMask = 0x0FFF0000;
+  static const uint32_t kCodeMask = 0x000FFFF;
   static const uint32_t kSeveritySuccess = 0x00000000;
 };
 
 template <typename T>
 NtStatus NtStatus::from_response(response_t<T> resp) {
-  return resp.has_error() ? from(nsError, npCustomer, resp.error_code()) : success();
+  return resp.has_error() ? from(nsError, npCustomer, nfConprx, resp.error_code()) : success();
 }
 
 // The result of a windows-like call: either a successful value or an nonzero

@@ -40,7 +40,7 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   Interceptor *inter = current();
   if (inter->one_shot_special_handler_) {
     inter->one_shot_special_handler_ = false;
-    if (request->api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
+    if (request->header.api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
       void *scratch[kLocateCCCSStackCaptureSize];
       Vector<void*> stack(scratch, kLocateCCCSStackCaptureSize);
       memset(stack.start(), 0, stack.size_bytes());
@@ -50,7 +50,7 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
         stack = Vector<void*>();
       inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
       return ntSuccess;
-    } else if (request->api_number == kCalibrationApiNumber && inter->is_calibrating_) {
+    } else if (request->header.api_number == kCalibrationApiNumber && inter->is_calibrating_) {
       inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
       return ntSuccess;
     } else {
@@ -62,19 +62,13 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
 }
 
 ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
-    message_data_t *request, message_data_t *incoming_reply) {
+    message_data_t *request, message_data_t *reply) {
   if (enabled_ && port_handle == console_server_port_handle_) {
-    lpc::Message message(request, port_xform());
-    fat_bool_t result = handler_(this, &message, incoming_reply);
-    if (!result) {
-      Disable disable(this);
-      WARN("Failed to handle message %x", message.api_number());
-      return NtStatus::from(NtStatus::nsError, NtStatus::npCustomer, 3).to_nt();
-    } else if (!message.keep_propagating()) {
-      return NtStatus::success().to_nt();
-    }
+    lpc::Message message(request, reply, this, port_xform());
+    return handler_(&message).to_nt();
+  } else {
+    return nt_request_wait_reply_port_imposter(port_handle, request, reply);
   }
-  return nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
 }
 
 fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
@@ -86,6 +80,12 @@ fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
   }
   *request = PatchRequest(original, replacement);
   return F_TRUE;
+}
+
+NtStatus Message::send_to_backend() {
+  ntstatus_t result = interceptor()->nt_request_wait_reply_port_imposter(
+      interceptor()->console_server_port_handle_, request_, reply_);
+  return NtStatus::from_nt(result);
 }
 
 fat_bool_t Interceptor::install() {
@@ -245,7 +245,7 @@ fat_bool_t Interceptor::process_calibration_message(handle_t port_handle,
     // Definitely both of these messages should be going to the same port so
     // if they're not something is not right and we abort.
     return F_FALSE;
-  calibration_capbuf_ = message->capture_buffer;
+  calibration_capbuf_ = message->header.capture_buffer;
   return F_TRUE;
 }
 

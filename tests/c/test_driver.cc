@@ -87,12 +87,13 @@ TEST(driver, errors) {
   ASSERT_TRUE(driver.connect());
 
   DriverRequest err = driver.raise_error(NtStatus::from(NtStatus::nsError,
-      NtStatus::npCustomer, 1090));
+      NtStatus::npCustomer, NtStatus::nfTerminal, 1090));
   ASSERT_TRUE(err.is_rejected());
   ConsoleError *result = err.error().native_as<ConsoleError>();
   ASSERT_EQ(1090, result->code());
   ASSERT_EQ(NtStatus::nsError, result->last_error().severity());
   ASSERT_EQ(NtStatus::npCustomer, result->last_error().provider());
+  ASSERT_EQ(NtStatus::nfTerminal, result->last_error().facility());
 
   ASSERT_TRUE(driver.join(NULL));
 }

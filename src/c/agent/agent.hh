@@ -147,8 +147,7 @@ public:
 
   // Processes LPC messages. The return value is used to decide whether to
   // report an error or not.
-  fat_bool_t on_message(lpc::Interceptor *interceptor, lpc::Message *request,
-      lpc::message_data_t *incoming_reply);
+  NtStatus on_message(lpc::Message *request);
 
   StreamServiceConnector *owner() { return *owner_; }
 
@@ -156,7 +155,7 @@ public:
 
   enum lpc_method_key_t {
     lmFirst
-#define __GEN_KEY_ENUM__(Name, name, DLL, API) , lm##Name = CALC_API_NUMBER(DLL, API)
+#define __GEN_KEY_ENUM__(Name, name, NUM, FLAGS) , lm##Name = (NUM)
     FOR_EACH_LPC_TO_INTERCEPT(__GEN_KEY_ENUM__)
 #undef __GEN_KEY_ENUM__
   };
@@ -173,6 +172,10 @@ private:
   fat_bool_t send_is_ready();
 
   fat_bool_t send_is_done();
+
+  // Tracer methods that dump the contents of the message.
+  void trace_before(const char *name, lpc::Message *message);
+  void trace_after(const char *name, lpc::Message *message, NtStatus status);
 
   // A connection to the owner of the agent.
   tclib::def_ref_t<StreamServiceConnector> owner_;

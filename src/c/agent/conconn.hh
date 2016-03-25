@@ -53,7 +53,7 @@ public:
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, DLL, API)                                  \
-  void name(lpc::Message *req, lpc::name##_m *data);
+  NtStatus name(lpc::Message *req, lpc::name##_m *data);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 

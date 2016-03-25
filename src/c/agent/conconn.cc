@@ -18,47 +18,93 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-void ConsoleAdaptor::get_console_cp(lpc::Message *req, lpc::get_console_cp_m *data) {
-  response_t<uint32_t> resp = connector()->get_console_cp(data->is_output);
-  req->set_return_value(NtStatus::from_response(resp));
-  data->code_page_id = (resp.has_error() ? 0 : resp.value());
+// Validates the given message, including the assumption that the message's
+// payload is of the given type.
+template <typename P>
+static NtStatus validate_message(lpc::Message *req, P *payload) {
+  size_t data_length = sizeof(lpc::message_data_header_t) + sizeof(P);
+  if (data_length != req->data_length()) {
+    WARN("Unexpected data length [%x]: expected %i, found %i", req->api_number(),
+        data_length, req->data_length());
+    return NtStatus::from(CONPRX_ERROR_INVALID_DATA_LENGTH);
+  }
+  size_t total_length = lpc::total_message_length_from_data_length(data_length);
+  if (total_length != req->total_length()) {
+    WARN("Unexpected total length [%x]: expected %i, found %i", req->api_number(),
+        total_length, req->total_length());
+    return NtStatus::from(CONPRX_ERROR_INVALID_TOTAL_LENGTH);
+  }
+  return NtStatus::success();
 }
 
-void ConsoleAdaptor::set_console_cp(lpc::Message *req, lpc::set_console_cp_m *data) {
+// Runs message validation, returning the error code on failure.
+#define VALIDATE_MESSAGE_OR_BAIL(REQ, PAYLOAD) do {                            \
+  NtStatus __status__ = validate_message((REQ), (PAYLOAD));                    \
+  if (!__status__.is_success())                                                \
+    return __status__;                                                         \
+} while (false)
+
+NtStatus ConsoleAdaptor::get_console_cp(lpc::Message *req,
+    lpc::get_console_cp_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  response_t<uint32_t> resp = connector()->get_console_cp(payload->is_output);
+  req->set_return_value(NtStatus::from_response(resp));
+  payload->code_page_id = (resp.has_error() ? 0 : resp.value());
+  return NtStatus::success();
+}
+
+NtStatus ConsoleAdaptor::set_console_cp(lpc::Message *req,
+    lpc::set_console_cp_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
   response_t<bool_t> resp = connector()->set_console_cp(
-      static_cast<uint32_t>(data->code_page_id), data->is_output);
+      static_cast<uint32_t>(payload->code_page_id), payload->is_output);
   req->set_return_value(NtStatus::from_response(resp));
+  return NtStatus::success();
 }
 
-void ConsoleAdaptor::set_console_title(lpc::Message *req,
-    lpc::set_console_title_m *data) {
-  void *start = req->xform().remote_to_local(data->title);
-  tclib::Blob blob(start, data->length);
-  response_t<bool_t> resp = connector()->set_console_title(blob, data->is_unicode);
+NtStatus ConsoleAdaptor::set_console_title(lpc::Message *req,
+    lpc::set_console_title_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  void *start = req->xform().remote_to_local(payload->title);
+  tclib::Blob blob(start, payload->length);
+  response_t<bool_t> resp = connector()->set_console_title(blob, payload->is_unicode);
   req->set_return_value(NtStatus::from_response(resp));
+  return NtStatus::success();
 }
 
-void ConsoleAdaptor::get_console_title(lpc::Message *req,
-    lpc::get_console_title_m *data) {
-  void *start = req->xform().remote_to_local(data->title);
-  tclib::Blob scratch(start, data->length);
-  response_t<uint32_t> resp = connector()->get_console_title(scratch, data->is_unicode);
+NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
+    lpc::get_console_title_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  void *start = req->xform().remote_to_local(payload->title);
+  tclib::Blob scratch(start, payload->length);
+  response_t<uint32_t> resp = connector()->get_console_title(scratch, payload->is_unicode);
   req->set_return_value(NtStatus::from_response(resp));
-  data->length = resp.value();
+  payload->length = resp.value();
+  return NtStatus::success();
 }
 
-void ConsoleAdaptor::set_console_mode(lpc::Message *req,
-    lpc::set_console_mode_m *data) {
+NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
+    lpc::set_console_mode_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
   response_t<bool_t> resp = connector()->set_console_mode(
-      data->handle, data->mode);
+      payload->handle, payload->mode);
   req->set_return_value(NtStatus::from_response(resp));
+  return NtStatus::success();
 }
 
-void ConsoleAdaptor::get_console_mode(lpc::Message *req,
-    lpc::get_console_mode_m *data) {
-  response_t<uint32_t> resp = connector()->get_console_mode(data->handle);
+NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
+    lpc::get_console_mode_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  response_t<uint32_t> resp = connector()->get_console_mode(payload->handle);
   req->set_return_value(NtStatus::from_response(resp));
-  data->mode = resp.value();
+  payload->mode = resp.value();
+  return NtStatus::success();
+}
+
+NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
+    lpc::get_console_screen_buffer_info_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  return NtStatus::success();
 }
 
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {

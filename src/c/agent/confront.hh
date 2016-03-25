@@ -143,6 +143,8 @@ class ConsoleAdaptor;
 
 #define mfOr(OR) OR
 
+class ConsoleAgent;
+
 // A container that holds the various definitions used by the other console
 // types.
 class ConsoleFrontend : public tclib::DefaultDestructable {
@@ -173,7 +175,7 @@ public:
   // Returns a new simulating console frontend that simulates interaction with
   // the given backend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(
-      ConsoleAdaptor *adaptor, ssize_t delta = 0);
+      ConsoleAgent *agent, ssize_t delta = 0);
 };
 
 } // conprx
