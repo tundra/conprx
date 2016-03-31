@@ -20,6 +20,18 @@ using plankton::Arena;
 
 class Launcher;
 
+// A console window provides the information the console api needs about the
+// window it's running in.
+class ConsoleWindow {
+public:
+  virtual ~ConsoleWindow() { }
+  virtual coord_t size() = 0;
+  virtual coord_t cursor_position() = 0;
+  virtual word_t attributes() = 0;
+  virtual small_rect_t position() = 0;
+  virtual coord_t maximum_window_size() = 0;
+};
+
 // Virtual type, implementations of which can be used as the implementation of
 // a console.
 class ConsoleBackend {
@@ -70,6 +82,10 @@ public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       console_screen_buffer_infoex_t *info_out);
 
+  // Sets the console window backing this backend. If you don't set one a
+  // dummy one will be used.
+  void set_window(ConsoleWindow *window) { window_ = window; }
+
   // Returns the value of the last poke that was sent.
   int64_t last_poke() { return last_poke_; }
 
@@ -77,6 +93,7 @@ public:
   utf8_t title() { return title_; }
 
 private:
+  ConsoleWindow *window() { return window_; }
   int64_t last_poke_;
   uint32_t input_codepage_;
   uint32_t output_codepage_;
@@ -84,6 +101,7 @@ private:
   // TODO: for now all handles have the same mode value. There needs to be a
   //   more nuanced way to set those.
   uint32_t mode_;
+  ConsoleWindow *window_;
 };
 
 // The service the driver will call back to when it wants to access the manager.

@@ -183,7 +183,7 @@ bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
   lpc::set_console_title_m *payload = message.payload();
   size_t length = strlen(str);
-  payload->length = length;
+  payload->length = static_cast<uint32_t>(length);
   payload->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
   agent()->on_message(message.message());
   return update_last_error(&message);

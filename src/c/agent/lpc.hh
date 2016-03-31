@@ -269,6 +269,7 @@ struct capture_buffer_data_t {
 
 // A platform integer.
 typedef IF_32_BIT(int32_t, int64_t) intn_t;
+typedef IF_32_BIT(uint32_t, uint64_t) uintn_t;
 
 struct get_console_mode_m {
   void *handle;
@@ -278,7 +279,8 @@ struct get_console_mode_m {
 typedef get_console_mode_m set_console_mode_m;
 
 struct get_console_title_m {
-  intn_t length;
+  uint32_t length;
+  ONLY_64_BIT(uint32_t padding);
   void *title;
   bool is_unicode;
 };

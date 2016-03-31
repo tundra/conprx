@@ -35,12 +35,35 @@ ConsoleBackendService::ConsoleBackendService()
   set_fallback(new_callback(&ConsoleBackendService::message_not_understood, this));
 }
 
+// Dummy implementation used when none has been explicitly specified.
+class NoConsoleWindow : public ConsoleWindow {
+public:
+  virtual coord_t size() { return coord_zero(); }
+  virtual coord_t cursor_position() { return coord_zero(); }
+  virtual word_t attributes() { return 0; }
+  virtual small_rect_t position() { return small_rect_zero(); }
+  virtual coord_t maximum_window_size() { return coord_zero(); }
+  static NoConsoleWindow *get();
+
+private:
+  static NoConsoleWindow instance;
+  static coord_t coord_zero() { coord_t result = {0, 0}; return result; }
+  static small_rect_t small_rect_zero() { small_rect_t result = {0, 0, 0, 0}; return result; }
+};
+
+NoConsoleWindow NoConsoleWindow::instance;
+
+NoConsoleWindow *NoConsoleWindow::get() {
+  return &instance;
+}
+
 BasicConsoleBackend::BasicConsoleBackend()
   : last_poke_(0)
   , input_codepage_(cpUtf8)
   , output_codepage_(cpUtf8)
   , title_(string_empty())
-  , mode_(0) { }
+  , mode_(0)
+  , window_(NoConsoleWindow::get()) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
   string_default_delete(title_);
@@ -103,6 +126,11 @@ response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t
 response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
     Handle buffer, console_screen_buffer_infoex_t *info_out) {
   struct_zero_fill(*info_out);
+  info_out->dwSize = window()->size();
+  info_out->dwCursorPosition = window()->cursor_position();
+  info_out->wAttributes = window()->attributes();
+  info_out->srWindow = window()->position();
+  info_out->dwMaximumWindowSize = window()->maximum_window_size();
   return response_t<bool_t>::yes();
 }
 
