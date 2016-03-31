@@ -108,7 +108,7 @@ NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
   console_screen_buffer_info_t info;
   struct_zero_fill(info);
   response_t<bool_t> resp = connector()->get_console_screen_buffer_info(
-      Handle::invalid(), payload->output, &info);
+      payload->output, &info);
   req->set_return_value(NtStatus::from_response(resp));
   payload->size = info.dwSize;
   payload->cursor_position = info.dwCursorPosition;
@@ -154,7 +154,7 @@ response_t<T> PrpcConsoleConnector::send_request(rpc::OutgoingRequest *request,
   rpc::IncomingResponse resp = *resp_out = socket()->send_request(request);
   while (!resp->is_settled()) {
     if (!in()->process_next_instruction(NULL))
-      return response_t<T>::error(1);
+      return response_t<T>::error(CONPRX_ERROR_PROCESSING_INSTRUCTIONS);
   }
   if (resp->is_fulfilled()) {
     return response_t<T>::of(C::convert(resp->peek_value(Variant::null())));
@@ -237,20 +237,17 @@ response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
 }
 
 response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
-    Handle console, Handle output, console_screen_buffer_info_t *info_out) {
+    Handle buffer, console_screen_buffer_info_t *info_out) {
   rpc::OutgoingRequest req(Variant::null(), "get_console_screen_buffer_info");
-  Variant args[2] = {
-      req.factory()->new_native(&console),
-      req.factory()->new_native(&output),
-  };
-  req.set_arguments(2, args);
+  Variant args[1] = {req.factory()->new_native(&buffer)};
+  req.set_arguments(1, args);
   rpc::IncomingResponse resp;
   response_t<Variant> result = send_request_default<Variant>(&req, &resp);
   if (result.has_error())
     return response_t<bool_t>::error(result);
   console_screen_buffer_info_t *info = result.value().native_as<console_screen_buffer_info_t>();
   if (info == NULL)
-    return response_t<bool_t>::error(1);
+    return response_t<bool_t>::error(CONPRX_ERROR_INVALID_RESPONSE);
   *info_out = *info;
   return response_t<bool_t>::yes();
 }

@@ -100,8 +100,8 @@ response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t
   return response_t<bool_t>::yes();
 }
 
-response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(Handle console,
-    Handle output, console_screen_buffer_info_t *info_out) {
+response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
+    Handle buffer, console_screen_buffer_info_t *info_out) {
   struct_zero_fill(*info_out);
   return response_t<bool_t>::yes();
 }
@@ -203,14 +203,12 @@ void ConsoleBackendService::on_get_console_mode(rpc::RequestData *data, Response
 
 void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *data,
     ResponseCallback resp) {
-  Handle *console = data->argument(0).native_as<Handle>();
-  if (console == NULL)
-    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  Handle *output = data->argument(1).native_as<Handle>();
+  Handle *output = data->argument(0).native_as<Handle>();
   if (output == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  console_screen_buffer_info_t *info = new (data->factory()) console_screen_buffer_info_t();
-  response_t<bool_t> result = backend()->get_console_screen_buffer_info(*console, *output, info);
+  console_screen_buffer_info_t *info = new (data->factory()) console_screen_buffer_info_t;
+  struct_zero_fill(*info);
+  response_t<bool_t> result = backend()->get_console_screen_buffer_info(*output, info);
   if (result.has_error()) {
     return resp(rpc::OutgoingResponse::failure(result.error_code()));
   } else {

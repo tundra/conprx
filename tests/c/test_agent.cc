@@ -289,12 +289,12 @@ MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)
 
 class InfoBackend : public BasicConsoleBackend {
 public:
-  virtual response_t<bool_t> get_console_screen_buffer_info(Handle console,
-      Handle output, console_screen_buffer_info_t *info_out);
+  virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
+      console_screen_buffer_info_t *info_out);
 };
 
-response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle console,
-      Handle output, console_screen_buffer_info_t *info_out) {
+response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
+      console_screen_buffer_info_t *info_out) {
   info_out->dwSize.X = 0x0FEE;
   info_out->dwSize.Y = 0x0BAA;
   info_out->dwCursorPosition.X = 0x0EFF;
@@ -350,7 +350,7 @@ public:
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
-  response_t<bool_t> get_console_screen_buffer_info(Handle console, Handle output, console_screen_buffer_info_t *info_out) { return fail<bool_t>(); }
+  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_info_t *info_out) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();
@@ -409,6 +409,8 @@ MULTITEST(agent, failures, bool, use_real, ("real", true), ("simul", false)) {
   Handle dummy_handle(10);
   ASSERT_EQ(199, get_last_error(driver.get_console_mode(dummy_handle)));
   ASSERT_EQ(322, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
+
+  ASSERT_EQ(521, get_last_error(driver.get_console_screen_buffer_info(dummy_handle)));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

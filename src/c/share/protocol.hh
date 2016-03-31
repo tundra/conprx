@@ -66,8 +66,9 @@ enum conprx_error_t {
   CONPRX_ERROR_INVALID_DATA_LENGTH = 0x0001,
   CONPRX_ERROR_INVALID_TOTAL_LENGTH = 0x0002,
   CONPRX_ERROR_NOT_IMPLEMENTED = 0x0003,
-  CONPRX_ERROR_EXPECTED_HANDLE = 0x0004
-
+  CONPRX_ERROR_EXPECTED_HANDLE = 0x0004,
+  CONPRX_ERROR_PROCESSING_INSTRUCTIONS = 0x0005,
+  CONPRX_ERROR_INVALID_RESPONSE = 0x0006
 };
 
 // A wrapper around an nt status code that makes it easier to dissect the value
@@ -272,6 +273,7 @@ private:
   int64_t id_;
 };
 
+// Stuff relating to the console protocol types that doesn't fit anywhere else.
 class ConsoleTypes {
 public:
   // Returns a singleton type registry that holds all the types relevant to the

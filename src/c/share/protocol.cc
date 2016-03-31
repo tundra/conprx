@@ -27,7 +27,7 @@ TypeRegistry *ConsoleTypes::registry() {
 }
 
 
-DefaultSeedType<Handle> Handle::kSeedType("conprx.Handle");
+DefaultSeedType<Handle> Handle::kSeedType("winapi.HANDLE");
 
 Handle *Handle::new_instance(Variant header, Factory *factory) {
   return new (factory) Handle();
