@@ -50,7 +50,7 @@ public:
   // Fill in the given output parameter with information about the buffer with
   // the given handle.
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out) = 0;
+      console_screen_buffer_infoex_t *info_out) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -68,7 +68,7 @@ public:
   virtual response_t<uint32_t> get_console_mode(Handle handle);
   virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode);
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out);
+      console_screen_buffer_infoex_t *info_out);
 
   // Returns the value of the last poke that was sent.
   int64_t last_poke() { return last_poke_; }

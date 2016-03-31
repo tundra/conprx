@@ -295,4 +295,8 @@ template <> struct default_seed_type<console_screen_buffer_info_t> {
   static plankton::ConcreteSeedType<console_screen_buffer_info_t> *get();
 };
 
+template <> struct default_seed_type<console_screen_buffer_infoex_t> {
+  static plankton::ConcreteSeedType<console_screen_buffer_infoex_t> *get();
+};
+
 #endif // _CONPRX_SHARE_PROTOCOL_HH

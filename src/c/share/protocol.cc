@@ -8,6 +8,7 @@
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
+#include "utils/misc-inl.h"
 END_C_INCLUDES
 
 using namespace conprx;
@@ -22,6 +23,7 @@ TypeRegistry *ConsoleTypes::registry() {
     instance->register_type<coord_t>();
     instance->register_type<small_rect_t>();
     instance->register_type<console_screen_buffer_info_t>();
+    instance->register_type<console_screen_buffer_infoex_t>();
   }
   return instance;
 }
@@ -84,6 +86,48 @@ static plankton::SeedType<console_screen_buffer_info_t> console_info_seed_type(
 
 ConcreteSeedType<console_screen_buffer_info_t> *default_seed_type<console_screen_buffer_info_t>::get() {
   return &console_info_seed_type;
+}
+
+static console_screen_buffer_infoex_t *new_console_screen_buffer_infoex(Variant header, Factory *factory) {
+  console_screen_buffer_infoex_t *result = new (factory) console_screen_buffer_infoex_t;
+  struct_zero_fill(*result);
+  return result;
+}
+
+static void init_console_screen_buffer_infoex(console_screen_buffer_infoex_t *info,
+    Seed payload, Factory *factory) {
+  init_console_screen_buffer_info(console_screen_buffer_info_from_ex(info),
+      payload, factory);
+  info->wPopupAttributes = static_cast<uint16_t>(payload.get_field("wPopupAttributes").integer_value());
+  info->bFullscreenSupported = payload.get_field("bFullscreenSupported").bool_value();
+  Array color_table = payload.get_field("ColorTable");
+  for (uint32_t i = 0; i < min_size(16, color_table.length()); i++)
+    info->ColorTable[i] = static_cast<colorref_t>(color_table[i].integer_value());
+}
+
+static Variant console_screen_buffer_infoex_to_seed(console_screen_buffer_infoex_t *info,
+    Factory *factory) {
+  Seed seed = factory->new_seed(default_seed_type<console_screen_buffer_infoex_t>::get());
+  seed.set_field("dwSize", factory->new_native(&info->dwSize));
+  seed.set_field("dwCursorPosition", factory->new_native(&info->dwCursorPosition));
+  seed.set_field("wAttributes", info->wAttributes);
+  seed.set_field("srWindow", factory->new_native(&info->srWindow));
+  seed.set_field("dwMaximumWindowSize", factory->new_native(&info->dwMaximumWindowSize));
+  seed.set_field("wPopupAttributes", info->wPopupAttributes);
+  seed.set_field("bFullscreenSupported", Variant::boolean(info->bFullscreenSupported));
+  Array color_table = factory->new_array(16);
+  for (size_t i = 0; i < 16; i++)
+    color_table.add(info->ColorTable[i]);
+  seed.set_field("ColorTable", color_table);
+  return seed;
+}
+
+static plankton::SeedType<console_screen_buffer_infoex_t> console_infoex_seed_type(
+    "winapi.CONSOLE_SCREEN_BUFFER_INFOEX", &new_console_screen_buffer_infoex,
+    &init_console_screen_buffer_infoex, &console_screen_buffer_infoex_to_seed);
+
+ConcreteSeedType<console_screen_buffer_infoex_t> *default_seed_type<console_screen_buffer_infoex_t>::get() {
+  return &console_infoex_seed_type;
 }
 
 static coord_t *new_coord(Variant header, Factory *factory) {

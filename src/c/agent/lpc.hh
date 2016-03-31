@@ -307,9 +307,9 @@ struct get_console_screen_buffer_info_m {
   word_t  attributes;
   coord_t window_extent;
   coord_t maximum_window_size;
-  // There is structure to the rest of the data but I expect it all relates to
-  // GetConsoleScreenBufferInfoEx so I'll figure that out when I implement that.
-  int16_t rest[34];
+  word_t popup_attributes;
+  bool_t fullscreen_supported;
+  colorref_t color_table[16];
 };
 
 // How these are actually declared in the windows implementation I have no idea

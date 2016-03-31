@@ -101,7 +101,7 @@ response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t
 }
 
 response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
-    Handle buffer, console_screen_buffer_info_t *info_out) {
+    Handle buffer, console_screen_buffer_infoex_t *info_out) {
   struct_zero_fill(*info_out);
   return response_t<bool_t>::yes();
 }
@@ -206,7 +206,7 @@ void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *
   Handle *output = data->argument(0).native_as<Handle>();
   if (output == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  console_screen_buffer_info_t *info = new (data->factory()) console_screen_buffer_info_t;
+  console_screen_buffer_infoex_t *info = new (data->factory()) console_screen_buffer_infoex_t;
   struct_zero_fill(*info);
   response_t<bool_t> result = backend()->get_console_screen_buffer_info(*output, info);
   if (result.has_error()) {

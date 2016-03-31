@@ -290,11 +290,11 @@ MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)
 class InfoBackend : public BasicConsoleBackend {
 public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out);
+      console_screen_buffer_infoex_t *info_out);
 };
 
 response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out) {
+      console_screen_buffer_infoex_t *info_out) {
   info_out->dwSize.X = 0x0FEE;
   info_out->dwSize.Y = 0x0BAA;
   info_out->dwCursorPosition.X = 0x0EFF;
@@ -306,6 +306,10 @@ response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
   info_out->srWindow.Top = 0x0ABD;
   info_out->srWindow.Right = 0x0BAB;
   info_out->srWindow.Bottom = 0x0D0B;
+  info_out->wPopupAttributes = 0x0B00;
+  info_out->bFullscreenSupported = true;
+  for (size_t i = 0; i < 16; i++)
+    info_out->ColorTable[i] = static_cast<colorref_t>(0x0DECADE0 + i);
   return response_t<bool_t>::yes();
 }
 
@@ -321,19 +325,38 @@ MULTITEST(agent, get_info, bool, use_real, ("real", true), ("simul", false)) {
   DriverRequest gsh0 = driver.get_std_handle(conprx::kStdOutputHandle);
   Handle output = *gsh0->native_as<Handle>();
   DriverRequest gin0 = driver.get_console_screen_buffer_info(output);
-  console_screen_buffer_info_t *info = gin0->native_as<console_screen_buffer_info_t>();
-  ASSERT_TRUE(info != NULL);
-  ASSERT_EQ(0x0FEE, info->dwSize.X);
-  ASSERT_EQ(0x0BAA, info->dwSize.Y);
-  ASSERT_EQ(0x0EFF, info->dwCursorPosition.X);
-  ASSERT_EQ(0x0ABB, info->dwCursorPosition.Y);
-  ASSERT_EQ(0x0CAB, info->wAttributes);
-  ASSERT_EQ(0x0F00, info->dwMaximumWindowSize.X);
-  ASSERT_EQ(0x0BAD, info->dwMaximumWindowSize.Y);
-  ASSERT_EQ(0x0DAB, info->srWindow.Left);
-  ASSERT_EQ(0x0ABD, info->srWindow.Top);
-  ASSERT_EQ(0x0BAB, info->srWindow.Right);
-  ASSERT_EQ(0x0D0B, info->srWindow.Bottom);
+  console_screen_buffer_info_t *i0 = gin0->native_as<console_screen_buffer_info_t>();
+  ASSERT_TRUE(i0 != NULL);
+  ASSERT_EQ(0x0FEE, i0->dwSize.X);
+  ASSERT_EQ(0x0BAA, i0->dwSize.Y);
+  ASSERT_EQ(0x0EFF, i0->dwCursorPosition.X);
+  ASSERT_EQ(0x0ABB, i0->dwCursorPosition.Y);
+  ASSERT_EQ(0x0CAB, i0->wAttributes);
+  ASSERT_EQ(0x0F00, i0->dwMaximumWindowSize.X);
+  ASSERT_EQ(0x0BAD, i0->dwMaximumWindowSize.Y);
+  ASSERT_EQ(0x0DAB, i0->srWindow.Left);
+  ASSERT_EQ(0x0ABD, i0->srWindow.Top);
+  ASSERT_EQ(0x0BAB, i0->srWindow.Right);
+  ASSERT_EQ(0x0D0B, i0->srWindow.Bottom);
+
+  DriverRequest gin1 = driver.get_console_screen_buffer_info_ex(output);
+  console_screen_buffer_infoex_t *i1 = gin1->native_as<console_screen_buffer_infoex_t>();
+  ASSERT_TRUE(i1 != NULL);
+  ASSERT_EQ(0x0FEE, i1->dwSize.X);
+  ASSERT_EQ(0x0BAA, i1->dwSize.Y);
+  ASSERT_EQ(0x0EFF, i1->dwCursorPosition.X);
+  ASSERT_EQ(0x0ABB, i1->dwCursorPosition.Y);
+  ASSERT_EQ(0x0CAB, i1->wAttributes);
+  ASSERT_EQ(0x0F00, i1->dwMaximumWindowSize.X);
+  ASSERT_EQ(0x0BAD, i1->dwMaximumWindowSize.Y);
+  ASSERT_EQ(0x0DAB, i1->srWindow.Left);
+  ASSERT_EQ(0x0ABD, i1->srWindow.Top);
+  ASSERT_EQ(0x0BAB, i1->srWindow.Right);
+  ASSERT_EQ(0x0D0B, i1->srWindow.Bottom);
+  ASSERT_EQ(0x0B00, i1->wPopupAttributes);
+  ASSERT_TRUE(i1->bFullscreenSupported);
+  for (size_t i = 0; i < 16; i++)
+    ASSERT_EQ(0x0DECADE0 + i, i1->ColorTable[i]);
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
@@ -350,7 +373,7 @@ public:
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
-  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_info_t *info_out) { return fail<bool_t>(); }
+  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_infoex_t *info_out) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();

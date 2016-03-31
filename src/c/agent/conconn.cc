@@ -105,7 +105,7 @@ NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
 NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
     lpc::get_console_screen_buffer_info_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
-  console_screen_buffer_info_t info;
+  console_screen_buffer_infoex_t info;
   struct_zero_fill(info);
   response_t<bool_t> resp = connector()->get_console_screen_buffer_info(
       payload->output, &info);
@@ -118,6 +118,9 @@ NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
   payload->window_top_left.Y = info.srWindow.Top;
   payload->window_extent.X = static_cast<int16_t>(info.srWindow.Right - info.srWindow.Left + 1);
   payload->window_extent.Y = static_cast<int16_t>(info.srWindow.Bottom - info.srWindow.Top + 1);
+  payload->popup_attributes = info.wPopupAttributes;
+  payload->fullscreen_supported = info.bFullscreenSupported;
+  memcpy(payload->color_table, info.ColorTable, sizeof(info.ColorTable));
   return NtStatus::success();
 }
 
@@ -237,7 +240,7 @@ response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
 }
 
 response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
-    Handle buffer, console_screen_buffer_info_t *info_out) {
+    Handle buffer, console_screen_buffer_infoex_t *info_out) {
   rpc::OutgoingRequest req(Variant::null(), "get_console_screen_buffer_info");
   Variant args[1] = {req.factory()->new_native(&buffer)};
   req.set_arguments(1, args);
@@ -245,7 +248,7 @@ response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
   response_t<Variant> result = send_request_default<Variant>(&req, &resp);
   if (result.has_error())
     return response_t<bool_t>::error(result);
-  console_screen_buffer_info_t *info = result.value().native_as<console_screen_buffer_info_t>();
+  console_screen_buffer_infoex_t *info = result.value().native_as<console_screen_buffer_infoex_t>();
   if (info == NULL)
     return response_t<bool_t>::error(CONPRX_ERROR_INVALID_RESPONSE);
   *info_out = *info;

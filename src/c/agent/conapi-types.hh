@@ -18,4 +18,11 @@
 #include "conapi-types-posix.hh"
 #endif
 
+// Given an extended screen buffer info returns a pointer into it that makes
+// up a non-extended version.
+static inline console_screen_buffer_info_t *console_screen_buffer_info_from_ex(
+    console_screen_buffer_infoex_t *ex) {
+  return reinterpret_cast<console_screen_buffer_info_t*>(&ex->dwSize);
+}
+
 #endif // _CONAPI_TYPES

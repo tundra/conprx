@@ -44,7 +44,7 @@ public:
   virtual response_t<uint32_t> get_console_mode(handle_t handle) = 0;
 
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out) = 0;
+      console_screen_buffer_infoex_t *info_out) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -82,7 +82,7 @@ public:
   virtual response_t<bool_t> set_console_mode(handle_t handle, uint32_t mode);
   virtual response_t<uint32_t> get_console_mode(handle_t handle);
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_info_t *info_out);
+      console_screen_buffer_infoex_t *info_out);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);

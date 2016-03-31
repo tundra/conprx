@@ -210,6 +210,19 @@ void ConsoleFrontendService::get_console_screen_buffer_info(rpc::RequestData *da
   return callback(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
 }
 
+void ConsoleFrontendService::get_console_screen_buffer_info_ex(rpc::RequestData *data,
+    ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL)
+    return fail_request(data, callback);
+  console_screen_buffer_infoex_t *info = new (data->factory()) console_screen_buffer_infoex_t;
+  struct_zero_fill(*info);
+  info->cbSize = sizeof(*info);
+  if (!frontend()->get_console_screen_buffer_info_ex(handle->ptr(), info))
+    return fail_request(data, callback);
+  return callback(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
+}
+
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
   Handle *handle = new (factory) Handle(raw_handle);
   return factory->new_native(handle);

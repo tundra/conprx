@@ -46,6 +46,9 @@ class ConsoleAdaptor;
 #define sigGetConsoleScreenBufferInfo(F) F(bool_t,                             \
     (handle_t console_output, console_screen_buffer_info_t *buffer_info),      \
     (console_output, buffer_info))
+#define sigGetConsoleScreenBufferInfoEx(F) F(bool_t,                           \
+    (handle_t console_output, console_screen_buffer_infoex_t *buffer_info),    \
+    (console_output, buffer_info))
 #define sigReadConsoleA(F) F(bool_t,                                           \
     (handle_t console_input, void *buffer, dword_t chars_to_read,              \
      dword_t *chars_read, console_readconsole_control_t *input_control),       \
@@ -109,18 +112,19 @@ class ConsoleAdaptor;
 //   - _Or_, create a stub for calling the original function.
 //
 //  CamelName                   underscore_name                 (Or) sigSignature                   psigProxySignature
-#define FOR_EACH_CONAPI_FUNCTION(F)                                                                                        \
-  F(GetStdHandle,               get_std_handle,                 (X), sigDWordToHandle,              psigDWordToHandle)     \
-  F(WriteConsoleA,              write_console_a,                (X), sigWriteConsoleA,              psigWriteConsoleA)     \
-  F(GetConsoleTitleA,           get_console_title_a,            (X), sigStrToDWord,                 psigDWordToStr)        \
-  F(SetConsoleTitleA,           set_console_title_a,            (X), sigAnsiCStrToBool,             psigAnsiCStrToVariant) \
-  F(GetConsoleCP,               get_console_cp,                 (X), sigVoidToUInt,                 psigVoidToDWord)       \
-  F(SetConsoleCP,               set_console_cp,                 (X), sigUIntToBool,                 psigUIntToBool)        \
-  F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 psigVoidToDWord)       \
-  F(SetConsoleOutputCP,         set_console_output_cp,          (X), sigUIntToBool,                 psigUIntToBool)        \
-  F(GetConsoleMode,             get_console_mode,               (X), sigGetConsoleMode,             psigGetConsoleMode)    \
-  F(SetConsoleMode,             set_console_mode,               (X), sigSetConsoleMode,             psigSetConsoleMode)    \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X), sigGetConsoleScreenBufferInfo, psigHandle)            \
+#define FOR_EACH_CONAPI_FUNCTION(F)                                                                                               \
+  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigDWordToHandle)     \
+  F(WriteConsoleA,                write_console_a,                   (X), sigWriteConsoleA,                psigWriteConsoleA)     \
+  F(GetConsoleTitleA,             get_console_title_a,               (X), sigStrToDWord,                   psigDWordToStr)        \
+  F(SetConsoleTitleA,             set_console_title_a,               (X), sigAnsiCStrToBool,               psigAnsiCStrToVariant) \
+  F(GetConsoleCP,                 get_console_cp,                    (X), sigVoidToUInt,                   psigVoidToDWord)       \
+  F(SetConsoleCP,                 set_console_cp,                    (X), sigUIntToBool,                   psigUIntToBool)        \
+  F(GetConsoleOutputCP,           get_console_output_cp,             (X), sigVoidToUInt,                   psigVoidToDWord)       \
+  F(SetConsoleOutputCP,           set_console_output_cp,             (X), sigUIntToBool,                   psigUIntToBool)        \
+  F(GetConsoleMode,               get_console_mode,                  (X), sigGetConsoleMode,               psigGetConsoleMode)    \
+  F(SetConsoleMode,               set_console_mode,                  (X), sigSetConsoleMode,               psigSetConsoleMode)    \
+  F(GetConsoleScreenBufferInfo,   get_console_screen_buffer_info,    (X), sigGetConsoleScreenBufferInfo,   psigHandle)            \
+  F(GetConsoleScreenBufferInfoEx, get_console_screen_buffer_info_ex, (X), sigGetConsoleScreenBufferInfoEx, psigHandle)            \
 
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
@@ -129,7 +133,6 @@ class ConsoleAdaptor;
   F(FreeConsole,                free_console,                   (X), sigVoidToBool,                 _)                     \
   F(GetConsoleCursorInfo,       get_console_cursor_info,        (X), sigGetConsoleCursorInfo,       _)                     \
   F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 _)                     \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X), sigGetConsoleScreenBufferInfo, _)                     \
   F(GetConsoleTitleW,           get_console_title_w,            (X), sigWideStrToDWord,             _)                     \
   F(GetConsoleWindow,           get_console_window,             (X), sigVoidToHWnd,                 _)                     \
   F(ReadConsoleA,               read_console_a,                 (X), sigReadConsoleA,               _)                     \

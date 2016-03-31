@@ -42,6 +42,19 @@ struct console_screen_buffer_info_t {
 // COLORREF
 typedef dword_t colorref_t;
 
+// CONSOLE_SCREEN_BUFFER_INFOEX
+struct console_screen_buffer_infoex_t {
+  uint32_t cbSize;
+  coord_t dwSize;
+  coord_t dwCursorPosition;
+  word_t wAttributes;
+  small_rect_t srWindow;
+  coord_t dwMaximumWindowSize;
+  word_t wPopupAttributes;
+  bool_t bFullscreenSupported;
+  colorref_t ColorTable[16];
+};
+
 // CHAR_INFO
 struct char_info_t {
   union {

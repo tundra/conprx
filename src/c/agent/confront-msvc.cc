@@ -77,6 +77,11 @@ bool_t WindowsConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
   return GetConsoleScreenBufferInfo(handle, info_out);
 }
 
+bool_t WindowsConsoleFrontend::get_console_screen_buffer_info_ex(handle_t handle,
+    console_screen_buffer_infoex_t *info_out) {
+  return GetConsoleScreenBufferInfoEx(handle, info_out);
+}
+
 NtStatus WindowsConsoleFrontend::get_last_error() {
   return NtStatus::from_nt(GetLastError());
 }

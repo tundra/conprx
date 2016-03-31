@@ -218,12 +218,10 @@ bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode
   return update_last_error(&message);
 }
 
-bool_t SimulatingConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
+// Helper that copies data from an lpc payload into a screen buffer info
+// struct.
+static void store_console_screen_buffer_info(lpc::get_console_screen_buffer_info_m *payload,
     console_screen_buffer_info_t *info_out) {
-  SimulatedMessage<ConsoleAgent::lmGetConsoleScreenBufferInfo> message(this);
-  lpc::get_console_screen_buffer_info_m *payload = message.payload();
-  payload->output = handle;
-  agent()->on_message(message.message());
   info_out->dwSize = payload->size;
   info_out->dwCursorPosition = payload->cursor_position;
   info_out->wAttributes = payload->attributes;
@@ -234,6 +232,28 @@ bool_t SimulatingConsoleFrontend::get_console_screen_buffer_info(handle_t handle
   info_out->srWindow.Top = window_top;
   info_out->srWindow.Right = static_cast<short_t>(window_left + payload->window_extent.X - 1);
   info_out->srWindow.Bottom = static_cast<short_t>(window_top + payload->window_extent.Y - 1);
+}
+
+bool_t SimulatingConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
+    console_screen_buffer_info_t *info_out) {
+  SimulatedMessage<ConsoleAgent::lmGetConsoleScreenBufferInfo> message(this);
+  lpc::get_console_screen_buffer_info_m *payload = message.payload();
+  payload->output = handle;
+  agent()->on_message(message.message());
+  store_console_screen_buffer_info(payload, info_out);
+  return update_last_error(&message);
+}
+
+bool_t SimulatingConsoleFrontend::get_console_screen_buffer_info_ex(handle_t handle,
+    console_screen_buffer_infoex_t *info_out) {
+  SimulatedMessage<ConsoleAgent::lmGetConsoleScreenBufferInfo> message(this);
+  lpc::get_console_screen_buffer_info_m *payload = message.payload();
+  payload->output = handle;
+  agent()->on_message(message.message());
+  store_console_screen_buffer_info(payload, console_screen_buffer_info_from_ex(info_out));
+  info_out->wPopupAttributes = payload->popup_attributes;
+  info_out->bFullscreenSupported = payload->fullscreen_supported;
+  memcpy(info_out->ColorTable, payload->color_table, sizeof(info_out->ColorTable));
   return update_last_error(&message);
 }
 

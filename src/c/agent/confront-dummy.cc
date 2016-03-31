@@ -101,6 +101,11 @@ bool_t DummyConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
   return false;
 }
 
+bool_t DummyConsoleFrontend::get_console_screen_buffer_info_ex(handle_t handle,
+    console_screen_buffer_infoex_t *info_out) {
+  return false;
+}
+
 NtStatus DummyConsoleFrontend::get_last_error() {
   return NtStatus::success();
 }

@@ -103,6 +103,10 @@ Variant DriverRequest::get_console_screen_buffer_info(Handle handle) {
   return send("get_console_screen_buffer_info", factory()->new_native(&handle));
 }
 
+Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
+  return send("get_console_screen_buffer_info_ex", factory()->new_native(&handle));
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_fulfilled());
