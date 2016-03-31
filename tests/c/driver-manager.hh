@@ -216,6 +216,8 @@ private:
   tclib::def_ref_t<Launcher> launcher_;
   Launcher *launcher() { return *launcher_; }
 
+  plankton::TypeRegistry registry_;
+
   // The channel through which we control the driver.
   tclib::def_ref_t<tclib::ServerChannel> channel_;
   tclib::ServerChannel *channel() { return *channel_;}

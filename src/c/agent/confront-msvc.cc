@@ -72,6 +72,11 @@ bool_t WindowsConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
   return SetConsoleMode(handle, mode);
 }
 
+bool_t WindowsConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
+    console_screen_buffer_info_t *info_out) {
+  return GetConsoleScreenBufferInfo(handle, info_out);
+}
+
 NtStatus WindowsConsoleFrontend::get_last_error() {
   return NtStatus::from_nt(GetLastError());
 }

@@ -172,38 +172,17 @@ void Message::set_return_value(conprx::NtStatus status) {
   reply_->header.return_value = status.to_nt();
 }
 
-static void dump_blob(tclib::OutStream *out, tclib::Blob data, Message::dump_style_t style) {
-  size_t blocksize = sizeof(int32_t);
-  int32_t *start = static_cast<int32_t*>(data.start());
-  for (size_t i = 0; i < data.size(); i += blocksize) {
-    size_t index = (i / blocksize);
-    if ((i > 0) && ((index % 4) == 0))
-      out->printf("\n");
-    int32_t word = start[index];
-    out->printf("%08x ", word);
-    if (style & Message::dsInts)
-      out->printf("(%8i) ", word);
-    if (style & Message::dsAscii) {
-      out->printf("\"");
-      byte_t *chars = reinterpret_cast<byte_t*>(start + index);
-      for (size_t ic = 0; ic < 4; ic++)
-        out->printf("%c", chars[ic]);
-      out->printf("\" ");
-    }
-  }
-}
-
-void Message::dump(tclib::OutStream *out, dump_style_t style) {
+void Message::dump(OutStream *out, Blob::DumpStyle style) {
   size_t total_size = this->total_length();
   size_t data_size = this->data_length();
   size_t header_size = total_size - data_size;
   out->printf("--- message %x [size: %i, data: %i]\n", api_number(), total_size, data_size);
   address_t start = reinterpret_cast<address_t>(request_);
   tclib::Blob header(start, header_size);
-  dump_blob(out, header, style);
+  header.dump(out, style);
   out->printf("\n--- data ---\n");
   tclib::Blob data(start + header_size, data_size);
-  dump_blob(out, data, style);
+  data.dump(out, style);
   out->printf("\n");
   out->flush();
 }

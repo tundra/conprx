@@ -218,6 +218,25 @@ bool_t SimulatingConsoleFrontend::set_console_mode(handle_t handle, dword_t mode
   return update_last_error(&message);
 }
 
+bool_t SimulatingConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
+    console_screen_buffer_info_t *info_out) {
+  SimulatedMessage<ConsoleAgent::lmGetConsoleScreenBufferInfo> message(this);
+  lpc::get_console_screen_buffer_info_m *payload = message.payload();
+  payload->output = handle;
+  agent()->on_message(message.message());
+  info_out->dwSize = payload->size;
+  info_out->dwCursorPosition = payload->cursor_position;
+  info_out->wAttributes = payload->attributes;
+  info_out->dwMaximumWindowSize = payload->maximum_window_size;
+  short_t window_left = payload->window_top_left.X;
+  short_t window_top = payload->window_top_left.Y;
+  info_out->srWindow.Left = window_left;
+  info_out->srWindow.Top = window_top;
+  info_out->srWindow.Right = static_cast<short_t>(window_left + payload->window_extent.X - 1);
+  info_out->srWindow.Bottom = static_cast<short_t>(window_top + payload->window_extent.Y - 1);
+  return update_last_error(&message);
+}
+
 NtStatus SimulatingConsoleFrontend::get_last_error() {
   return last_error_;
 }

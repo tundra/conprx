@@ -33,14 +33,6 @@ enum DriverFrontendType {
   dfSimulating
 };
 
-// Utilities that don't fit anywhere else.
-class ConsoleProxy {
-public:
-  // Returns a singleton type registry that holds all the types relevant to the
-  // console proxy.
-  static plankton::TypeRegistry *registry();
-};
-
 // An object that indicates a problem interacting with the console api.
 class ConsoleError {
 public:

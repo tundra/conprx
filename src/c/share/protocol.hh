@@ -4,7 +4,7 @@
 // Type declarations used by both sides of the console api.
 
 #include "rpc.hh"
-#include "utils/types.hh"
+#include "agent/conapi-types.hh"
 
 #ifndef _CONPRX_SHARE_PROTOCOL_HH
 #define _CONPRX_SHARE_PROTOCOL_HH
@@ -20,7 +20,7 @@
 //  Name                        name                            num   (Tr Da)
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
   F(GetConsoleMode,             get_console_mode,               0x08, (_, _))  \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (X, X))  \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (_, _))  \
   F(SetConsoleMode,             set_console_mode,               0x11, (_, _))  \
   F(GetConsoleTitle,            get_console_title,              0x24, (_, _))  \
   F(SetConsoleTitle,            set_console_title,              0x25, (_, _))  \
@@ -65,7 +65,8 @@ template <typename T> class response_t;
 enum conprx_error_t {
   CONPRX_ERROR_INVALID_DATA_LENGTH = 0x0001,
   CONPRX_ERROR_INVALID_TOTAL_LENGTH = 0x0002,
-  CONPRX_ERROR_NOT_IMPLEMENTED = 0x0003
+  CONPRX_ERROR_NOT_IMPLEMENTED = 0x0003,
+  CONPRX_ERROR_EXPECTED_HANDLE = 0x0004
 
 };
 
@@ -242,7 +243,7 @@ public:
   explicit Handle(int64_t id) : id_(id) { }
 
   // Initializes a handle with an id corresponding to the given pointer.
-  explicit Handle(void *raw) : id_(reinterpret_cast<int64_t>(raw)) { }
+  Handle(handle_t raw) : id_(reinterpret_cast<int64_t>(raw)) { }
 
   // Is this a valid handle?
   bool is_valid() { return id_ != kInvalidHandleValue; }
@@ -271,6 +272,25 @@ private:
   int64_t id_;
 };
 
+class ConsoleTypes {
+public:
+  // Returns a singleton type registry that holds all the types relevant to the
+  // console proxy.
+  static plankton::TypeRegistry *registry();
+};
+
 } // namespace conprx
+
+template <> struct default_seed_type<coord_t> {
+  static plankton::ConcreteSeedType<coord_t> *get();
+};
+
+template <> struct default_seed_type<small_rect_t> {
+  static plankton::ConcreteSeedType<small_rect_t> *get();
+};
+
+template <> struct default_seed_type<console_screen_buffer_info_t> {
+  static plankton::ConcreteSeedType<console_screen_buffer_info_t> *get();
+};
 
 #endif // _CONPRX_SHARE_PROTOCOL_HH

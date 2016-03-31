@@ -198,6 +198,18 @@ void ConsoleFrontendService::set_console_mode(rpc::RequestData *data, ResponseCa
   return fail_request(data, callback);
 }
 
+void ConsoleFrontendService::get_console_screen_buffer_info(rpc::RequestData *data,
+    ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL)
+    return fail_request(data, callback);
+  console_screen_buffer_info_t *info = new (data->factory()) console_screen_buffer_info_t;
+  struct_zero_fill(*info);
+  if (!frontend()->get_console_screen_buffer_info(handle->ptr(), info))
+    return fail_request(data, callback);
+  return callback(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
+}
+
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
   Handle *handle = new (factory) Handle(raw_handle);
   return factory->new_native(handle);
@@ -360,7 +372,7 @@ bool ConsoleDriverMain::install_fake_agent() {
 bool ConsoleDriverMain::run() {
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
-  connector.set_default_type_registry(ConsoleProxy::registry());
+  connector.set_default_type_registry(ConsoleTypes::registry());
   def_ref_t<ConsoleFrontend> frontend;
   def_ref_t<ConsoleConnector> conconn;
   def_ref_t<ConsoleAdaptor> condapt;

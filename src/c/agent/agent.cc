@@ -129,6 +129,7 @@ fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
   agent_in_ = agent_in;
   agent_out_ = agent_out;
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
+  owner_->set_default_type_registry(ConsoleTypes::registry());
   if (!owner()->init(empty_callback()))
     return F_FALSE;
   log()->set_destination(owner());

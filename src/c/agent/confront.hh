@@ -100,6 +100,7 @@ class ConsoleAdaptor;
 #define psigSetConsoleMode(F) F(_,                                             \
     (Handle console_handle, uint32_t mode),                                    \
     (console_handle, mode))
+#define psigHandle(F) F(_, (Handle handle), (handle))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -119,6 +120,7 @@ class ConsoleAdaptor;
   F(SetConsoleOutputCP,         set_console_output_cp,          (X), sigUIntToBool,                 psigUIntToBool)        \
   F(GetConsoleMode,             get_console_mode,               (X), sigGetConsoleMode,             psigGetConsoleMode)    \
   F(SetConsoleMode,             set_console_mode,               (X), sigSetConsoleMode,             psigSetConsoleMode)    \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, (X), sigGetConsoleScreenBufferInfo, psigHandle)            \
 
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \

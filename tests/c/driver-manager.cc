@@ -99,6 +99,10 @@ Variant DriverRequest::set_console_mode(Handle handle, uint32_t mode) {
   return send("set_console_mode", factory()->new_native(&handle), mode);
 }
 
+Variant DriverRequest::get_console_screen_buffer_info(Handle handle) {
+  return send("get_console_screen_buffer_info", factory()->new_native(&handle));
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   ASSERT_TRUE(response_->is_fulfilled());
@@ -226,7 +230,9 @@ fat_bool_t DriverManager::connect() {
   F_TRY(channel()->open());
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
-  connector_->set_default_type_registry(ConsoleProxy::registry());
+  registry_.add_fallback(ConsoleTypes::registry());
+  registry_.register_type<ConsoleError>();
+  connector_->set_default_type_registry(&registry_);
   return connector()->init(empty_callback());
 }
 

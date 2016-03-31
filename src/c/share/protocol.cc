@@ -6,9 +6,26 @@
 #include "marshal-inl.hh"
 #include "utils/callback.hh"
 
+BEGIN_C_INCLUDES
+#include "utils/log.h"
+END_C_INCLUDES
+
 using namespace conprx;
 using namespace plankton;
 using namespace tclib;
+
+TypeRegistry *ConsoleTypes::registry() {
+  static TypeRegistry *instance = NULL;
+  if (instance == NULL) {
+    instance = new TypeRegistry();
+    instance->register_type<Handle>();
+    instance->register_type<coord_t>();
+    instance->register_type<small_rect_t>();
+    instance->register_type<console_screen_buffer_info_t>();
+  }
+  return instance;
+}
+
 
 DefaultSeedType<Handle> Handle::kSeedType("conprx.Handle");
 
@@ -31,4 +48,94 @@ void Handle::init(Seed payload, Factory *factory) {
 NtStatus NtStatus::from(Severity severity, Provider provider, Facility facility,
     uint32_t code) {
   return severity | provider | facility | (code & kCodeMask);
+}
+
+static console_screen_buffer_info_t *new_console_screen_buffer_info(Variant header, Factory *factory) {
+  console_screen_buffer_info_t *result = new (factory) console_screen_buffer_info_t;
+  struct_zero_fill(*result);
+  return result;
+}
+
+static void init_console_screen_buffer_info(console_screen_buffer_info_t *info,
+    Seed payload, Factory *factory) {
+  coord_t zero_coord = {0, 0};
+  info->dwSize = *payload.get_field("dwSize").native_as_or_else<coord_t>(&zero_coord);
+  info->dwCursorPosition = *payload.get_field("dwCursorPosition").native_as_or_else<coord_t>(&zero_coord);
+  info->wAttributes = static_cast<uint16_t>(payload.get_field("wAttributes").integer_value());
+  small_rect_t zero_rect = {0, 0, 0, 0};
+  info->srWindow = *payload.get_field("srWindow").native_as_or_else<small_rect_t>(&zero_rect);
+  info->dwMaximumWindowSize = *payload.get_field("dwMaximumWindowSize").native_as_or_else<coord_t>(&zero_coord);
+}
+
+static Variant console_screen_buffer_info_to_seed(console_screen_buffer_info_t *info,
+    Factory *factory) {
+  Seed seed = factory->new_seed(default_seed_type<console_screen_buffer_info_t>::get());
+  seed.set_field("dwSize", factory->new_native(&info->dwSize));
+  seed.set_field("dwCursorPosition", factory->new_native(&info->dwCursorPosition));
+  seed.set_field("wAttributes", info->wAttributes);
+  seed.set_field("srWindow", factory->new_native(&info->srWindow));
+  seed.set_field("dwMaximumWindowSize", factory->new_native(&info->dwMaximumWindowSize));
+  return seed;
+}
+
+static plankton::SeedType<console_screen_buffer_info_t> console_info_seed_type(
+    "winapi.CONSOLE_SCREEN_BUFFER_INFO", &new_console_screen_buffer_info,
+    &init_console_screen_buffer_info, &console_screen_buffer_info_to_seed);
+
+ConcreteSeedType<console_screen_buffer_info_t> *default_seed_type<console_screen_buffer_info_t>::get() {
+  return &console_info_seed_type;
+}
+
+static coord_t *new_coord(Variant header, Factory *factory) {
+  coord_t *result = new (factory) coord_t;
+  struct_zero_fill(*result);
+  return result;
+}
+
+static void init_coord(coord_t *coord, Seed payload, Factory *factory) {
+  coord->X = static_cast<int16_t>(payload.get_field("X").integer_value());
+  coord->Y = static_cast<int16_t>(payload.get_field("Y").integer_value());
+}
+
+static Variant coord_to_seed(coord_t *coord, Factory *factory) {
+  Seed seed = factory->new_seed(default_seed_type<coord_t>::get());
+  seed.set_field("X", coord->X);
+  seed.set_field("Y", coord->Y);
+  return seed;
+}
+
+static plankton::SeedType<coord_t> coord_seed_type("winapi.COORD", &new_coord,
+    &init_coord, &coord_to_seed);
+
+ConcreteSeedType<coord_t> *default_seed_type<coord_t>::get() {
+  return &coord_seed_type;
+}
+
+static small_rect_t *new_small_rect(Variant header, Factory *factory) {
+  small_rect_t *result = new (factory) small_rect_t;
+  struct_zero_fill(*result);
+  return result;
+}
+
+static void init_small_rect(small_rect_t *rect, Seed payload, Factory *factory) {
+  rect->Left = static_cast<int16_t>(payload.get_field("Left").integer_value());
+  rect->Top = static_cast<int16_t>(payload.get_field("Top").integer_value());
+  rect->Right = static_cast<int16_t>(payload.get_field("Right").integer_value());
+  rect->Bottom = static_cast<int16_t>(payload.get_field("Bottom").integer_value());
+}
+
+static Variant small_rect_to_seed(small_rect_t *rect, Factory *factory) {
+  Seed seed = factory->new_seed(default_seed_type<small_rect_t>::get());
+  seed.set_field("Left", rect->Left);
+  seed.set_field("Top", rect->Top);
+  seed.set_field("Right", rect->Right);
+  seed.set_field("Bottom", rect->Bottom);
+  return seed;
+}
+
+static plankton::SeedType<small_rect_t> small_rect_seed_type("winapi.SMALL_RECT",
+    &new_small_rect, &init_small_rect, &small_rect_to_seed);
+
+ConcreteSeedType<small_rect_t> *default_seed_type<small_rect_t>::get() {
+  return &small_rect_seed_type;
 }

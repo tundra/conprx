@@ -11,16 +11,6 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-TypeRegistry *ConsoleProxy::registry() {
-  static TypeRegistry *instance = NULL;
-  if (instance == NULL) {
-    instance = new TypeRegistry();
-    instance->register_type<Handle>();
-    instance->register_type<ConsoleError>();
-  }
-  return instance;
-}
-
 DefaultSeedType<ConsoleError> ConsoleError::kSeedType("conprx.ConsoleError");
 
 ConsoleError *ConsoleError::new_instance(Variant header, Factory *factory) {

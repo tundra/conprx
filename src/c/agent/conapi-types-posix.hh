@@ -39,6 +39,9 @@ struct console_screen_buffer_info_t {
   coord_t dwMaximumWindowSize;
 };
 
+// COLORREF
+typedef dword_t colorref_t;
+
 // CHAR_INFO
 struct char_info_t {
   union {

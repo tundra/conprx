@@ -270,17 +270,9 @@ struct capture_buffer_data_t {
 // A platform integer.
 typedef IF_32_BIT(int32_t, int64_t) intn_t;
 
-// How these are actually declared in the windows implementation I have no idea
-// but using 4-packing seems to produce a struct packing that matches the data
-// we get passed both on 32- and 64-bit.
-#ifdef IS_MSVC
-#  pragma pack(push, 4)
-#endif
-
 struct get_console_mode_m {
   void *handle;
   uint32_t mode;
-  ONLY_64_BIT(uint32_t padding);
 };
 
 typedef get_console_mode_m set_console_mode_m;
@@ -289,7 +281,6 @@ struct get_console_title_m {
   intn_t length;
   void *title;
   bool is_unicode;
-  ONLY_64_BIT(uint32_t padding);
 };
 
 typedef get_console_title_m set_console_title_m;
@@ -301,24 +292,32 @@ struct get_console_cp_m {
 
 typedef get_console_cp_m set_console_cp_m;
 
-struct get_console_screen_buffer_info_m {
-  handle_t console;
-  handle_t output;
-  coord_t size;
-  coord_t cursor_position;
-  coord_t scroll_position;
-  uint16_t attributes;
-  coord_t current_window_size;
-  coord_t maximum_window_size;
-  uint32_t mode;
-};
-
 struct message_data_header_t {
   capture_buffer_data_t *capture_buffer;
   uint32_t api_number;
   int32_t return_value;
   intn_t reserved;
 };
+
+struct get_console_screen_buffer_info_m {
+  handle_t output;
+  coord_t size;
+  coord_t cursor_position;
+  coord_t window_top_left;
+  word_t  attributes;
+  coord_t window_extent;
+  coord_t maximum_window_size;
+  // There is structure to the rest of the data but I expect it all relates to
+  // GetConsoleScreenBufferInfoEx so I'll figure that out when I implement that.
+  int16_t rest[34];
+};
+
+// How these are actually declared in the windows implementation I have no idea
+// but using 4-packing seems to produce a struct packing that matches the data
+// we get passed both on 32- and 64-bit.
+#ifdef IS_MSVC
+#  pragma pack(push, 4)
+#endif
 
 // A console api message, a superset of a port message.
 struct message_data_t {
@@ -371,14 +370,8 @@ public:
   // Sets the return status to the given value.
   void set_return_value(conprx::NtStatus status);
 
-  enum dump_style_t {
-    dsPlain = 0,
-    dsInts = 1,
-    dsAscii = 2
-  };
-
   // Dump this message textually to the given out stream.
-  void dump(tclib::OutStream *out, dump_style_t style = dsPlain);
+  void dump(tclib::OutStream *out, tclib::Blob::DumpStyle style = tclib::Blob::DumpStyle());
 
   AddressXform xform() { return xform_; }
 

@@ -96,6 +96,11 @@ bool_t DummyConsoleFrontend::set_console_mode(handle_t handle, dword_t mode) {
   return false;
 }
 
+bool_t DummyConsoleFrontend::get_console_screen_buffer_info(handle_t handle,
+    console_screen_buffer_info_t *info_out) {
+  return false;
+}
+
 NtStatus DummyConsoleFrontend::get_last_error() {
   return NtStatus::success();
 }

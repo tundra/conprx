@@ -7,6 +7,7 @@
 #include "agent.hh"
 #include "async/promise-inl.hh"
 #include "conconn.hh"
+#include "marshal-inl.hh"
 #include "plankton-inl.hh"
 #include "utils/misc-inl.h"
 
@@ -104,6 +105,19 @@ NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
 NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
     lpc::get_console_screen_buffer_info_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  console_screen_buffer_info_t info;
+  struct_zero_fill(info);
+  response_t<bool_t> resp = connector()->get_console_screen_buffer_info(
+      Handle::invalid(), payload->output, &info);
+  req->set_return_value(NtStatus::from_response(resp));
+  payload->size = info.dwSize;
+  payload->cursor_position = info.dwCursorPosition;
+  payload->attributes = info.wAttributes;
+  payload->maximum_window_size = info.dwMaximumWindowSize;
+  payload->window_top_left.X = info.srWindow.Left;
+  payload->window_top_left.Y = info.srWindow.Top;
+  payload->window_extent.X = static_cast<int16_t>(info.srWindow.Right - info.srWindow.Left + 1);
+  payload->window_extent.Y = static_cast<int16_t>(info.srWindow.Bottom - info.srWindow.Top + 1);
   return NtStatus::success();
 }
 
@@ -220,6 +234,25 @@ response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
   req.set_arguments(2, args);
   rpc::IncomingResponse resp;
   return send_request_default<bool_t>(&req, &resp);
+}
+
+response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
+    Handle console, Handle output, console_screen_buffer_info_t *info_out) {
+  rpc::OutgoingRequest req(Variant::null(), "get_console_screen_buffer_info");
+  Variant args[2] = {
+      req.factory()->new_native(&console),
+      req.factory()->new_native(&output),
+  };
+  req.set_arguments(2, args);
+  rpc::IncomingResponse resp;
+  response_t<Variant> result = send_request_default<Variant>(&req, &resp);
+  if (result.has_error())
+    return response_t<bool_t>::error(result);
+  console_screen_buffer_info_t *info = result.value().native_as<console_screen_buffer_info_t>();
+  if (info == NULL)
+    return response_t<bool_t>::error(1);
+  *info_out = *info;
+  return response_t<bool_t>::yes();
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

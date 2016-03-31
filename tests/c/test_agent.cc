@@ -287,6 +287,57 @@ MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)
   ASSERT_F_TRUE(driver.join(NULL));
 }
 
+class InfoBackend : public BasicConsoleBackend {
+public:
+  virtual response_t<bool_t> get_console_screen_buffer_info(Handle console,
+      Handle output, console_screen_buffer_info_t *info_out);
+};
+
+response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle console,
+      Handle output, console_screen_buffer_info_t *info_out) {
+  info_out->dwSize.X = 0x0FEE;
+  info_out->dwSize.Y = 0x0BAA;
+  info_out->dwCursorPosition.X = 0x0EFF;
+  info_out->dwCursorPosition.Y = 0x0ABB;
+  info_out->wAttributes = 0x0CAB;
+  info_out->dwMaximumWindowSize.X = 0x0F00;
+  info_out->dwMaximumWindowSize.Y = 0x0BAD;
+  info_out->srWindow.Left = 0x0DAB;
+  info_out->srWindow.Top = 0x0ABD;
+  info_out->srWindow.Right = 0x0BAB;
+  info_out->srWindow.Bottom = 0x0D0B;
+  return response_t<bool_t>::yes();
+}
+
+MULTITEST(agent, get_info, bool, use_real, ("real", true), ("simul", false)) {
+  SKIP_IF_UNSUPPORTED(use_real);
+  InfoBackend backend;
+  DriverManager driver;
+  configure_driver(&driver, use_real);
+  driver.set_backend(&backend);
+  ASSERT_F_TRUE(driver.start());
+  ASSERT_F_TRUE(driver.connect());
+
+  DriverRequest gsh0 = driver.get_std_handle(conprx::kStdOutputHandle);
+  Handle output = *gsh0->native_as<Handle>();
+  DriverRequest gin0 = driver.get_console_screen_buffer_info(output);
+  console_screen_buffer_info_t *info = gin0->native_as<console_screen_buffer_info_t>();
+  ASSERT_TRUE(info != NULL);
+  ASSERT_EQ(0x0FEE, info->dwSize.X);
+  ASSERT_EQ(0x0BAA, info->dwSize.Y);
+  ASSERT_EQ(0x0EFF, info->dwCursorPosition.X);
+  ASSERT_EQ(0x0ABB, info->dwCursorPosition.Y);
+  ASSERT_EQ(0x0CAB, info->wAttributes);
+  ASSERT_EQ(0x0F00, info->dwMaximumWindowSize.X);
+  ASSERT_EQ(0x0BAD, info->dwMaximumWindowSize.Y);
+  ASSERT_EQ(0x0DAB, info->srWindow.Left);
+  ASSERT_EQ(0x0ABD, info->srWindow.Top);
+  ASSERT_EQ(0x0BAB, info->srWindow.Right);
+  ASSERT_EQ(0x0D0B, info->srWindow.Bottom);
+
+  ASSERT_F_TRUE(driver.join(NULL));
+}
+
 // A backend that fails on *everything*. Don't forget to add a test when you
 // add a new method.
 class FailingConsoleBackend : public ConsoleBackend {
@@ -299,6 +350,7 @@ public:
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
+  response_t<bool_t> get_console_screen_buffer_info(Handle console, Handle output, console_screen_buffer_info_t *info_out) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();

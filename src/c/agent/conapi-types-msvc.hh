@@ -11,5 +11,6 @@ typedef COORD coord_t;
 typedef SMALL_RECT small_rect_t;
 typedef CONSOLE_SCREEN_BUFFER_INFO console_screen_buffer_info_t;
 typedef CHAR_INFO char_info_t;
+typedef COLORREF colorref_t;
 
 #define MSVC_STDCALL __stdcall
