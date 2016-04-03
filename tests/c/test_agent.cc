@@ -211,11 +211,11 @@ TitleBackend::~TitleBackend() {
 }
 
 void TitleBackend::set_title(ansi_cstr_t new_title) {
-  set_console_title(StringUtils::as_blob(new_title, false), false);
+  set_console_title(StringUtils::as_blob(new_title), false);
 }
 
 void TitleBackend::set_title(wide_cstr_t new_title) {
-  set_console_title(StringUtils::as_blob(new_title, false), true);
+  set_console_title(StringUtils::as_blob(new_title), true);
 }
 
 utf8_t TitleBackend::c_str() {
@@ -282,7 +282,7 @@ MULTITEST(agent, native_set_title_noconv, bool, use_real, ("real", true), ("simu
   ASSERT_TRUE(st2->bool_value());
 
   DriverRequest gt3 = driver.get_console_title_w(256);
-  ASSERT_BLOBEQ(StringUtils::as_blob(fourth, false), as_blob(*gt3));
+  ASSERT_BLOBEQ(StringUtils::as_blob(fourth), as_blob(*gt3));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
@@ -454,6 +454,10 @@ MULTITEST(agent, failures, bool, use_real, ("real", true), ("simul", false)) {
   ASSERT_EQ(322, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
 
   ASSERT_EQ(521, get_last_error(driver.get_console_screen_buffer_info(dummy_handle)));
+
+  const wide_char_t wide_foo[] = {'f', 'o', 'o', 0};
+  ASSERT_EQ(843, get_last_error(driver.get_console_title_w(1)));
+  ASSERT_EQ(1364, get_last_error(driver.set_console_title_w(wide_foo)));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }

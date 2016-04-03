@@ -24,10 +24,12 @@ public:
   static size_t wstrlen(wide_cstr_t str);
 
   // Returns a blob that extends from the beginning of the given string to the
-  // end, including the null terminator.
-  static tclib::Blob as_blob(ansi_cstr_t str, bool include_null);
+  // end, optionally including the null terminator.
+  static tclib::Blob as_blob(ansi_cstr_t str, bool include_null=false);
 
-  static tclib::Blob as_blob(wide_cstr_t str, bool include_null);
+  // Returns a blob that extends from the beginning of the given string to the
+  // end, optionally including the null terminator.
+  static tclib::Blob as_blob(wide_cstr_t str, bool include_null=false);
 };
 
 } // namespace conprx

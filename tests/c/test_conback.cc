@@ -274,19 +274,19 @@ CONBACK_TEST(title_w) {
   bufblob.fill(-1);
   ASSERT_EQ(26, frontend->get_console_title_w(buf, 32));
   ASSERT_BLOBEQ(tclib::Blob(letters, 15 * sizeof(wide_char_t)),
-      StringUtils::as_blob(buf, false));
+      StringUtils::as_blob(buf));
   ASSERT_EQ(wide_minus_1, buf[17]);
 
   bufblob.fill(-1);
   ASSERT_EQ(26, frontend->get_console_title_w(buf, 50));
   ASSERT_BLOBEQ(tclib::Blob(letters, 24 * sizeof(wide_char_t)),
-      StringUtils::as_blob(buf, false));
+      StringUtils::as_blob(buf));
   ASSERT_EQ(wide_minus_1, buf[26]);
 
   bufblob.fill(-1);
   ASSERT_EQ(26, frontend->get_console_title_w(buf, 52));
   ASSERT_BLOBEQ(tclib::Blob(letters, 25 * sizeof(wide_char_t)),
-      StringUtils::as_blob(buf, false));
+      StringUtils::as_blob(buf));
   ASSERT_EQ(wide_minus_1, buf[27]);
 }
 

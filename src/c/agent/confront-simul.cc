@@ -182,7 +182,7 @@ bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
 bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
   lpc::set_console_title_m *payload = message.payload();
-  tclib::Blob blob = StringUtils::as_blob(str, false);
+  tclib::Blob blob = StringUtils::as_blob(str);
   payload->size_in_bytes_in = static_cast<uint32_t>(blob.size());
   payload->title = xform().local_to_remote(blob.start());
   payload->is_unicode = false;
@@ -204,7 +204,7 @@ dword_t SimulatingConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n
 bool_t SimulatingConsoleFrontend::set_console_title_w(wide_cstr_t str) {
   SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
   lpc::set_console_title_m *payload = message.payload();
-  tclib::Blob blob = StringUtils::as_blob(str, false);
+  tclib::Blob blob = StringUtils::as_blob(str);
   payload->size_in_bytes_in = static_cast<uint32_t>(blob.size());
   payload->title = xform().local_to_remote(blob.start());
   payload->is_unicode = true;

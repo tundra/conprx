@@ -238,7 +238,7 @@ void ConsoleBackendService::on_set_console_cp(rpc::RequestData *data, ResponseCa
 void ConsoleBackendService::on_get_console_title(rpc::RequestData *data, ResponseCallback resp) {
   uint32_t byte_size = static_cast<uint32_t>(data->argument(0).integer_value());
   bool is_unicode = data->argument(1).bool_value();
-  plankton::Blob scratch_blob = data->factory()->new_blob(byte_size + 1);
+  plankton::Blob scratch_blob = data->factory()->new_blob(byte_size);
   tclib::Blob scratch(scratch_blob.mutable_data(), byte_size);
   blob_fill(scratch, 0);
   size_t bytes_written = 0;
