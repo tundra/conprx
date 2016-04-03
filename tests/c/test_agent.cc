@@ -3,6 +3,7 @@
 
 #include "driver-manager.hh"
 #include "test.hh"
+#include "utils/string.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/misc-inl.h"
@@ -189,8 +190,10 @@ public:
   TitleBackend() : is_unicode(false) { }
   ~TitleBackend();
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode);
-  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode);
-  void set_title(const char *new_title, bool new_is_unicode);
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode,
+      size_t *bytes_written_out);
+  void set_title(ansi_cstr_t new_title);
+  void set_title(wide_cstr_t new_title);
   utf8_t c_str();
 
   tclib::Blob title;
@@ -207,8 +210,12 @@ TitleBackend::~TitleBackend() {
   allocator_default_free(title);
 }
 
-void TitleBackend::set_title(const char *new_title, bool new_is_unicode) {
-  set_console_title(tclib::Blob(new_title, strlen(new_title)), new_is_unicode);
+void TitleBackend::set_title(ansi_cstr_t new_title) {
+  set_console_title(StringUtils::as_blob(new_title, false), false);
+}
+
+void TitleBackend::set_title(wide_cstr_t new_title) {
+  set_console_title(StringUtils::as_blob(new_title, false), true);
 }
 
 utf8_t TitleBackend::c_str() {
@@ -222,17 +229,23 @@ response_t<bool_t> TitleBackend::set_console_title(tclib::Blob new_title, bool n
   return response_t<bool_t>::yes();
 }
 
-response_t<uint32_t> TitleBackend::get_console_title(tclib::Blob buffer, bool is_unicode) {
+response_t<uint32_t> TitleBackend::get_console_title(tclib::Blob buffer, bool is_unicode,
+    size_t *bytes_written_out) {
   uint32_t len = static_cast<uint32_t>(min_size(buffer.size(), title.size()));
   tclib::Blob data(title.start(), len);
   blob_copy_to(data, buffer);
+  *bytes_written_out = len;
   return response_t<uint32_t>::of(len);
 }
 
 #define ASSERT_V_STREQ(C_STR, VAR)                                             \
-  ASSERT_STREQ(new_c_string(C_STR), new_string((VAR).string_chars(), (VAR).string_length()))
+  ASSERT_STREQ(new_c_string(C_STR), new_string(static_cast<const char *>((VAR).blob_data()), (VAR).blob_size()))
 
-MULTITEST(agent, native_set_title, bool, use_real, ("real", true), ("simul", false)) {
+static tclib::Blob as_blob(Variant var) {
+  return tclib::Blob(var.blob_data(), var.blob_size());
+}
+
+MULTITEST(agent, native_set_title_noconv, bool, use_real, ("real", true), ("simul", false)) {
   SKIP_IF_UNSUPPORTED(use_real);
   TitleBackend backend;
   DriverManager driver;
@@ -241,9 +254,9 @@ MULTITEST(agent, native_set_title, bool, use_real, ("real", true), ("simul", fal
   ASSERT_F_TRUE(driver.start());
   ASSERT_F_TRUE(driver.connect());
 
-  backend.set_title("First", true);
+  backend.set_title("First");
   ASSERT_STREQ(new_c_string("First"), backend.c_str());
-  ASSERT_TRUE(backend.is_unicode);
+  ASSERT_FALSE(backend.is_unicode);
 
   DriverRequest gt0 = driver.get_console_title_a(256);
   ASSERT_V_STREQ("First", *gt0);
@@ -263,6 +276,13 @@ MULTITEST(agent, native_set_title, bool, use_real, ("real", true), ("simul", fal
 
   DriverRequest gt2 = driver.get_console_title_a(256);
   ASSERT_V_STREQ("Third", *gt2);
+
+  wide_char_t fourth[] = {'f', 'o', 'u', 'r', 't', 'h', 0};
+  DriverRequest st2 = driver.set_console_title_w(fourth);
+  ASSERT_TRUE(st2->bool_value());
+
+  DriverRequest gt3 = driver.get_console_title_w(256);
+  ASSERT_BLOBEQ(StringUtils::as_blob(fourth, false), as_blob(*gt3));
 
   ASSERT_F_TRUE(driver.join(NULL));
 }
@@ -369,7 +389,7 @@ public:
   response_t<int64_t> poke(int64_t value) { return fail<int64_t>(); }
   response_t<uint32_t> get_console_cp(bool is_output) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return fail<bool_t>(); }
-  response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) { return fail<uint32_t>(); }
+  response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode, size_t *bytes_written_out) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }

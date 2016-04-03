@@ -31,9 +31,9 @@ class ConsoleAdaptor;
 #define sigVoidToUInt(F) F(uint32_t, (), ())
 #define sigUIntToBool(F) F(bool_t, (uint32_t value), (value))
 #define sigVoidToHWnd(F) F(hwnd_t, (), ())
-#define sigWideStrToDWord(F) F(dword_t, (wide_str_t str, uint32_t n), (str, n))
+#define sigWideStrDWordToDWord(F) F(dword_t, (wide_str_t str, dword_t n), (str, n))
 #define sigWideCStrToBool(F) F(bool_t, (wide_cstr_t str), (str))
-#define sigStrToDWord(F) F(dword_t, (str_t str, dword_t n), (str, n))
+#define sigAnsiStrDwordToDWord(F) F(dword_t, (ansi_str_t str, dword_t n), (str, n))
 #define sigAnsiCStrToBool(F) F(bool_t, (ansi_cstr_t str), (str))
 #define sigDWordToHandle(F) F(handle_t, (dword_t handle), (handle))
 
@@ -91,15 +91,14 @@ class ConsoleAdaptor;
      coord_t buffer_coord, small_rect_t *write_region),                        \
     (console_output, buffer, buffer_size, buffer_coord, write_region))
 
-#define psigDWordToHandle(F) F(_, (int64_t n_std_handle), (n_std_handle))
+#define psigInt64(F) F(_, (int64_t n), (n))
 #define psigWriteConsoleA(F) F(_,                                              \
     (Handle console_output, const char *string, int64_t chars_to_write),       \
     (console_output, string, chars_to_write))
-#define psigDWordToStr(F) F(_, (int64_t bufsize), (bufsize))
-#define psigAnsiCStrToVariant(F) F(_, (const char* string), (string))
-#define psigVoidToDWord(F) F(_, (), ())
-#define psigUIntToBool(F) F(_, (uint32_t value), (value))
-#define psigGetConsoleMode(F) F(_, (Handle handle), (handle))
+#define psigAnsiCStr(F) F(_, (ansi_cstr_t str), (str))
+#define psigWideCStr(F) F(_, (wide_cstr_t str), (str))
+#define psigVoid(F) F(_, (), ())
+#define psigUInt32(F) F(_, (uint32_t value), (value))
 #define psigSetConsoleMode(F) F(_,                                             \
     (Handle console_handle, uint32_t mode),                                    \
     (console_handle, mode))
@@ -113,15 +112,17 @@ class ConsoleAdaptor;
 //
 //  CamelName                   underscore_name                 (Or) sigSignature                   psigProxySignature
 #define FOR_EACH_CONAPI_FUNCTION(F)                                                                                               \
-  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigDWordToHandle)     \
+  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigInt64)             \
   F(WriteConsoleA,                write_console_a,                   (X), sigWriteConsoleA,                psigWriteConsoleA)     \
-  F(GetConsoleTitleA,             get_console_title_a,               (X), sigStrToDWord,                   psigDWordToStr)        \
-  F(SetConsoleTitleA,             set_console_title_a,               (X), sigAnsiCStrToBool,               psigAnsiCStrToVariant) \
-  F(GetConsoleCP,                 get_console_cp,                    (X), sigVoidToUInt,                   psigVoidToDWord)       \
-  F(SetConsoleCP,                 set_console_cp,                    (X), sigUIntToBool,                   psigUIntToBool)        \
-  F(GetConsoleOutputCP,           get_console_output_cp,             (X), sigVoidToUInt,                   psigVoidToDWord)       \
-  F(SetConsoleOutputCP,           set_console_output_cp,             (X), sigUIntToBool,                   psigUIntToBool)        \
-  F(GetConsoleMode,               get_console_mode,                  (X), sigGetConsoleMode,               psigGetConsoleMode)    \
+  F(GetConsoleTitleA,             get_console_title_a,               (X), sigAnsiStrDwordToDWord,          psigInt64)             \
+  F(SetConsoleTitleA,             set_console_title_a,               (X), sigAnsiCStrToBool,               psigAnsiCStr)          \
+  F(GetConsoleTitleW,             get_console_title_w,               (X), sigWideStrDWordToDWord,          psigInt64)             \
+  F(SetConsoleTitleW,             set_console_title_w,               (X), sigWideCStrToBool,               psigWideCStr)          \
+  F(GetConsoleCP,                 get_console_cp,                    (X), sigVoidToUInt,                   psigVoid)              \
+  F(SetConsoleCP,                 set_console_cp,                    (X), sigUIntToBool,                   psigUInt32)            \
+  F(GetConsoleOutputCP,           get_console_output_cp,             (X), sigVoidToUInt,                   psigVoid)              \
+  F(SetConsoleOutputCP,           set_console_output_cp,             (X), sigUIntToBool,                   psigUInt32)            \
+  F(GetConsoleMode,               get_console_mode,                  (X), sigGetConsoleMode,               psigHandle)            \
   F(SetConsoleMode,               set_console_mode,                  (X), sigSetConsoleMode,               psigSetConsoleMode)    \
   F(GetConsoleScreenBufferInfo,   get_console_screen_buffer_info,    (X), sigGetConsoleScreenBufferInfo,   psigHandle)            \
   F(GetConsoleScreenBufferInfoEx, get_console_screen_buffer_info_ex, (X), sigGetConsoleScreenBufferInfoEx, psigHandle)            \
@@ -133,7 +134,6 @@ class ConsoleAdaptor;
   F(FreeConsole,                free_console,                   (X), sigVoidToBool,                 _)                     \
   F(GetConsoleCursorInfo,       get_console_cursor_info,        (X), sigGetConsoleCursorInfo,       _)                     \
   F(GetConsoleOutputCP,         get_console_output_cp,          (X), sigVoidToUInt,                 _)                     \
-  F(GetConsoleTitleW,           get_console_title_w,            (X), sigWideStrToDWord,             _)                     \
   F(GetConsoleWindow,           get_console_window,             (X), sigVoidToHWnd,                 _)                     \
   F(ReadConsoleA,               read_console_a,                 (X), sigReadConsoleA,               _)                     \
   F(ReadConsoleW,               read_console_w,                 (X), sigReadConsoleW,               _)                     \
@@ -141,7 +141,6 @@ class ConsoleAdaptor;
   F(ReadConsoleOutputW,         read_console_output_w,          (X), sigReadConsoleOutputW,         _)                     \
   F(SetConsoleCursorInfo,       set_console_cursor_info,        (X), sigSetConsoleCursorInfo,       _)                     \
   F(SetConsoleCursorPosition,   set_console_cursor_position,    (X), sigSetConsoleCursorPosition,   _)                     \
-  F(SetConsoleTitleW,           set_console_title_w,            (X), sigWideCStrToBool,             _)                     \
   F(WriteConsoleW,              write_console_w,                (X), sigWriteConsoleW,              _)                     \
   F(WriteConsoleOutputA,        write_console_output_a,         (X), sigWriteConsoleOutputA,        _)                     \
   F(WriteConsoleOutputW,        write_console_output_w,         (X), sigWriteConsoleOutputW,        _)

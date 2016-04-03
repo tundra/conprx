@@ -131,13 +131,31 @@ void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, Respons
   dword_t len = frontend()->get_console_title_a(*scratch, chars_to_read);
   if (len == 0)
     return fail_request(data, callback);
-  String result = data->factory()->new_string(*scratch, static_cast<uint32_t>(len));
+  plankton::Blob result = data->factory()->new_blob(*scratch, static_cast<uint32_t>(len));
   callback(rpc::OutgoingResponse::success(result));
 }
 
 void ConsoleFrontendService::set_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
-  const char *new_title = data->argument(0).string_chars();
+  ansi_cstr_t new_title = static_cast<ansi_cstr_t>(data->argument(0).blob_data());
   if (!frontend()->set_console_title_a(new_title))
+    return fail_request(data, callback);
+  callback(rpc::OutgoingResponse::success(Variant::yes()));
+}
+
+void ConsoleFrontendService::get_console_title_w(rpc::RequestData *data, ResponseCallback callback) {
+  dword_t chars_to_read = to_dword(data->argument(0));
+  TempBuffer<wide_char_t> scratch(chars_to_read + 1);
+  dword_t len = frontend()->get_console_title_w(*scratch, chars_to_read);
+  if (len == 0)
+    return fail_request(data, callback);
+  Variant result = data->factory()->new_blob(*scratch,
+      static_cast<uint32_t>(len * sizeof(wide_char_t)));
+  callback(rpc::OutgoingResponse::success(result));
+}
+
+void ConsoleFrontendService::set_console_title_w(rpc::RequestData *data, ResponseCallback callback) {
+  wide_cstr_t new_title = static_cast<wide_cstr_t>(data->argument(0).blob_data());
+  if (!frontend()->set_console_title_w(new_title))
     return fail_request(data, callback);
   callback(rpc::OutgoingResponse::success(Variant::yes()));
 }

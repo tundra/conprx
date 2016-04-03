@@ -4,6 +4,7 @@
 #include "async/promise-inl.hh"
 #include "marshal-inl.hh"
 #include "server/conback.hh"
+#include "utils/string.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
@@ -85,30 +86,72 @@ response_t<bool_t> BasicConsoleBackend::set_console_cp(uint32_t value, bool is_o
 }
 
 response_t<uint32_t> BasicConsoleBackend::get_console_title(tclib::Blob buffer,
-    bool is_unicode) {
-  size_t length = title().size;
-  if (buffer.size() < length) {
+    bool is_unicode, size_t *bytes_written_out) {
+  return is_unicode
+      ? get_console_title_wide(buffer, bytes_written_out)
+      : get_console_title_ansi(buffer, bytes_written_out);
+}
+
+response_t<uint32_t> BasicConsoleBackend::get_console_title_wide(tclib::Blob buffer,
+    size_t *bytes_written_out) {
+  if (buffer.size() == 0) {
+    *bytes_written_out = 0;
+    return response_t<uint32_t>::of(0);
+  }
+  // This is super verbose but it's sooo easy to get the whole title-length,
+  // buffer-length, null/no-null mixed up.
+  wide_str_t wide_buf = static_cast<wide_str_t>(buffer.start());
+  size_t title_chars_no_null = title().size;
+  size_t buffer_chars_with_null = buffer.size() / sizeof(wide_char_t);
+  size_t buffer_chars_no_null = buffer_chars_with_null - 1;
+  size_t char_to_copy_no_null = min_size(title_chars_no_null, buffer_chars_no_null);
+  for (size_t i = 0; i < char_to_copy_no_null; i++)
+    wide_buf[i] = title_.chars[i];
+  wide_buf[char_to_copy_no_null] = '\0';
+  *bytes_written_out = char_to_copy_no_null * sizeof(wide_char_t);
+  return response_t<uint32_t>::of(static_cast<uint32_t>(title_chars_no_null * sizeof(wide_char_t)));
+}
+
+response_t<uint32_t> BasicConsoleBackend::get_console_title_ansi(tclib::Blob buffer,
+    size_t *bytes_written_out) {
+  size_t title_chars_no_null = title().size;
+  if (buffer.size() < title_chars_no_null) {
     // We refuse to return less than the full title if the buffer is too small.
     // Still null-terminate though.
     if (buffer.size() > 0)
       static_cast<byte_t*>(buffer.start())[0] = 0;
     return response_t<uint32_t>::of(0);
   }
-  blob_copy_to(tclib::Blob(title().chars, length), buffer);
+  blob_copy_to(tclib::Blob(title().chars, title_chars_no_null), buffer);
   // There's a weird corner case here where we'll allow a buffer that's the
   // null terminator too short to hold the complete terminated title -- but we
   // return the title anyway and overwrite the last character with the
   // terminator.
-  size_t term_index = (buffer.size() == length) ? (length - 1) : length;
-  static_cast<char*>(buffer.start())[term_index] = '\0';
-  return response_t<uint32_t>::of(static_cast<uint32_t>(length));
+  size_t null_index = (buffer.size() == title_chars_no_null) ? (title_chars_no_null - 1) : title_chars_no_null;
+  *bytes_written_out = null_index;
+  return response_t<uint32_t>::of(static_cast<uint32_t>(title_chars_no_null));
+}
+
+utf8_t BasicConsoleBackend::blob_to_utf8_dumb(tclib::Blob title, bool is_unicode) {
+  if (is_unicode) {
+    wide_str_t wstr = static_cast<wide_str_t>(title.start());
+    size_t length = title.size() / sizeof(wide_char_t);
+    blob_t memory = allocator_default_malloc(length + 1);
+    char *chars = static_cast<char*>(memory.start);
+    for (size_t i = 0; i < length; i++)
+      chars[i] = static_cast<char>(wstr[i]);
+    chars[length] = '\0';
+    return new_string(chars, length);
+  } else {
+    utf8_t as_utf8 = new_string(static_cast<char*>(title.start()), title.size());
+    return string_default_dup(as_utf8);
+  }
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
     bool is_unicode) {
   string_default_delete(title_);
-  utf8_t new_title = new_string(static_cast<char*>(title.start()), title.size());
-  title_ = string_default_dup(new_title);
+  title_ = blob_to_utf8_dumb(title, is_unicode);
   return response_t<bool_t>::yes();
 }
 
@@ -193,17 +236,23 @@ void ConsoleBackendService::on_set_console_cp(rpc::RequestData *data, ResponseCa
 }
 
 void ConsoleBackendService::on_get_console_title(rpc::RequestData *data, ResponseCallback resp) {
-  uint32_t length = static_cast<uint32_t>(data->argument(0).integer_value());
+  uint32_t byte_size = static_cast<uint32_t>(data->argument(0).integer_value());
   bool is_unicode = data->argument(1).bool_value();
-  plankton::Blob scratch_blob = data->factory()->new_blob(length);
-  tclib::Blob scratch(scratch_blob.mutable_data(), length);
+  plankton::Blob scratch_blob = data->factory()->new_blob(byte_size + 1);
+  tclib::Blob scratch(scratch_blob.mutable_data(), byte_size);
   blob_fill(scratch, 0);
-  response_t<uint32_t> result = backend()->get_console_title(scratch, is_unicode);
+  size_t bytes_written = 0;
+  response_t<uint32_t> result = backend()->get_console_title(scratch, is_unicode,
+      &bytes_written);
   if (result.has_error()) {
     resp(rpc::OutgoingResponse::failure(Variant::integer(result.error_code())));
   } else {
-    plankton::Blob response_blob = Variant::blob(scratch_blob.data(), result.value());
-    resp(rpc::OutgoingResponse::success(response_blob));
+    plankton::Blob response_blob = Variant::blob(scratch_blob.data(),
+        static_cast<uint32_t>(bytes_written));
+    Array pair = data->factory()->new_array(2);
+    pair.add(response_blob);
+    pair.add(result.value());
+    resp(rpc::OutgoingResponse::success(pair));
   }
 }
 

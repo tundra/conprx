@@ -8,6 +8,7 @@
 #include "rpc.hh"
 #include "server/conback.hh"
 #include "test.hh"
+#include "utils/string.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -39,6 +40,7 @@ private:
 class SimulatedFrontendAdaptor : public tclib::DefaultDestructable {
 public:
   SimulatedFrontendAdaptor(ConsoleBackend *backend);
+  void set_trace(bool value) { trace_ = value; }
   virtual ~SimulatedFrontendAdaptor() { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
   fat_bool_t initialize();
@@ -52,6 +54,8 @@ private:
   SimulatedAgent agent_;
   def_ref_t<ConsoleFrontend> frontend_;
   ConsoleBackendService service_;
+  bool trace_;
+  rpc::TracingMessageSocketObserver tracer_;
 };
 
 SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
@@ -59,12 +63,16 @@ SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
   , buffer_(1024)
   , streams_(&buffer_, &buffer_)
   , connector_(streams_.socket(), streams_.input())
-  , agent_(&connector_) {
+  , agent_(&connector_)
+  , trace_(false)
+  , tracer_("SB") {
   frontend_ = ConsoleFrontend::new_simulating(&agent_, 0);
   service_.set_backend(backend_);
 }
 
 fat_bool_t SimulatedFrontendAdaptor::initialize() {
+  if (trace_)
+    tracer_.install(streams_.socket());
   if (!buffer_.initialize())
     return F_FALSE;
   F_TRY(streams_.init(service_.handler()));
@@ -124,10 +132,12 @@ class FrontendMultiplexer {
 public:
   FrontendMultiplexer(bool use_native)
     : use_native_(use_native)
-    , frontend_(NULL) { }
+    , frontend_(NULL)
+    , trace_(false) { }
   ~FrontendMultiplexer();
   ConsoleFrontend *operator->() { return frontend_; }
   fat_bool_t initialize();
+  void set_trace(bool value) { trace_ = value; }
 
 private:
   bool use_native_;
@@ -136,6 +146,7 @@ private:
   def_ref_t<SimulatedFrontendAdaptor> fake_;
   def_ref_t<ConsoleFrontend> native_;
   FrontendSnapshot initial_state_;
+  bool trace_;
 };
 
 fat_bool_t FrontendMultiplexer::initialize() {
@@ -144,6 +155,7 @@ fat_bool_t FrontendMultiplexer::initialize() {
     frontend_ = *native_;
   } else {
     fake_ = new (kDefaultAlloc) SimulatedFrontendAdaptor(&backend_);
+    fake_->set_trace(trace_);
     F_TRY(fake_->initialize());
     frontend_ = fake_->frontend();
   }
@@ -198,7 +210,7 @@ CONBACK_TEST(title_a) {
   FrontendMultiplexer frontend(use_native);
   ASSERT_F_TRUE(frontend.initialize());
 
-  const char *letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  ansi_cstr_t letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   ASSERT_TRUE(frontend->set_console_title_a(letters));
   char buf[1024];
   tclib::Blob bufblob(buf, 1024);
@@ -225,4 +237,125 @@ CONBACK_TEST(title_a) {
   bufblob.fill(-1);
   ASSERT_EQ(26, frontend->get_console_title_a(buf, 27));
   ASSERT_C_STREQ(letters, buf);
+}
+
+CONBACK_TEST(title_w) {
+  SKIP_IF_UNSUPPORTED();
+  FrontendMultiplexer frontend(use_native);
+  ASSERT_F_TRUE(frontend.initialize());
+
+  const wide_char_t letters[27] = {
+      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+      'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+      'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+      'Y', 'Z', 0
+  };
+  wide_char_t wide_minus_1 = static_cast<wide_char_t>(-1);
+  ASSERT_TRUE(frontend->set_console_title_w(letters));
+  wide_char_t buf[1024];
+  tclib::Blob bufblob(buf, sizeof(buf));
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(buf, 54));
+  ASSERT_BLOBEQ(StringUtils::as_blob(letters, true),
+      StringUtils::as_blob(buf, true));
+  ASSERT_EQ(wide_minus_1, buf[27]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(buf, 60));
+  ASSERT_BLOBEQ(StringUtils::as_blob(letters, true),
+      StringUtils::as_blob(buf, true));
+  ASSERT_EQ(wide_minus_1, buf[27]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(0, frontend->get_console_title_w(buf, 0));
+  ASSERT_EQ(wide_minus_1, buf[0]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(buf, 32));
+  ASSERT_BLOBEQ(tclib::Blob(letters, 15 * sizeof(wide_char_t)),
+      StringUtils::as_blob(buf, false));
+  ASSERT_EQ(wide_minus_1, buf[17]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(buf, 50));
+  ASSERT_BLOBEQ(tclib::Blob(letters, 24 * sizeof(wide_char_t)),
+      StringUtils::as_blob(buf, false));
+  ASSERT_EQ(wide_minus_1, buf[26]);
+
+  bufblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(buf, 52));
+  ASSERT_BLOBEQ(tclib::Blob(letters, 25 * sizeof(wide_char_t)),
+      StringUtils::as_blob(buf, false));
+  ASSERT_EQ(wide_minus_1, buf[27]);
+}
+
+CONBACK_TEST(title_aw_ascii) {
+  SKIP_IF_UNSUPPORTED();
+  FrontendMultiplexer frontend(use_native);
+  ASSERT_F_TRUE(frontend.initialize());
+
+  const wide_char_t wide_alphabet[27] = {
+      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+      'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+      'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+      'Y', 'Z', 0
+  };
+  const ansi_char_t ansi_alphabet[27] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  wide_char_t widebuf[1024];
+  tclib::Blob wideblob(widebuf, sizeof(widebuf));
+  ansi_char_t ansibuf[1024];
+  tclib::Blob ansiblob(ansibuf, sizeof(ansibuf));
+
+  ASSERT_TRUE(frontend->set_console_title_a(ansi_alphabet));
+
+  ansiblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_a(ansibuf, sizeof(ansibuf)));
+  ASSERT_C_STREQ(ansi_alphabet, ansibuf);
+
+  wideblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(widebuf, sizeof(widebuf)));
+  ASSERT_BLOBEQ(StringUtils::as_blob(wide_alphabet, false),
+      StringUtils::as_blob(widebuf, false));
+
+  ASSERT_TRUE(frontend->set_console_title_w(wide_alphabet));
+
+  ansiblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_a(ansibuf, sizeof(ansibuf)));
+  ASSERT_C_STREQ(ansi_alphabet, ansibuf);
+
+  wideblob.fill(-1);
+  ASSERT_EQ(26, frontend->get_console_title_w(widebuf, sizeof(widebuf)));
+  ASSERT_BLOBEQ(StringUtils::as_blob(wide_alphabet, false),
+      StringUtils::as_blob(widebuf, false));
+}
+
+CONBACK_TEST(title_aw_unicode) {
+  SKIP_TEST("waiting for CP437 codec");
+  SKIP_IF_UNSUPPORTED();
+  FrontendMultiplexer frontend(use_native);
+  ASSERT_F_TRUE(frontend.initialize());
+
+  // Ἀλέξ Alex Алекс
+  const wide_char_t wide_names[16] = {
+      0x1F08, 0x03BB, 0x03AD, 0x03BE, ' ', 'A', 'l', 'e',
+      'x', ' ', 0x0410, 0x043B, 0x0435, 0x043A, 0x0441, 0x0000
+  };
+
+  wide_char_t widebuf[1024];
+  tclib::Blob wideblob(widebuf, sizeof(widebuf));
+  ansi_char_t ansibuf[1024];
+  tclib::Blob ansiblob(ansibuf, sizeof(ansibuf));
+
+  ASSERT_TRUE(frontend->set_console_title_w(wide_names));
+
+  ansiblob.fill(-1);
+  ASSERT_EQ(15, frontend->get_console_title_a(ansibuf, sizeof(ansibuf)));
+  ASSERT_C_STREQ("???? Alex ?????", ansibuf);
+
+  wideblob.fill(-1);
+  ASSERT_EQ(15, frontend->get_console_title_w(widebuf, sizeof(widebuf)));
+  ASSERT_BLOBEQ(StringUtils::as_blob(wide_names, false),
+      StringUtils::as_blob(widebuf, false));
 }

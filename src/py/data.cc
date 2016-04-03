@@ -150,7 +150,7 @@ PyObject *WideBuffer::to_string(PyObject *object) {
   WideBuffer *self = WideBuffer::type.cast(object);
   wide_str_t w_str = self->as_c_str();
   size_t last_char = self->data_size_ - 1;
-  size_t length = (w_str[last_char] == '\0') ? String::wstrlen(w_str) : last_char;
+  size_t length = (w_str[last_char] == '\0') ? StringUtils::wstrlen(w_str) : last_char;
   // This actually returns a unicode, not a string, but python seems to do the
   // right thing both when calling this through str() and unicode().
   return PyUnicode_DecodeUTF16(reinterpret_cast<const char *>(w_str),

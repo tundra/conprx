@@ -182,21 +182,45 @@ bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
 bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
   lpc::set_console_title_m *payload = message.payload();
-  size_t length = strlen(str);
-  payload->length = static_cast<uint32_t>(length);
-  payload->title = xform().local_to_remote(const_cast<ansi_str_t>(str));
+  tclib::Blob blob = StringUtils::as_blob(str, false);
+  payload->size_in_bytes_in = static_cast<uint32_t>(blob.size());
+  payload->title = xform().local_to_remote(blob.start());
+  payload->is_unicode = false;
   agent()->on_message(message.message());
   return update_last_error(&message);
 }
 
-dword_t SimulatingConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
+dword_t SimulatingConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n) {
   SimulatedMessage<ConsoleAgent::lmGetConsoleTitle> message(this);
   lpc::get_console_title_m *payload = message.payload();
-  payload->length = n;
+  payload->size_in_bytes_in = n;
   payload->title = xform().local_to_remote(str);
+  payload->is_unicode = false;
   agent()->on_message(message.message());
   update_last_error(&message);
-  return static_cast<uint32_t>(payload->length);
+  return payload->length_in_chars_out;
+}
+
+bool_t SimulatingConsoleFrontend::set_console_title_w(wide_cstr_t str) {
+  SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
+  lpc::set_console_title_m *payload = message.payload();
+  tclib::Blob blob = StringUtils::as_blob(str, false);
+  payload->size_in_bytes_in = static_cast<uint32_t>(blob.size());
+  payload->title = xform().local_to_remote(blob.start());
+  payload->is_unicode = true;
+  agent()->on_message(message.message());
+  return update_last_error(&message);
+}
+
+dword_t SimulatingConsoleFrontend::get_console_title_w(wide_str_t str, dword_t n) {
+  SimulatedMessage<ConsoleAgent::lmGetConsoleTitle> message(this);
+  lpc::get_console_title_m *payload = message.payload();
+  payload->size_in_bytes_in = n;
+  payload->title = xform().local_to_remote(str);
+  payload->is_unicode = true;
+  agent()->on_message(message.message());
+  update_last_error(&message);
+  return payload->length_in_chars_out;
 }
 
 bool_t SimulatingConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {

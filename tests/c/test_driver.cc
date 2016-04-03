@@ -70,13 +70,14 @@ TEST(driver, get_console_title) {
   ASSERT_TRUE(driver.connect());
 
   DriverRequest tit0 = driver.get_console_title_a(1024);
-  ASSERT_TRUE(tit0->is_string());
+  ASSERT_TRUE(tit0->is_blob());
 
   DriverRequest settit0 = driver.set_console_title_a("Looky here!");
   ASSERT_TRUE(*settit0 == Variant::yes());
 
   DriverRequest tit1 = driver.get_console_title_a(1024);
-  ASSERT_C_STREQ("Looky here!", tit1->string_chars());
+  ASSERT_BLOBEQ(tclib::Blob("Looky here!", 12),
+      tclib::Blob(tit1->blob_data(), tit1->blob_size()));
 
   ASSERT_TRUE(driver.join(NULL));
 }

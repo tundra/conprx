@@ -5,11 +5,20 @@
 
 using namespace conprx;
 
-size_t String::wstrlen(wide_cstr_t str) {
+size_t StringUtils::wstrlen(wide_cstr_t str) {
   wide_cstr_t p = str;
   while (*p)
     p++;
   return p - str;
+}
+
+tclib::Blob StringUtils::as_blob(ansi_cstr_t str, bool include_null) {
+  return tclib::Blob(str, strlen(str) + (include_null ? 1 : 0));
+}
+
+tclib::Blob StringUtils::as_blob(wide_cstr_t str, bool include_null) {
+  size_t char_count = wstrlen(str) + (include_null ? 1 : 0);
+  return tclib::Blob(str, char_count * sizeof(wide_char_t));
 }
 
 #ifdef IS_MSVC

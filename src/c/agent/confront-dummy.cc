@@ -59,7 +59,7 @@ static size_t min_size(size_t a, size_t b) {
   return (a < b) ? a : b;
 }
 
-dword_t DummyConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
+dword_t DummyConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n) {
   size_t count = min_size(title_.size + 1, n);
   utf8_t title = string_substring(title_, 0, count);
   string_copy_to(title, str, count);
@@ -70,6 +70,14 @@ bool_t DummyConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   string_default_delete(title_);
   title_ = string_default_dup(new_c_string(str));
   return true;
+}
+
+dword_t DummyConsoleFrontend::get_console_title_w(wide_str_t str, dword_t n) {
+  return 0;
+}
+
+bool_t DummyConsoleFrontend::set_console_title_w(wide_cstr_t str) {
+  return false;
 }
 
 uint32_t DummyConsoleFrontend::get_console_cp() {

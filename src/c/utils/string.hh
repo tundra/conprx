@@ -7,10 +7,12 @@
 #include "c/stdc.h"
 #include "types.hh"
 
+#include "utils/blob.hh"
+
 namespace conprx {
 
 // Various string utilities.
-class String {
+class StringUtils {
 public:
   // Given a wide string with a length, converts it to UTF8. The result is
   // stored in the utf8_out parameter and the number of bytes of the utf8 string
@@ -20,6 +22,12 @@ public:
 
   // Returns the index of the first \0 in the given string.
   static size_t wstrlen(wide_cstr_t str);
+
+  // Returns a blob that extends from the beginning of the given string to the
+  // end, including the null terminator.
+  static tclib::Blob as_blob(ansi_cstr_t str, bool include_null);
+
+  static tclib::Blob as_blob(wide_cstr_t str, bool include_null);
 };
 
 } // namespace conprx

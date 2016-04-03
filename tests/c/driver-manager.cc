@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "driver-manager.hh"
+#include "utils/string.hh"
 
 #include "test.hh"
 
@@ -71,8 +72,20 @@ Variant DriverRequest::get_console_title_a(int64_t bufsize) {
   return send("get_console_title_a", bufsize);
 }
 
-Variant DriverRequest::set_console_title_a(const char *string) {
-  return send("set_console_title_a", string);
+Variant DriverRequest::set_console_title_a(ansi_cstr_t string) {
+  tclib::Blob blob = StringUtils::as_blob(string, true);
+  return send("set_console_title_a", Variant::blob(blob.start(),
+      static_cast<uint32_t>(blob.size())));
+}
+
+Variant DriverRequest::get_console_title_w(int64_t bufsize) {
+  return send("get_console_title_w", bufsize);
+}
+
+Variant DriverRequest::set_console_title_w(wide_cstr_t string) {
+  tclib::Blob blob = StringUtils::as_blob(string, true);
+  return send("set_console_title_w", Variant::blob(blob.start(),
+      static_cast<uint32_t>(blob.size())));
 }
 
 Variant DriverRequest::get_console_cp() {
@@ -320,21 +333,4 @@ fat_bool_t FakeAgentLauncher::start_connect_to_agent() {
 fat_bool_t NoAgentLauncher::start_connect_to_agent() {
   UNREACHABLE("NoAgentLauncher::start_connect_to_agent");
   return F_FALSE;
-}
-
-void TracingMessageSocketObserver::on_incoming_request(rpc::IncomingRequest *request,
-      uint64_t serial) {
-  TextWriter selw;
-  selw.write(request->selector());
-  TextWriter argw;
-  argw.write(request->arguments());
-  INFO("BE <%i| %s %s", static_cast<uint32_t>(serial), *selw, *argw);
-}
-
-void TracingMessageSocketObserver::on_outgoing_response(rpc::OutgoingResponse response,
-      uint64_t serial) {
-  TextWriter payw;
-  payw.write(response.payload());
-  INFO("BE %s%i> %s", (response.is_success() ? "|" : "!"),
-      static_cast<uint32_t>(serial), *payw);
 }

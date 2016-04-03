@@ -125,16 +125,6 @@ protected:
 
 };
 
-// A message socket observer that simply logs requests coming in and responses
-// going out.
-class TracingMessageSocketObserver : public plankton::rpc::MessageSocketObserver {
-public:
-  virtual void on_incoming_request(plankton::rpc::IncomingRequest *request,
-      uint64_t serial);
-  virtual void on_outgoing_response(plankton::rpc::OutgoingResponse response,
-      uint64_t serial);
-};
-
 // A manager that manages the lifetime of the driver, including starting it up,
 // and allows communication with it.
 class DriverManager {
@@ -229,7 +219,7 @@ private:
 
   bool silence_log_;
   bool trace_;
-  TracingMessageSocketObserver tracer_;
+  plankton::rpc::TracingMessageSocketObserver tracer_;
   utf8_t agent_path_;
   utf8_t agent_path();
   AgentType agent_type_;

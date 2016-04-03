@@ -48,7 +48,8 @@ public:
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 
   // Fill the given buffer with the title.
-  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode) = 0;
+  virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode,
+      size_t *bytes_written_out) = 0;
 
   // Set the title to the contents of the given buffer.
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
@@ -74,7 +75,7 @@ public:
   virtual response_t<uint32_t> get_console_cp(bool is_output);
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer,
-      bool is_unicode);
+      bool is_unicode, size_t *bytes_written_out);
   virtual response_t<bool_t> set_console_title(tclib::Blob title,
       bool is_unicode);
   virtual response_t<uint32_t> get_console_mode(Handle handle);
@@ -92,7 +93,23 @@ public:
   // The current title encoded as utf-8.
   utf8_t title() { return title_; }
 
+  // Converts a blob that may or may not be unicode to a utf8-string in a super
+  // dumb way that does, however, work if you pass it only ascii.
+  // TODO: make this not be so dumb.
+  static utf8_t blob_to_utf8_dumb(tclib::Blob blob, bool is_unicode);
+
+  // Returns the size of an individual character under unicode/non-unicode.
+  static size_t get_char_size(bool is_unicode);
+
 private:
+  // Get-title for ansi strings.
+  response_t<uint32_t> get_console_title_ansi(tclib::Blob buffer,
+      size_t *bytes_written_out);
+
+  // Get-title for wide strings.
+  response_t<uint32_t> get_console_title_wide(tclib::Blob buffer,
+      size_t *bytes_written_out);
+
   ConsoleWindow *window() { return window_; }
   int64_t last_poke_;
   uint32_t input_codepage_;

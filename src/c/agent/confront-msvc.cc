@@ -40,12 +40,20 @@ bool_t WindowsConsoleFrontend::write_console_a(handle_t console_output, const vo
   return WriteConsoleA(console_output, buffer, chars_to_write, chars_written, reserved);
 }
 
-dword_t WindowsConsoleFrontend::get_console_title_a(str_t str, dword_t n) {
+dword_t WindowsConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n) {
   return GetConsoleTitleA(str, n);
 }
 
 bool_t WindowsConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   return SetConsoleTitleA(str);
+}
+
+dword_t WindowsConsoleFrontend::get_console_title_w(wide_str_t str, dword_t n) {
+  return GetConsoleTitleW(str, n);
+}
+
+bool_t WindowsConsoleFrontend::set_console_title_w(wide_cstr_t str) {
+  return SetConsoleTitleW(str);
 }
 
 uint32_t WindowsConsoleFrontend::get_console_cp() {

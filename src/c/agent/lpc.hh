@@ -279,7 +279,14 @@ struct get_console_mode_m {
 typedef get_console_mode_m set_console_mode_m;
 
 struct get_console_title_m {
-  uint32_t length;
+  union {
+    // It appears that this field is used for two different purposes: as a
+    // request it indicates the size in bytes of the buffer to fill, as a
+    // response it's the number of whole character written. Be careful not to
+    // get the two uses confused.
+    uint32_t size_in_bytes_in;
+    uint32_t length_in_chars_out;
+  };
   ONLY_64_BIT(uint32_t padding);
   void *title;
   bool is_unicode;

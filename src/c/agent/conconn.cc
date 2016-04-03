@@ -67,7 +67,7 @@ NtStatus ConsoleAdaptor::set_console_title(lpc::Message *req,
     lpc::set_console_title_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   void *start = req->xform().remote_to_local(payload->title);
-  tclib::Blob blob(start, payload->length);
+  tclib::Blob blob(start, payload->size_in_bytes_in);
   response_t<bool_t> resp = connector()->set_console_title(blob, payload->is_unicode);
   req->set_return_value(NtStatus::from_response(resp));
   return NtStatus::success();
@@ -77,10 +77,11 @@ NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
     lpc::get_console_title_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   void *start = req->xform().remote_to_local(payload->title);
-  tclib::Blob scratch(start, payload->length);
+  tclib::Blob scratch(start, payload->size_in_bytes_in);
   response_t<uint32_t> resp = connector()->get_console_title(scratch, payload->is_unicode);
   req->set_return_value(NtStatus::from_response(resp));
-  payload->length = resp.value();
+  size_t char_size = payload->is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
+  payload->length_in_chars_out = static_cast<uint32_t>(resp.value() / char_size);
   return NtStatus::success();
 }
 
@@ -213,11 +214,18 @@ response_t<uint32_t> PrpcConsoleConnector::get_console_title(tclib::Blob buffer,
   response_t<Variant> result = send_request_default<Variant>(&req, &resp);
   if (result.has_error())
     return response_t<uint32_t>::error(result);
-  plankton::Blob presult = result.value();
-  uint32_t amount = static_cast<uint32_t>(min_size(presult.size(), buffer.size()));
-  blob_fill(buffer, 0);
-  blob_copy_to(tclib::Blob(presult.data(), amount), buffer);
-  return response_t<uint32_t>::of(amount);
+  Array pair = result.value();
+  plankton::Blob presult = pair[0];
+  size_t char_size = is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
+  uint32_t return_value = static_cast<uint32_t>(pair[1].integer_value());
+  if (buffer.size() >= char_size) {
+    // There is always an implicit null terminator after the response's contents
+    // so we never copy more than leaves room for that.
+    uint32_t bytes_to_write = static_cast<uint32_t>(min_size(presult.size(), buffer.size() - char_size));
+    blob_copy_to(tclib::Blob(presult.data(), bytes_to_write), buffer);
+    tclib::Blob(static_cast<byte_t*>(buffer.start()) + bytes_to_write, char_size).fill(0);
+  }
+  return response_t<uint32_t>::of(return_value);
 }
 
 response_t<uint32_t> PrpcConsoleConnector::get_console_mode(handle_t raw_handle) {
