@@ -51,26 +51,35 @@ private:
   static const uint8_t kWideToGraphic[29];
 };
 
+// A ucs-16 string, that is, like utf-16 except that surrogate pairs are left
+// uninterpreted.
 struct ucs16_t {
   wide_str_t chars;
   size_t length;
 };
 
+// Wraps the given chars and length in a ucs16. A null terminator is optional,
+// the length is the size without that.
 static ucs16_t ucs16_new(wide_str_t chars, size_t length) {
   ucs16_t result = {chars, length};
   return result;
 }
 
+// Returns the empty ucs16 string which is different from a ucs16-string of
+// length 0.
 static ucs16_t ucs16_empty() {
   return ucs16_new(NULL, 0);
 }
 
+// Returns true iff the given value is the result of ucs16_empty.
 static bool ucs16_is_empty(ucs16_t value) {
   return value.chars == NULL;
 }
 
+// Returns a copy of the given string allocated using the default allocator.
 ucs16_t ucs16_default_dup(ucs16_t str);
 
+// Deletes the given string using the default allocator.
 void ucs16_default_delete(ucs16_t str);
 
 } // namespace conprx

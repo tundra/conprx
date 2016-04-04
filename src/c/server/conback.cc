@@ -118,9 +118,6 @@ response_t<uint32_t> BasicConsoleBackend::get_console_title_ansi(tclib::Blob buf
   ansi_str_t astr = static_cast<ansi_str_t>(buffer.start());
   if (buffer.size() < title_chars_no_null) {
     // We refuse to return less than the full title if the buffer is too small.
-    // Still null-terminate though.
-    if (buffer.size() > 0)
-      astr[0] = 0;
     *bytes_written_out = 0;
     return response_t<uint32_t>::of(0);
   }

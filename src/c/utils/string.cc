@@ -153,10 +153,11 @@ const uint8_t MsDosCodec::kWideToGraphic[29] = {
 ucs16_t conprx::ucs16_default_dup(ucs16_t str) {
   if (ucs16_is_empty(str))
     return str;
-  size_t size = sizeof(wide_char_t) * (str.length + 1);
-  blob_t buf = allocator_default_malloc(size);
+  size_t size_no_null = sizeof(wide_char_t) * str.length;
+  size_t size_with_null = size_no_null + sizeof(wide_char_t);
+  blob_t buf = allocator_default_malloc(size_with_null);
   wide_str_t chars = (wide_str_t) buf.start;
-  blob_copy_to(blob_new(str.chars, size), buf);
+  blob_copy_to(blob_new(str.chars, size_no_null), buf);
   chars[str.length] = '\0';
   return ucs16_new(chars, str.length);
 }
