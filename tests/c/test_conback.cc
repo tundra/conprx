@@ -332,7 +332,6 @@ CONBACK_TEST(title_aw_ascii) {
 }
 
 CONBACK_TEST(title_aw_unicode) {
-  SKIP_TEST("waiting for CP437 codec");
   SKIP_IF_UNSUPPORTED();
   FrontendMultiplexer frontend(use_native);
   ASSERT_F_TRUE(frontend.initialize());
@@ -358,4 +357,43 @@ CONBACK_TEST(title_aw_unicode) {
   ASSERT_EQ(15, frontend->get_console_title_w(widebuf, sizeof(widebuf)));
   ASSERT_BLOBEQ(StringUtils::as_blob(wide_names, false),
       StringUtils::as_blob(widebuf, false));
+
+  // Surrogate pair, for 0x2A601, Cantonese "to bite". We expect it to not be
+  // understood but treated as two different characters.
+  const wide_char_t wide_surrogate[5] = {'{', 0xD869, 0xDE01, '}', 0};
+  ASSERT_TRUE(frontend->set_console_title_w(wide_surrogate));
+
+  ansiblob.fill(-1);
+  ASSERT_EQ(4, frontend->get_console_title_a(ansibuf, sizeof(ansibuf)));
+  ASSERT_C_STREQ("{??}", ansibuf);
+
+  wideblob.fill(-1);
+  ASSERT_EQ(4, frontend->get_console_title_w(widebuf, sizeof(widebuf)));
+  ASSERT_BLOBEQ(StringUtils::as_blob(wide_surrogate, false),
+      StringUtils::as_blob(widebuf, false));
+}
+
+CONBACK_TEST(title_aw_complete) {
+  SKIP_IF_UNSUPPORTED();
+  FrontendMultiplexer frontend(use_native);
+  ASSERT_F_TRUE(frontend.initialize());
+
+  ansi_char_t all_chars[256];
+  for (size_t i = 0; i < 256; i++)
+    all_chars[i] = static_cast<ansi_char_t>(i + 1);
+  all_chars[255] = 0;
+
+  ASSERT_TRUE(frontend->set_console_title_a(all_chars));
+
+  wide_char_t wide_chars[256];
+  ASSERT_EQ(255, frontend->get_console_title_w(wide_chars, sizeof(wide_chars)));
+  for (size_t i = 0; i < 256; i++)
+    ASSERT_EQ(MsDosCodec::ansi_to_wide_char(all_chars[i]), wide_chars[i]);
+
+  ASSERT_TRUE(frontend->set_console_title_w(wide_chars));
+
+  ansi_char_t ansi_chars[256];
+  ASSERT_EQ(255, frontend->get_console_title_a(ansi_chars, sizeof(ansi_chars)));
+  for (size_t i = 0; i < 256; i++)
+    ASSERT_EQ(all_chars[i], ansi_chars[i]);
 }

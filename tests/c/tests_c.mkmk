@@ -11,6 +11,7 @@ filenames = [
   "test_driver.cc",
   "test_lpc.cc",
   "test_protocol.cc",
+  "test_string.cc",
   "test_vector.cc",
   "driver-shared.cc",
   "driver-manager.cc",

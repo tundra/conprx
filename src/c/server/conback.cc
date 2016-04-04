@@ -62,12 +62,12 @@ BasicConsoleBackend::BasicConsoleBackend()
   : last_poke_(0)
   , input_codepage_(cpUtf8)
   , output_codepage_(cpUtf8)
-  , title_(string_empty())
+  , title_(ucs16_empty())
   , mode_(0)
   , window_(NoConsoleWindow::get()) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
-  string_default_delete(title_);
+  ucs16_default_delete(title_);
 }
 
 response_t<int64_t> BasicConsoleBackend::poke(int64_t value) {
@@ -100,29 +100,32 @@ response_t<uint32_t> BasicConsoleBackend::get_console_title_wide(tclib::Blob buf
   }
   // This is super verbose but it's sooo easy to get the whole title-length,
   // buffer-length, null/no-null mixed up.
-  wide_str_t wide_buf = static_cast<wide_str_t>(buffer.start());
-  size_t title_chars_no_null = title().size;
+  wide_str_t wstr = static_cast<wide_str_t>(buffer.start());
+  size_t title_chars_no_null = title().length;
   size_t buffer_chars_with_null = buffer.size() / sizeof(wide_char_t);
   size_t buffer_chars_no_null = buffer_chars_with_null - 1;
   size_t char_to_copy_no_null = min_size(title_chars_no_null, buffer_chars_no_null);
   for (size_t i = 0; i < char_to_copy_no_null; i++)
-    wide_buf[i] = title_.chars[i];
-  wide_buf[char_to_copy_no_null] = '\0';
+    wstr[i] = title().chars[i];
+  wstr[char_to_copy_no_null] = '\0';
   *bytes_written_out = char_to_copy_no_null * sizeof(wide_char_t);
   return response_t<uint32_t>::of(static_cast<uint32_t>(title_chars_no_null * sizeof(wide_char_t)));
 }
 
 response_t<uint32_t> BasicConsoleBackend::get_console_title_ansi(tclib::Blob buffer,
     size_t *bytes_written_out) {
-  size_t title_chars_no_null = title().size;
+  size_t title_chars_no_null = title().length;
+  ansi_str_t astr = static_cast<ansi_str_t>(buffer.start());
   if (buffer.size() < title_chars_no_null) {
     // We refuse to return less than the full title if the buffer is too small.
     // Still null-terminate though.
     if (buffer.size() > 0)
-      static_cast<byte_t*>(buffer.start())[0] = 0;
+      astr[0] = 0;
+    *bytes_written_out = 0;
     return response_t<uint32_t>::of(0);
   }
-  blob_copy_to(tclib::Blob(title().chars, title_chars_no_null), buffer);
+  for (size_t i = 0; i < title_chars_no_null; i++)
+    astr[i] = MsDosCodec::wide_to_ansi_char(title().chars[i]);
   // There's a weird corner case here where we'll allow a buffer that's the
   // null terminator too short to hold the complete terminated title -- but we
   // return the title anyway and overwrite the last character with the
@@ -132,26 +135,27 @@ response_t<uint32_t> BasicConsoleBackend::get_console_title_ansi(tclib::Blob buf
   return response_t<uint32_t>::of(static_cast<uint32_t>(title_chars_no_null));
 }
 
-utf8_t BasicConsoleBackend::blob_to_utf8_dumb(tclib::Blob title, bool is_unicode) {
+ucs16_t BasicConsoleBackend::blob_to_ucs16(tclib::Blob blob, bool is_unicode) {
   if (is_unicode) {
-    wide_str_t wstr = static_cast<wide_str_t>(title.start());
-    size_t length = title.size() / sizeof(wide_char_t);
-    blob_t memory = allocator_default_malloc(length + 1);
-    char *chars = static_cast<char*>(memory.start);
-    for (size_t i = 0; i < length; i++)
-      chars[i] = static_cast<char>(wstr[i]);
-    chars[length] = '\0';
-    return new_string(chars, length);
+    wide_str_t wstr = static_cast<wide_str_t>(blob.start());
+    size_t length = blob.size() / sizeof(wide_char_t);
+    return ucs16_default_dup(ucs16_new(wstr, length));
   } else {
-    utf8_t as_utf8 = new_string(static_cast<char*>(title.start()), title.size());
-    return string_default_dup(as_utf8);
+    size_t length = blob.size();
+    size_t size = (blob.size() + 1) * sizeof(wide_char_t);
+    wide_str_t wstr = static_cast<wide_str_t>(allocator_default_malloc(size).start);
+    ansi_str_t astr = static_cast<ansi_str_t>(blob.start());
+    for (size_t i = 0; i < length; i++)
+      wstr[i] = MsDosCodec::ansi_to_wide_char(astr[i]);
+    wstr[length] = 0;
+    return ucs16_new(wstr, blob.size());
   }
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
     bool is_unicode) {
-  string_default_delete(title_);
-  title_ = blob_to_utf8_dumb(title, is_unicode);
+  ucs16_default_delete(title_);
+  title_ = blob_to_ucs16(title, is_unicode);
   return response_t<bool_t>::yes();
 }
 

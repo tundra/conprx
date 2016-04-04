@@ -11,6 +11,7 @@
 #include "sync/thread.hh"
 #include "utils/blob.hh"
 #include "utils/fatbool.hh"
+#include "utils/string.hh"
 
 namespace conprx {
 
@@ -91,12 +92,10 @@ public:
   int64_t last_poke() { return last_poke_; }
 
   // The current title encoded as utf-8.
-  utf8_t title() { return title_; }
+  ucs16_t title() { return title_; }
 
-  // Converts a blob that may or may not be unicode to a utf8-string in a super
-  // dumb way that does, however, work if you pass it only ascii.
-  // TODO: make this not be so dumb.
-  static utf8_t blob_to_utf8_dumb(tclib::Blob blob, bool is_unicode);
+  // Converts a blob that may or may not be unicode to a ucs16-string.
+  static ucs16_t blob_to_ucs16(tclib::Blob blob, bool is_unicode);
 
   // Returns the size of an individual character under unicode/non-unicode.
   static size_t get_char_size(bool is_unicode);
@@ -114,7 +113,7 @@ private:
   int64_t last_poke_;
   uint32_t input_codepage_;
   uint32_t output_codepage_;
-  utf8_t title_;
+  ucs16_t title_;
   // TODO: for now all handles have the same mode value. There needs to be a
   //   more nuanced way to set those.
   uint32_t mode_;

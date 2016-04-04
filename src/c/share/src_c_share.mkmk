@@ -14,6 +14,7 @@ files = [
 
 objects = get_group("objects")
 objects.add_member(get_dep_external("plankton", "src", "c", "library"))
+objects.add_member(get_external("src", "c", "utils", "objects"))
 
 for filename in files:
   objects.add_member(build_object(filename))
