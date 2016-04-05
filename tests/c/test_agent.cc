@@ -36,11 +36,10 @@ DriverManagerJoiner::~DriverManagerJoiner() {
 }
 
 // Initializes the driver to use for this agent test.
-#define AGENT_TEST_PREAMBLE_TRACE(BACKEND, USE_REAL, TRACE)                    \
+#define AGENT_TEST_PREAMBLE(BACKEND, USE_REAL)                                 \
     if ((USE_REAL) && !DriverManager::kSupportsRealAgent)                      \
       SKIP_TEST("requires real agent");                                        \
     DriverManager driver;                                                      \
-    driver.set_trace((TRACE));                                                 \
     DriverManagerJoiner joiner;                                                \
     do {                                                                       \
       configure_driver(&driver, (USE_REAL));                                   \
@@ -49,8 +48,6 @@ DriverManagerJoiner::~DriverManagerJoiner() {
       ASSERT_F_TRUE(driver.connect());                                         \
       joiner.set_driver(&driver);                                              \
     } while (false)
-
-#define AGENT_TEST_PREAMBLE(BACKEND, USE_REAL) AGENT_TEST_PREAMBLE_TRACE(BACKEND, USE_REAL, false)
 
 static void configure_driver(DriverManager *driver, bool use_real) {
   if (use_real) {
