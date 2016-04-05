@@ -15,6 +15,53 @@ using namespace tclib;
 using namespace plankton;
 using namespace conprx;
 
+// Declares a standard agent test that is run both against the real agent and
+// the simulated one.
+#define AGENT_TEST(NAME) MULTITEST(agent, NAME, bool, use_real, ("real", true), ("simul", false))
+
+// Helper class that takes care of joining drivers if they are started properly.
+class DriverManagerJoiner {
+public:
+  DriverManagerJoiner() : manager_(NULL) { }
+  ~DriverManagerJoiner();
+  void set_driver(DriverManager *manager) { manager_ = manager; }
+private:
+  DriverManager *manager_;
+};
+
+DriverManagerJoiner::~DriverManagerJoiner() {
+  if (manager_ == NULL)
+    return;
+  ASSERT_F_TRUE(manager_->join(NULL));
+}
+
+// Initializes the driver to use for this agent test.
+#define AGENT_TEST_PREAMBLE_TRACE(BACKEND, USE_REAL, TRACE)                    \
+    if ((USE_REAL) && !DriverManager::kSupportsRealAgent)                      \
+      SKIP_TEST("requires real agent");                                        \
+    DriverManager driver;                                                      \
+    driver.set_trace((TRACE));                                                 \
+    DriverManagerJoiner joiner;                                                \
+    do {                                                                       \
+      configure_driver(&driver, (USE_REAL));                                   \
+      driver.set_backend((BACKEND));                                           \
+      ASSERT_F_TRUE(driver.start());                                           \
+      ASSERT_F_TRUE(driver.connect());                                         \
+      joiner.set_driver(&driver);                                              \
+    } while (false)
+
+#define AGENT_TEST_PREAMBLE(BACKEND, USE_REAL) AGENT_TEST_PREAMBLE_TRACE(BACKEND, USE_REAL, false)
+
+static void configure_driver(DriverManager *driver, bool use_real) {
+  if (use_real) {
+    driver->set_agent_type(DriverManager::atReal);
+    driver->set_frontend_type(dfNative);
+  } else {
+    driver->set_agent_type(DriverManager::atFake);
+    driver->set_frontend_type(dfSimulating);
+  }
+}
+
 MULTITEST(agent, simple, bool, use_fake, ("fake", true), ("real", false)) {
   if (!use_fake && !DriverManager::kSupportsRealAgent)
     SKIP_TEST(kIsMsvc ? "debug codegen" : "msvc only");
@@ -94,32 +141,9 @@ response_t<bool_t> CodePageBackend::set_console_cp(uint32_t value, bool is_outpu
   return response_t<bool_t>::yes();
 }
 
-
-#define SKIP_IF_UNSUPPORTED(USE_REAL) do {                                     \
-  if ((USE_REAL) && !DriverManager::kSupportsRealAgent)                        \
-    SKIP_TEST("requires real agent");                                          \
-} while (false)
-
-static void configure_driver(DriverManager *driver, bool use_real) {
-  if (use_real) {
-    driver->set_agent_type(DriverManager::atReal);
-    driver->set_frontend_type(dfNative);
-  } else {
-    driver->set_agent_type(DriverManager::atFake);
-    driver->set_frontend_type(dfSimulating);
-  }
-}
-
-#include "agent/lpc.hh"
-
-MULTITEST(agent, native_get_cp, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(native_get_cp) {
   CodePageBackend backend;
-  DriverManager driver;
-  driver.set_backend(&backend);
-  configure_driver(&driver, use_real);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   backend.input = response_t<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
@@ -132,18 +156,11 @@ MULTITEST(agent, native_get_cp, bool, use_real, ("real", true), ("simul", false)
   backend.input = response_t<uint32_t>::error(123);
   DriverRequest cp2 = driver.get_console_cp();
   ASSERT_EQ(123, static_cast<int32_t>(cp2.error().native_as<ConsoleError>()->code()));
-
-  ASSERT_F_TRUE(driver.join(NULL));
 }
 
-MULTITEST(agent, native_set_cp, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(native_set_cp) {
   CodePageBackend backend;
-  DriverManager driver;
-  driver.set_backend(&backend);
-  configure_driver(&driver, use_real);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   backend.input = response_t<uint32_t>::of(82723);
   DriverRequest cp0 = driver.get_console_cp();
@@ -152,18 +169,11 @@ MULTITEST(agent, native_set_cp, bool, use_real, ("real", true), ("simul", false)
   DriverRequest cp1 = driver.set_console_cp(54643);
   ASSERT_TRUE(cp1->bool_value());
   ASSERT_EQ(54643, backend.input.value());
-
-  ASSERT_F_TRUE(driver.join(NULL));
 }
 
-MULTITEST(agent, native_set_output_cp, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(native_set_output_cp) {
   CodePageBackend backend;
-  DriverManager driver;
-  driver.set_backend(&backend);
-  configure_driver(&driver, use_real);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   backend.output = response_t<uint32_t>::of(534);
   backend.input = response_t<uint32_t>::of(653);
@@ -180,9 +190,6 @@ MULTITEST(agent, native_set_output_cp, bool, use_real, ("real", true), ("simul",
   ASSERT_EQ(443, cp3->integer_value());
   DriverRequest cp4 = driver.get_console_cp();
   ASSERT_EQ(653, cp4->integer_value());
-
-
-  ASSERT_F_TRUE(driver.join(NULL));
 }
 
 class TitleBackend : public BasicConsoleBackend {
@@ -245,14 +252,9 @@ static tclib::Blob as_blob(Variant var) {
   return tclib::Blob(var.blob_data(), var.blob_size());
 }
 
-MULTITEST(agent, native_set_title_noconv, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(native_set_title_noconv) {
   TitleBackend backend;
-  DriverManager driver;
-  configure_driver(&driver, use_real);
-  driver.set_backend(&backend);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   backend.set_title("First");
   ASSERT_STREQ(new_c_string("First"), backend.c_str());
@@ -283,18 +285,11 @@ MULTITEST(agent, native_set_title_noconv, bool, use_real, ("real", true), ("simu
 
   DriverRequest gt3 = driver.get_console_title_w(256);
   ASSERT_BLOBEQ(StringUtils::as_blob(fourth), as_blob(*gt3));
-
-  ASSERT_F_TRUE(driver.join(NULL));
 }
 
-MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(set_std_modes) {
   BasicConsoleBackend backend;
-  DriverManager driver;
-  configure_driver(&driver, use_real);
-  driver.set_backend(&backend);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   DriverRequest gsh0 = driver.get_std_handle(conprx::kStdInputHandle);
   Handle input = *gsh0->native_as<Handle>();
@@ -303,8 +298,6 @@ MULTITEST(agent, set_std_modes, bool, use_real, ("real", true), ("simul", false)
 
   ASSERT_TRUE(driver.set_console_mode(input, 0xF00B00)->bool_value());
   ASSERT_EQ(0xF00B00, driver.get_console_mode(input)->integer_value());
-
-  ASSERT_F_TRUE(driver.join(NULL));
 }
 
 class InfoBackend : public BasicConsoleBackend {
@@ -333,14 +326,9 @@ response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
   return response_t<bool_t>::yes();
 }
 
-MULTITEST(agent, get_info, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
+AGENT_TEST(get_info) {
   InfoBackend backend;
-  DriverManager driver;
-  configure_driver(&driver, use_real);
-  driver.set_backend(&backend);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   DriverRequest gsh0 = driver.get_std_handle(conprx::kStdOutputHandle);
   Handle output = *gsh0->native_as<Handle>();
@@ -377,8 +365,57 @@ MULTITEST(agent, get_info, bool, use_real, ("real", true), ("simul", false)) {
   ASSERT_TRUE(i1->bFullscreenSupported);
   for (size_t i = 0; i < 16; i++)
     ASSERT_EQ(0x0DECADE0 + i, i1->ColorTable[i]);
+}
 
-  ASSERT_F_TRUE(driver.join(NULL));
+class WriteConsoleBackend : public BasicConsoleBackend {
+public:
+  WriteConsoleBackend() : last_written(ucs16_empty()) { }
+  ~WriteConsoleBackend() { ucs16_default_delete(last_written); }
+  response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode);
+  ucs16_t last_written;
+};
+
+response_t<uint32_t> WriteConsoleBackend::write_console(Handle output,
+    tclib::Blob data, bool is_unicode) {
+  ucs16_default_delete(last_written);
+  last_written = blob_to_ucs16(data, is_unicode);
+  return response_t<uint32_t>::of(static_cast<uint32_t>(data.size()));
+}
+
+AGENT_TEST(write_console_aw) {
+  WriteConsoleBackend backend;
+  AGENT_TEST_PREAMBLE(&backend, use_real);
+
+  DriverRequest gsh0 = driver.get_std_handle(conprx::kStdOutputHandle);
+  Handle output = *gsh0->native_as<Handle>();
+  ASSERT_EQ(0, backend.last_written.length);
+
+  ansi_char_t ansi_chars[256];
+  wide_char_t wide_chars[256];
+  for (size_t i = 0; i < 255; i++) {
+    ansi_char_t c = static_cast<ansi_char_t>('A' + (i % 26));
+    ansi_chars[i] = c;
+    wide_chars[i] = c;
+  }
+  wide_chars[255] = ansi_chars[255] = 0;
+
+  for (size_t i = 0; i < 255; i += 13) {
+    size_t wide_size = i * sizeof(wide_char_t);
+    DriverRequest wca0 = driver.write_console_a(output, tclib::Blob(ansi_chars, i));
+    ASSERT_EQ(i, wca0->integer_value());
+    ASSERT_EQ(i, backend.last_written.length);
+    ASSERT_BLOBEQ(tclib::Blob(backend.last_written.chars, wide_size),
+        tclib::Blob(wide_chars, wide_size));
+  }
+
+  for (size_t i = 0; i < 255; i += 17) {
+    size_t wide_size = i * sizeof(wide_char_t);
+    DriverRequest wcw0 = driver.write_console_w(output, tclib::Blob(wide_chars, wide_size));
+    ASSERT_EQ(i, wcw0->integer_value());
+    ASSERT_EQ(i, backend.last_written.length);
+    ASSERT_BLOBEQ(tclib::Blob(backend.last_written.chars, wide_size),
+        tclib::Blob(wide_chars, wide_size));
+  }
 }
 
 // A backend that fails on *everything*. Don't forget to add a test when you
@@ -394,6 +431,7 @@ public:
   response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
   response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_infoex_t *info_out) { return fail<bool_t>(); }
+  response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();
@@ -406,10 +444,10 @@ private:
 };
 
 uint32_t FailingConsoleBackend::gen_error() {
-  uint32_t result = a_;
+  uint32_t old_a = a_;
   a_ = b_;
-  b_ = result + a_;
-  return result;
+  b_ = old_a + (a_ / 2);
+  return old_a;
 }
 
 static int64_t get_last_error(const DriverRequest &request) {
@@ -420,44 +458,40 @@ static int64_t get_last_error(const DriverRequest &request) {
   return error.native_as<ConsoleError>()->code();
 }
 
-MULTITEST(agent, failures, bool, use_real, ("real", true), ("simul", false)) {
-  SKIP_IF_UNSUPPORTED(use_real);
-  FailingConsoleBackend backend(4, 7);
-  DriverManager driver;
-  configure_driver(&driver, use_real);
-  driver.set_backend(&backend);
-  ASSERT_F_TRUE(driver.start());
-  ASSERT_F_TRUE(driver.connect());
+AGENT_TEST(failures) {
+  FailingConsoleBackend backend(3, 4);
+  AGENT_TEST_PREAMBLE(&backend, use_real);
 
   // In the simulated version the values from the backend. In the real version
   // it's the negated arguments. In both cases the values are the same.
+  ASSERT_EQ(3, get_last_error(driver.poke_backend(-3)));
   ASSERT_EQ(4, get_last_error(driver.poke_backend(-4)));
-  ASSERT_EQ(7, get_last_error(driver.poke_backend(-7)));
 
   if (use_real) {
     // If we're using the real console there's no backend so we need to advance
     // it manually for the codes to match up.
+    ASSERT_EQ(3, backend.gen_error());
     ASSERT_EQ(4, backend.gen_error());
-    ASSERT_EQ(7, backend.gen_error());
   }
 
-  ASSERT_EQ(11, get_last_error(driver.get_console_cp()));
-  ASSERT_EQ(18, get_last_error(driver.get_console_output_cp()));
+  ASSERT_EQ(5, get_last_error(driver.get_console_cp()));
+  ASSERT_EQ(6, get_last_error(driver.get_console_output_cp()));
 
-  ASSERT_EQ(29, get_last_error(driver.set_console_cp(10)));
-  ASSERT_EQ(47, get_last_error(driver.set_console_output_cp(10)));
+  ASSERT_EQ(8, get_last_error(driver.set_console_cp(10)));
+  ASSERT_EQ(10, get_last_error(driver.set_console_output_cp(10)));
 
-  ASSERT_EQ(76, get_last_error(driver.get_console_title_a(1)));
-  ASSERT_EQ(123, get_last_error(driver.set_console_title_a("foo")));
+  ASSERT_EQ(13, get_last_error(driver.get_console_title_a(1)));
+  ASSERT_EQ(16, get_last_error(driver.set_console_title_a("foo")));
   Handle dummy_handle(10);
-  ASSERT_EQ(199, get_last_error(driver.get_console_mode(dummy_handle)));
-  ASSERT_EQ(322, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
+  ASSERT_EQ(21, get_last_error(driver.get_console_mode(dummy_handle)));
+  ASSERT_EQ(26, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
 
-  ASSERT_EQ(521, get_last_error(driver.get_console_screen_buffer_info(dummy_handle)));
+  ASSERT_EQ(34, get_last_error(driver.get_console_screen_buffer_info(dummy_handle)));
 
   const wide_char_t wide_foo[] = {'f', 'o', 'o', 0};
-  ASSERT_EQ(843, get_last_error(driver.get_console_title_w(1)));
-  ASSERT_EQ(1364, get_last_error(driver.set_console_title_w(wide_foo)));
+  ASSERT_EQ(43, get_last_error(driver.get_console_title_w(1)));
+  ASSERT_EQ(55, get_last_error(driver.set_console_title_w(wide_foo)));
 
-  ASSERT_F_TRUE(driver.join(NULL));
+  ASSERT_EQ(70, get_last_error(driver.write_console_a(dummy_handle, StringUtils::as_blob("Foo"))));
+  ASSERT_EQ(90, get_last_error(driver.write_console_w(dummy_handle, StringUtils::as_blob(wide_foo))));
 }

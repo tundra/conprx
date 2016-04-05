@@ -49,10 +49,16 @@ handle_t DummyConsoleFrontend::get_std_handle(dword_t n) {
   return reinterpret_cast<handle_t>(result);
 }
 
-bool_t DummyConsoleFrontend::write_console_a(handle_t console_output, const void *buffer,
+bool_t DummyConsoleFrontend::write_console_a(handle_t output, const void *buffer,
     dword_t chars_to_write, dword_t *chars_written, void *reserved) {
-  *chars_written = chars_to_write;
-  return true;
+  *chars_written = 0;
+  return false;
+}
+
+bool_t DummyConsoleFrontend::write_console_w(handle_t output, const void *buffer,
+    dword_t chars_to_write, dword_t *chars_written, void *reserved) {
+  *chars_written = 0;
+  return false;
 }
 
 static size_t min_size(size_t a, size_t b) {

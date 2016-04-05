@@ -75,7 +75,7 @@ class ConsoleAdaptor;
     (handle_t console_handle, dword_t mode),                                   \
     (console_handle, mode))
 #define sigWriteConsoleA(F) F(bool_t,                                          \
-    (handle_t console_output, const void *buffer, dword_t chars_to_write,      \
+    (handle_t output, const void *buffer, dword_t chars_to_write,              \
      dword_t *chars_written, void *reserved),                                  \
     (console_output, buffer, chars_to_write, chars_written, reserved))
 #define sigWriteConsoleW(F) F(bool_t,                                          \
@@ -92,9 +92,6 @@ class ConsoleAdaptor;
     (console_output, buffer, buffer_size, buffer_coord, write_region))
 
 #define psigInt64(F) F(_, (int64_t n), (n))
-#define psigWriteConsoleA(F) F(_,                                              \
-    (Handle console_output, const char *string, int64_t chars_to_write),       \
-    (console_output, string, chars_to_write))
 #define psigAnsiCStr(F) F(_, (ansi_cstr_t str), (str))
 #define psigWideCStr(F) F(_, (wide_cstr_t str), (str))
 #define psigVoid(F) F(_, (), ())
@@ -103,6 +100,7 @@ class ConsoleAdaptor;
     (Handle console_handle, uint32_t mode),                                    \
     (console_handle, mode))
 #define psigHandle(F) F(_, (Handle handle), (handle))
+#define psigHandleBlob(F) F(_, (Handle output, tclib::Blob data), (output, data))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -113,7 +111,8 @@ class ConsoleAdaptor;
 //  CamelName                   underscore_name                 (Or) sigSignature                   psigProxySignature
 #define FOR_EACH_CONAPI_FUNCTION(F)                                                                                               \
   F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigInt64)             \
-  F(WriteConsoleA,                write_console_a,                   (X), sigWriteConsoleA,                psigWriteConsoleA)     \
+  F(WriteConsoleA,                write_console_a,                   (X), sigWriteConsoleA,                psigHandleBlob)        \
+  F(WriteConsoleW,                write_console_w,                   (X), sigWriteConsoleW,                psigHandleBlob)        \
   F(GetConsoleTitleA,             get_console_title_a,               (X), sigAnsiStrDwordToDWord,          psigInt64)             \
   F(SetConsoleTitleA,             set_console_title_a,               (X), sigAnsiCStrToBool,               psigAnsiCStr)          \
   F(GetConsoleTitleW,             get_console_title_w,               (X), sigWideStrDWordToDWord,          psigInt64)             \

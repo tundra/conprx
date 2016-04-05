@@ -35,9 +35,14 @@ handle_t WindowsConsoleFrontend::get_std_handle(dword_t handle) {
   return GetStdHandle(handle);
 }
 
-bool_t WindowsConsoleFrontend::write_console_a(handle_t console_output, const void *buffer,
+bool_t WindowsConsoleFrontend::write_console_a(handle_t output, const void *buffer,
     dword_t chars_to_write, dword_t *chars_written, void *reserved) {
-  return WriteConsoleA(console_output, buffer, chars_to_write, chars_written, reserved);
+  return WriteConsoleA(output, buffer, chars_to_write, chars_written, reserved);
+}
+
+bool_t WindowsConsoleFrontend::write_console_w(handle_t output, const void *buffer,
+    dword_t chars_to_write, dword_t *chars_written, void *reserved) {
+  return WriteConsoleW(output, buffer, chars_to_write, chars_written, reserved);
 }
 
 dword_t WindowsConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n) {

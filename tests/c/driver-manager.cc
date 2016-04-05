@@ -62,10 +62,14 @@ Variant DriverRequest::get_std_handle(int64_t n_std_handle) {
   return send("get_std_handle", n_std_handle);
 }
 
-Variant DriverRequest::write_console_a(Handle console_output, const char *string,
-    int64_t chars_to_write) {
-  return send("write_console_a", factory()->new_native(&console_output),
-      string, chars_to_write);
+Variant DriverRequest::write_console_a(Handle output, tclib::Blob data) {
+  return send("write_console_a", factory()->new_native(&output),
+      Variant::blob(data.start(), static_cast<uint32_t>(data.size())));
+}
+
+Variant DriverRequest::write_console_w(Handle output, tclib::Blob data) {
+  return send("write_console_w", factory()->new_native(&output),
+      Variant::blob(data.start(), static_cast<uint32_t>(data.size())));
 }
 
 Variant DriverRequest::get_console_title_a(int64_t bufsize) {

@@ -33,6 +33,9 @@ public:
   uint32_t get_console_cp(bool is_output);
   bool_t set_console_cp(uint32_t value, bool is_output);
 
+  bool_t write_console_aw(handle_t output, const void *buffer, dword_t chars_to_write,
+      dword_t *chars_written, bool is_unicode);
+
   virtual NtStatus get_last_error();
 
   virtual int64_t poke_backend(int64_t value);
@@ -79,11 +82,6 @@ handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n) {
   } else {
     return reinterpret_cast<handle_t>(IF_32_BIT(-1, -1LL));
   }
-}
-
-bool_t SimulatingConsoleFrontend::write_console_a(handle_t console_output, const void *buffer,
-    dword_t chars_to_write, dword_t *chars_written, void *reserved) {
-  return false;
 }
 
 // Static mapping from message keys to some types and functions it's convenient
@@ -221,6 +219,38 @@ dword_t SimulatingConsoleFrontend::get_console_title_w(wide_str_t str, dword_t n
   agent()->on_message(message.message());
   update_last_error(&message);
   return payload->length_in_chars_out;
+}
+
+bool_t SimulatingConsoleFrontend::write_console_a(handle_t output, const void *buffer,
+    dword_t chars_to_write, dword_t *chars_written, void *reserved) {
+  return write_console_aw(output, buffer, chars_to_write, chars_written, false);
+}
+
+bool_t SimulatingConsoleFrontend::write_console_w(handle_t output, const void *buffer,
+    dword_t chars_to_write, dword_t *chars_written, void *reserved) {
+  return write_console_aw(output, buffer, chars_to_write, chars_written, true);
+}
+
+bool_t SimulatingConsoleFrontend::write_console_aw(handle_t output, const void *buffer,
+    dword_t chars_to_write, dword_t *chars_written, bool is_unicode) {
+  SimulatedMessage<ConsoleAgent::lmWriteConsole> message(this);
+  lpc::write_console_m *payload = message.payload();
+  size_t char_size = is_unicode ? sizeof(wide_char_t) : 1;
+  size_t size_in_bytes = chars_to_write * char_size;
+  payload->output = output;
+  payload->size_in_bytes = static_cast<uint32_t>(size_in_bytes);
+  payload->is_unicode = is_unicode;
+  if (size_in_bytes <= lpc::kMaxInlineBytes) {
+    payload->is_inline = true;
+    payload->contents = const_cast<void*>(buffer);
+  } else {
+    payload->is_inline = false;
+    payload->contents = const_cast<void*>(xform().local_to_remote(buffer));
+  }
+  agent()->on_message(message.message());
+  if (chars_written != NULL)
+    *chars_written = static_cast<dword_t>(payload->size_in_bytes / char_size);
+  return update_last_error(&message);
 }
 
 bool_t SimulatingConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {

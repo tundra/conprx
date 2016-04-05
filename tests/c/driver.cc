@@ -117,12 +117,24 @@ void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCall
 
 void ConsoleFrontendService::write_console_a(rpc::RequestData *data, ResponseCallback callback) {
   handle_t output = data->argument(0).native_as<Handle>()->ptr();
-  const char *buffer = data->argument(1).string_chars();
-  dword_t chars_to_write = to_dword(data->argument(2));
+  plankton::Blob pblob = data->argument(1);
+  ansi_cstr_t buffer = static_cast<ansi_cstr_t>(pblob.blob_data());
+  dword_t chars_to_write = pblob.blob_size();
   dword_t chars_written = 0;
   if (!frontend()->write_console_a(output, buffer, chars_to_write, &chars_written, NULL))
     return fail_request(data, callback);
-  callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
+  callback(rpc::OutgoingResponse::success(chars_written));
+}
+
+void ConsoleFrontendService::write_console_w(rpc::RequestData *data, ResponseCallback callback) {
+  handle_t output = data->argument(0).native_as<Handle>()->ptr();
+  plankton::Blob pblob = data->argument(1);
+  wide_cstr_t buffer = static_cast<wide_cstr_t>(pblob.blob_data());
+  dword_t chars_to_write = static_cast<dword_t>(pblob.blob_size() / sizeof(wide_char_t));
+  dword_t chars_written = 0;
+  if (!frontend()->write_console_w(output, buffer, chars_to_write, &chars_written, NULL))
+    return fail_request(data, callback);
+  callback(rpc::OutgoingResponse::success(chars_written));
 }
 
 void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {

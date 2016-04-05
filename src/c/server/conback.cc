@@ -178,6 +178,11 @@ response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
   return response_t<bool_t>::yes();
 }
 
+response_t<uint32_t> BasicConsoleBackend::write_console(Handle output,
+    tclib::Blob data, bool is_unicode) {
+  return response_t<uint32_t>::error(101);
+}
+
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
   TextWriter writer;
   writer.write(data->argument(0));
@@ -255,6 +260,20 @@ void ConsoleBackendService::on_get_console_title(rpc::RequestData *data, Respons
     pair.add(result.value());
     resp(rpc::OutgoingResponse::success(pair));
   }
+}
+
+void ConsoleBackendService::on_write_console(rpc::RequestData *data, ResponseCallback resp) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
+  plankton::Blob pchars = data->argument(1);
+  tclib::Blob chars(pchars.data(), pchars.size());
+  bool is_unicode = data->argument(2).bool_value();
+  forward_response(backend()->write_console(*handle, chars, is_unicode), resp);
+}
+
+void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCallback resp) {
+  resp(rpc::OutgoingResponse::failure(10002));
 }
 
 void ConsoleBackendService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {

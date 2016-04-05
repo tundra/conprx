@@ -125,6 +125,24 @@ NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
   return NtStatus::success();
 }
 
+NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
+    lpc::write_console_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  void *start = payload->is_inline
+      ? payload->contents
+      : req->xform().remote_to_local(payload->contents);
+  tclib::Blob blob(start, payload->size_in_bytes);
+  response_t<uint32_t> resp = connector()->write_console(payload->output, blob,
+      payload->is_unicode);
+  req->set_return_value(NtStatus::from_response(resp));
+  return NtStatus::success();
+}
+
+NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
+    lpc::read_console_m *payload) {
+  return req->send_to_backend();
+}
+
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
   return connector()->poke(value);
 }
@@ -261,6 +279,19 @@ response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
     return response_t<bool_t>::error(CONPRX_ERROR_INVALID_RESPONSE);
   *info_out = *info;
   return response_t<bool_t>::yes();
+}
+
+response_t<uint32_t> PrpcConsoleConnector::write_console(Handle output,
+    tclib::Blob data, bool is_unicode) {
+  rpc::OutgoingRequest req(Variant::null(), "write_console");
+  Variant args[3] = {
+    req.factory()->new_native(&output),
+    Variant::blob(data.start(), static_cast<uint32_t>(data.size())),
+    Variant::boolean(is_unicode)
+  };
+  req.set_arguments(3, args);
+  rpc::IncomingResponse resp;
+  return send_request_default<uint32_t>(&req, &resp);
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

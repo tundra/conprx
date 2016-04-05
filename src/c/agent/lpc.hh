@@ -301,6 +301,26 @@ struct get_console_cp_m {
 
 typedef get_console_cp_m set_console_cp_m;
 
+// The max number of bytes we're willing to transport inline in write messages.
+static const size_t kMaxInlineBytes = 80;
+
+struct write_console_m {
+  handle_t output;
+  union {
+    uint8_t inline_ansi_buffer[kMaxInlineBytes];
+    uint16_t inline_wide_buffer[kMaxInlineBytes / sizeof(uint16_t)];
+  };
+  void *contents;
+  uint32_t size_in_bytes;
+  void *padding_1;
+  bool is_inline;
+  bool is_unicode;
+  bool padding_2;
+  int32_t unused_3;
+};
+
+struct read_console_m { };
+
 struct message_data_header_t {
   capture_buffer_data_t *capture_buffer;
   uint32_t api_number;
