@@ -237,7 +237,8 @@ void ConsoleFrontendService::get_console_screen_buffer_info(rpc::RequestData *da
   struct_zero_fill(*info);
   if (!frontend()->get_console_screen_buffer_info(handle->ptr(), info))
     return fail_request(data, callback);
-  return callback(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
+  NativeVariant info_var(info);
+  return callback(rpc::OutgoingResponse::success(info_var));
 }
 
 void ConsoleFrontendService::get_console_screen_buffer_info_ex(rpc::RequestData *data,
@@ -250,7 +251,8 @@ void ConsoleFrontendService::get_console_screen_buffer_info_ex(rpc::RequestData 
   info->cbSize = sizeof(*info);
   if (!frontend()->get_console_screen_buffer_info_ex(handle->ptr(), info))
     return fail_request(data, callback);
-  return callback(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
+  NativeVariant info_var(info);
+  return callback(rpc::OutgoingResponse::success(info_var));
 }
 
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {

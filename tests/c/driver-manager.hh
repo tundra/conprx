@@ -70,6 +70,9 @@ private:
     : is_used_(false)
     , manager_(connection) { }
 
+  // Returns a blob variant corresponding to the given blob.
+  Variant from_blob(tclib::Blob blob);
+
   Variant send(Variant selector);
   Variant send(Variant selector, Variant arg0);
   Variant send(Variant selector, Variant arg0, Variant arg1);

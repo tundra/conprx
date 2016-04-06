@@ -249,30 +249,27 @@ response_t<uint32_t> PrpcConsoleConnector::get_console_title(tclib::Blob buffer,
   return response_t<uint32_t>::of(return_value);
 }
 
-response_t<uint32_t> PrpcConsoleConnector::get_console_mode(handle_t raw_handle) {
-  rpc::OutgoingRequest req(Variant::null(), "get_console_mode");
-  Handle handle(raw_handle);
-  Variant args[1] = {req.factory()->new_native(&handle)};
-  req.set_arguments(1, args);
+response_t<uint32_t> PrpcConsoleConnector::get_console_mode(Handle handle) {
+  NativeVariant handle_var(&handle);
+  rpc::OutgoingRequest req(Variant::null(), "get_console_mode", 1, &handle_var);
   rpc::IncomingResponse resp;
   return send_request_default<uint32_t>(&req, &resp);
 }
 
-response_t<bool_t> PrpcConsoleConnector::set_console_mode(handle_t raw_handle,
+response_t<bool_t> PrpcConsoleConnector::set_console_mode(Handle handle,
     uint32_t mode) {
-  rpc::OutgoingRequest req(Variant::null(), "set_console_mode");
-  Handle handle(raw_handle);
-  Variant args[2] = {req.factory()->new_native(&handle), mode};
-  req.set_arguments(2, args);
+  NativeVariant handle_var(&handle);
+  Variant args[2] = {handle_var, mode};
+  rpc::OutgoingRequest req(Variant::null(), "set_console_mode", 2, args);
   rpc::IncomingResponse resp;
   return send_request_default<bool_t>(&req, &resp);
 }
 
 response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
     Handle buffer, console_screen_buffer_infoex_t *info_out) {
-  rpc::OutgoingRequest req(Variant::null(), "get_console_screen_buffer_info");
-  Variant args[1] = {req.factory()->new_native(&buffer)};
-  req.set_arguments(1, args);
+  NativeVariant buffer_var(&buffer);
+  rpc::OutgoingRequest req(Variant::null(), "get_console_screen_buffer_info",
+      1, &buffer_var);
   rpc::IncomingResponse resp;
   response_t<Variant> result = send_request_default<Variant>(&req, &resp);
   if (result.has_error())
@@ -286,13 +283,13 @@ response_t<bool_t> PrpcConsoleConnector::get_console_screen_buffer_info(
 
 response_t<uint32_t> PrpcConsoleConnector::write_console(Handle output,
     tclib::Blob data, bool is_unicode) {
-  rpc::OutgoingRequest req(Variant::null(), "write_console");
+  NativeVariant output_var(&output);
   Variant args[3] = {
-    req.factory()->new_native(&output),
+    output_var,
     Variant::blob(data.start(), static_cast<uint32_t>(data.size())),
     Variant::boolean(is_unicode)
   };
-  req.set_arguments(3, args);
+  rpc::OutgoingRequest req(Variant::null(), "write_console", 3, args);
   rpc::IncomingResponse resp;
   return send_request_default<uint32_t>(&req, &resp);
 }

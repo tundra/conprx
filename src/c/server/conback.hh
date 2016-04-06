@@ -154,6 +154,10 @@ private:
   // passed through to the implementation.
   void on_poke(plankton::rpc::RequestData*, ResponseCallback);
 
+  // Returns a blob corresponding to the given blob variant. If the variant is
+  // not a plankton blob the empty blob will be returned.
+  static tclib::Blob to_blob(Variant value);
+
 #define __GEN_HANDLER__(Name, name, DLL, API)                                  \
   void on_##name(plankton::rpc::RequestData*, ResponseCallback);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)

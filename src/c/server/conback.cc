@@ -263,13 +263,15 @@ void ConsoleBackendService::on_get_console_title(rpc::RequestData *data, Respons
   }
 }
 
+tclib::Blob ConsoleBackendService::to_blob(Variant value) {
+  return tclib::Blob(value.blob_data(), value.blob_size());
+}
+
 void ConsoleBackendService::on_write_console(rpc::RequestData *data, ResponseCallback resp) {
   Handle *handle = data->argument(0).native_as<Handle>();
   if (handle == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  // TODO: make a helper for converting blobs, this is getting tedious.
-  plankton::Blob pchars = data->argument(1);
-  tclib::Blob chars(pchars.data(), pchars.size());
+  tclib::Blob chars = to_blob(data->argument(1));
   bool is_unicode = data->argument(2).bool_value();
   forward_response(backend()->write_console(*handle, chars, is_unicode), resp);
 }
@@ -280,8 +282,7 @@ void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCall
 }
 
 void ConsoleBackendService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {
-  plankton::Blob pchars = data->argument(0);
-  tclib::Blob chars(pchars.data(), pchars.size());
+  tclib::Blob chars = to_blob(data->argument(0));
   bool is_unicode = data->argument(1).bool_value();
   forward_response(backend()->set_console_title(chars, is_unicode), resp);
 }
@@ -312,7 +313,8 @@ void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *
   if (result.has_error()) {
     return resp(rpc::OutgoingResponse::failure(result.error_code()));
   } else {
-    return resp(rpc::OutgoingResponse::success(data->factory()->new_native(info)));
+    NativeVariant info_var(info);
+    return resp(rpc::OutgoingResponse::success(info_var));
   }
 }
 

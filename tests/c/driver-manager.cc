@@ -62,14 +62,19 @@ Variant DriverRequest::get_std_handle(int64_t n_std_handle) {
   return send("get_std_handle", n_std_handle);
 }
 
+Variant DriverRequest::from_blob(tclib::Blob blob) {
+  return Variant::blob(blob.start(), static_cast<uint32_t>(blob.size()));
+}
+
+
 Variant DriverRequest::write_console_a(Handle output, tclib::Blob data) {
-  return send("write_console_a", factory()->new_native(&output),
-      Variant::blob(data.start(), static_cast<uint32_t>(data.size())));
+  NativeVariant output_var(&output);
+  return send("write_console_a", output_var, from_blob(data));
 }
 
 Variant DriverRequest::write_console_w(Handle output, tclib::Blob data) {
-  return send("write_console_w", factory()->new_native(&output),
-      Variant::blob(data.start(), static_cast<uint32_t>(data.size())));
+  NativeVariant output_var(&output);
+  return send("write_console_w", output_var, from_blob(data));
 }
 
 Variant DriverRequest::get_console_title_a(int64_t bufsize) {
@@ -78,8 +83,7 @@ Variant DriverRequest::get_console_title_a(int64_t bufsize) {
 
 Variant DriverRequest::set_console_title_a(ansi_cstr_t string) {
   tclib::Blob blob = StringUtils::as_blob(string, true);
-  return send("set_console_title_a", Variant::blob(blob.start(),
-      static_cast<uint32_t>(blob.size())));
+  return send("set_console_title_a", from_blob(blob));
 }
 
 Variant DriverRequest::get_console_title_w(int64_t bufsize) {
@@ -88,8 +92,7 @@ Variant DriverRequest::get_console_title_w(int64_t bufsize) {
 
 Variant DriverRequest::set_console_title_w(wide_cstr_t string) {
   tclib::Blob blob = StringUtils::as_blob(string, true);
-  return send("set_console_title_w", Variant::blob(blob.start(),
-      static_cast<uint32_t>(blob.size())));
+  return send("set_console_title_w", from_blob(blob));
 }
 
 Variant DriverRequest::get_console_cp() {
@@ -109,19 +112,23 @@ Variant DriverRequest::set_console_output_cp(uint32_t value) {
 }
 
 Variant DriverRequest::get_console_mode(Handle handle) {
-  return send("get_console_mode", factory()->new_native(&handle));
+  NativeVariant handle_var(&handle);
+  return send("get_console_mode", handle_var);
 }
 
 Variant DriverRequest::set_console_mode(Handle handle, uint32_t mode) {
-  return send("set_console_mode", factory()->new_native(&handle), mode);
+  NativeVariant handle_var(&handle);
+  return send("set_console_mode", handle_var, mode);
 }
 
 Variant DriverRequest::get_console_screen_buffer_info(Handle handle) {
-  return send("get_console_screen_buffer_info", factory()->new_native(&handle));
+  NativeVariant handle_var(&handle);
+  return send("get_console_screen_buffer_info", handle_var);
 }
 
 Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
-  return send("get_console_screen_buffer_info_ex", factory()->new_native(&handle));
+  NativeVariant handle_var(&handle);
+  return send("get_console_screen_buffer_info_ex", handle_var);
 }
 
 const Variant &DriverRequest::operator*() {

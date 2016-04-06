@@ -31,12 +31,13 @@ TEST(driver, simple) {
 
   DriverRequest call2 = driver.new_request();
   Handle out(54234);
-  Handle *in = call2.echo(call2.factory()->new_native(&out)).native_as(Handle::seed_type());
+  NativeVariant out_var(&out);
+  Handle *in = call2.echo(out_var).native_as(Handle::seed_type());
   ASSERT_TRUE(in != NULL);
   ASSERT_EQ(54234, in->id());
 
   DriverRequest call3 = driver.new_request();
-  ASSERT_TRUE(call3.is_handle(call3.factory()->new_native(&out)) == Variant::yes());
+  ASSERT_TRUE(call3.is_handle(out_var) == Variant::yes());
 
   DriverRequest call4 = driver.is_handle(100);
   ASSERT_TRUE(*call4 == Variant::no());

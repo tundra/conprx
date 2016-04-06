@@ -54,10 +54,9 @@ void LogEntry::init(plankton::Seed payload, plankton::Factory *factory) {
 }
 
 bool StreamingLog::record(log_entry_t *entry) {
-  rpc::OutgoingRequest req(Variant::null(), "log");
   LogEntry entry_data(entry);
-  Native entry_var = req.factory()->new_native(&entry_data);
-  req.set_arguments(1, &entry_var);
+  NativeVariant entry_var(&entry_data);
+  rpc::OutgoingRequest req(Variant::null(), "log", 1, &entry_var);
   rpc::IncomingResponse resp = out_->socket()->send_request(&req);
   while (!resp->is_settled())
     out_->input()->process_next_instruction(NULL);
