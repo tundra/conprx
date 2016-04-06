@@ -302,6 +302,8 @@ struct get_console_cp_m {
 typedef get_console_cp_m set_console_cp_m;
 
 // The max number of bytes we're willing to transport inline in write messages.
+// This is the size that makes the struct's size match up with what we receive
+// from the windows console api.
 static const size_t kMaxInlineBytes = 80;
 
 struct write_console_m {

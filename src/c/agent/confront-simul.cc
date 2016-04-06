@@ -33,6 +33,7 @@ public:
   uint32_t get_console_cp(bool is_output);
   bool_t set_console_cp(uint32_t value, bool is_output);
 
+  // Does the writing for both versions of write_console.
   bool_t write_console_aw(handle_t output, const void *buffer, dword_t chars_to_write,
       dword_t *chars_written, bool is_unicode);
 
@@ -240,6 +241,9 @@ bool_t SimulatingConsoleFrontend::write_console_aw(handle_t output, const void *
   payload->output = output;
   payload->size_in_bytes = static_cast<uint32_t>(size_in_bytes);
   payload->is_unicode = is_unicode;
+  // We could skip this special case here and always pass the buffer non-inline,
+  // the rest of the implementation doesn't care, but this way we're sure the
+  // inline case in the implementation gets exercised in the tests.
   if (size_in_bytes <= lpc::kMaxInlineBytes) {
     payload->is_inline = true;
     payload->contents = const_cast<void*>(buffer);

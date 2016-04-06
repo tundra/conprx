@@ -128,6 +128,8 @@ NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
 NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
     lpc::write_console_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  // It seems like it would be simpler to always transform the contents field
+  // regardless of where the contents were stored but that's not how it works.
   void *start = payload->is_inline
       ? payload->contents
       : req->xform().remote_to_local(payload->contents);
@@ -140,6 +142,7 @@ NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
 
 NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
     lpc::read_console_m *payload) {
+  // TODO: implement.
   return req->send_to_backend();
 }
 

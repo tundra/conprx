@@ -441,6 +441,8 @@ private:
 };
 
 uint32_t FailingConsoleBackend::gen_error() {
+  // This used to be the Fibonacci sequence but it grew too fast since we need
+  // the values to fit in 16 bits. This grows more slowly.
   uint32_t old_a = a_;
   a_ = b_;
   b_ = old_a + (a_ / 2);
