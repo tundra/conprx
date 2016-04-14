@@ -39,6 +39,7 @@ public:
 private:
   def_ref_t<ConsoleConnector> connector_;
   def_ref_t<ConsoleAdaptor> adaptor_;
+  def_ref_t<ConsolePlatform> platform_;
 
   lpc::Interceptor interceptor_;
   lpc::Interceptor *interceptor() { return &interceptor_; }
@@ -117,7 +118,8 @@ fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
   }
   agent_out_ = tclib::InOutStream::from_raw_handle(agent_out_handle);
 
-  F_TRY(install_agent(agent_in(), agent_out()));
+  platform_ = ConsolePlatform::create();
+  F_TRY(install_agent(agent_in(), agent_out(), *platform_));
 
   connector_ = PrpcConsoleConnector::create(owner()->socket(), owner()->input());
   adaptor_ = new (kDefaultAlloc) ConsoleAdaptor(*connector_);

@@ -45,7 +45,7 @@ TempBuffer<T>::~TempBuffer() {
 // A service wrapping a console frontend.
 class ConsoleFrontendService : public rpc::Service {
 public:
-  ConsoleFrontendService(ConsoleFrontend *console);
+  ConsoleFrontendService(ConsoleFrontend *frontend, ConsolePlatform *platform);
 
 #define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
   void name(rpc::RequestData *data, ResponseCallback callback);
@@ -57,6 +57,8 @@ public:
 
   // Returns the frontend we delegate everything to.
   ConsoleFrontend *frontend() { return frontend_; }
+
+  ConsolePlatform *platform() { return platform_; }
 
 private:
   // Captures the last error and wraps it in a console error.
@@ -70,10 +72,13 @@ private:
   static dword_t to_dword(Variant value);
 
   ConsoleFrontend *frontend_;
+  ConsolePlatform *platform_;
 };
 
-ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *console)
-  : frontend_(console) {
+ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *frontend,
+    ConsolePlatform *platform)
+  : frontend_(frontend)
+  , platform_(platform) {
 #define __REG_DRIVER_BY_NAME__(name, SIG, ARGS)                                \
   register_method(#name, new_callback(&ConsoleFrontendService::name, this));
   FOR_EACH_REMOTE_MESSAGE(__REG_DRIVER_BY_NAME__)
@@ -111,7 +116,7 @@ void ConsoleFrontendService::poke_backend(rpc::RequestData *data, ResponseCallba
 
 void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCallback callback) {
   dword_t n_std_handle = to_dword(data->argument(0));
-  handle_t handle = frontend()->get_std_handle(n_std_handle);
+  handle_t handle = platform()->get_std_handle(n_std_handle);
   callback(rpc::OutgoingResponse::success(wrap_handle(handle, data->factory())));
 }
 
@@ -344,6 +349,7 @@ private:
   bool use_fake_agent() { return !string_is_empty(fake_agent_channel_name_); }
   def_ref_t<FakeConsoleAgent> fake_agent_;
   FakeConsoleAgent *fake_agent() { return *fake_agent_; }
+  def_ref_t<ConsolePlatform> platform_;
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
@@ -410,8 +416,9 @@ bool ConsoleDriverMain::install_fake_agent() {
   if (!use_fake_agent())
     // There is no fake agent so this trivially succeeds.
     return true;
+  platform_ = ConsolePlatform::create();
   return fake_agent()->install_agent(fake_agent_channel()->in(),
-      fake_agent_channel()->out());
+      fake_agent_channel()->out(), *platform_);
 }
 
 bool ConsoleDriverMain::run() {
@@ -441,7 +448,8 @@ bool ConsoleDriverMain::run() {
       frontend = ConsoleFrontend::new_simulating(fake_agent(), port_delta_);
       break;
   }
-  ConsoleFrontendService driver(*frontend);
+  def_ref_t<ConsolePlatform> conplat = ConsolePlatform::create();
+  ConsoleFrontendService driver(*frontend, *conplat);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();

@@ -22,7 +22,7 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
-  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
+  mfUnlessPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
@@ -39,14 +39,6 @@ DummyConsoleFrontend::DummyConsoleFrontend()
 
 DummyConsoleFrontend::~DummyConsoleFrontend() {
   string_default_delete(title_);
-}
-
-handle_t DummyConsoleFrontend::get_std_handle(dword_t n) {
-  int32_t sn = static_cast<int32_t>(n);
-  ssize_t result = (-12 <= sn && sn <= -10)
-      ? sn + 18
-      : IF_32_BIT(-1, -1LL);
-  return reinterpret_cast<handle_t>(result);
 }
 
 bool_t DummyConsoleFrontend::write_console_a(handle_t output, const void *buffer,

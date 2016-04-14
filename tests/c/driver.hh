@@ -20,7 +20,7 @@ namespace conprx {
 #define FOR_EACH_REMOTE_MESSAGE(F)                                             \
   F(echo,               (Variant value),        (value))                       \
   F(is_handle,          (Variant value),        (value))                       \
-  F(raise_error,        (NtStatus last_error),   (last_error))                 \
+  F(raise_error,        (NtStatus last_error),  (last_error))                  \
   F(poke_backend,       (Variant value),        (value))
 
 enum DriverFrontendType {

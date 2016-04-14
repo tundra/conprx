@@ -45,9 +45,11 @@ enum code_page_t {
   cpUsAscii = 20127
 };
 
-static const int32_t kStdInputHandle = -10;
-static const int32_t kStdOutputHandle = -11;
-static const int32_t kStdErrorHandle = -12;
+enum standard_handle_t {
+  kStdInputHandle = -10,
+  kStdOutputHandle = -11,
+  kStdErrorHandle = -12
+};
 
 // The block of data passed through to the agent's dll connector.
 struct connect_data_t {

@@ -192,6 +192,14 @@ void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp
 }
 
 void ConsoleBackendService::on_is_ready(rpc::RequestData *data, ResponseCallback resp) {
+  Handle *stdin_handle = data->argument("stdin").native_as<Handle>();
+  Handle *stdout_handle = data->argument("stdout").native_as<Handle>();
+  Handle *stderr_handle = data->argument("stderr").native_as<Handle>();
+  if (stdin_handle == NULL || stdout_handle == NULL || stderr_handle == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
+  handles()->register_std_handle(kStdInputHandle, *stdin_handle);
+  handles()->register_std_handle(kStdOutputHandle, *stdout_handle);
+  handles()->register_std_handle(kStdErrorHandle, *stderr_handle);
   agent_is_ready_ = true;
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }

@@ -13,7 +13,7 @@ public:
   virtual void default_destroy() { default_delete_concrete(this); }
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
-  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
+  mfUnlessPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
@@ -29,10 +29,6 @@ int64_t WindowsConsoleFrontend::poke_backend(int64_t value) {
     SetLastError(-value);
     return 0;
   }
-}
-
-handle_t WindowsConsoleFrontend::get_std_handle(dword_t handle) {
-  return GetStdHandle(handle);
 }
 
 bool_t WindowsConsoleFrontend::write_console_a(handle_t output, const void *buffer,
@@ -101,4 +97,22 @@ NtStatus WindowsConsoleFrontend::get_last_error() {
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_native() {
   return new (kDefaultAlloc) WindowsConsoleFrontend();
+}
+
+class WindowsConsolePlatform : public ConsolePlatform {
+public:
+  virtual void default_destroy() { default_delete_concrete(this); }
+
+#define __DECLARE_PLATFORM_METHOD__(Name, name, FLAGS, SIG, PSIG)              \
+  mfOnlyPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_PLATFORM_METHOD__)
+#undef __DECLARE_PLATFORM_METHOD__
+};
+
+handle_t WindowsConsolePlatform::get_std_handle(dword_t id) {
+  return GetStdHandle(id);
+}
+
+pass_def_ref_t<ConsolePlatform> ConsolePlatform::new_native() {
+  return new (kDefaultAlloc) WindowsConsolePlatform();
 }

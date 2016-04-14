@@ -5,6 +5,7 @@
 #define _CONPRX_SERVER_CONBACK
 
 #include "rpc.hh"
+#include "server/handman.hh"
 #include "share/protocol.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
@@ -170,6 +171,9 @@ private:
   ConsoleBackend *backend() { return backend_; }
 
   plankton::TypeRegistry registry_;
+
+  HandleManager *handles() { return &handles_; }
+  HandleManager handles_;
 
   bool agent_is_ready_;
   bool agent_is_done_;

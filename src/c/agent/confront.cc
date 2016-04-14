@@ -14,6 +14,11 @@ END_C_INCLUDES
 
 using namespace conprx;
 using namespace plankton;
+using namespace tclib;
+
+pass_def_ref_t<ConsolePlatform> ConsolePlatform::create() {
+  return IF_MSVC(ConsolePlatform::new_native(), ConsolePlatform::new_simulating());
+}
 
 #include "confront-dummy.cc"
 

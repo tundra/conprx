@@ -65,7 +65,8 @@ bool StreamingLog::record(log_entry_t *entry) {
 
 ConsoleAgent::ConsoleAgent()
   : agent_in_(NULL)
-  , agent_out_(NULL) { }
+  , agent_out_(NULL)
+  , platform_(NULL) { }
 
 const char *ConsoleAgent::get_lpc_name(ulong_t number) {
   switch (number) {
@@ -124,9 +125,10 @@ void ConsoleAgent::trace_after(const char *name, lpc::Message *message, NtStatus
 }
 
 fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
-    tclib::OutStream *agent_out) {
+    tclib::OutStream *agent_out, ConsolePlatform *platform) {
   agent_in_ = agent_in;
   agent_out_ = agent_out;
+  platform_ = platform;
   owner_ = new (kDefaultAlloc) rpc::StreamServiceConnector(agent_in, agent_out);
   owner_->set_default_type_registry(ConsoleTypes::registry());
   if (!owner()->init(empty_callback()))
@@ -134,7 +136,7 @@ fat_bool_t ConsoleAgent::install_agent(tclib::InStream *agent_in,
   log()->set_destination(owner());
   log()->ensure_installed();
   F_TRY(install_agent_platform());
-  send_is_ready();
+  F_TRY(send_is_ready());
   return F_TRUE;
 }
 
@@ -150,13 +152,22 @@ fat_bool_t ConsoleAgent::uninstall_agent() {
 }
 
 fat_bool_t ConsoleAgent::send_is_ready() {
-  rpc::OutgoingRequest req(Variant::null(), "is_ready", 0, NULL);
+  rpc::OutgoingRequest req(Variant::null(), "is_ready");
+  Handle stdin_handle(platform()->get_std_handle(kStdInputHandle));
+  NativeVariant stdin_var(&stdin_handle);
+  req.set_argument("stdin", stdin_var);
+  Handle stdout_handle(platform()->get_std_handle(kStdOutputHandle));
+  NativeVariant stdout_var(&stdout_handle);
+  req.set_argument("stdout", stdout_var);
+  Handle stderr_handle(platform()->get_std_handle(kStdErrorHandle));
+  NativeVariant stderr_var(&stderr_handle);
+  req.set_argument("stderr", stderr_var);
   rpc::IncomingResponse resp;
   return send_request(&req, &resp);
 }
 
 fat_bool_t ConsoleAgent::send_is_done() {
-  rpc::OutgoingRequest req(Variant::null(), "is_done", 0, NULL);
+  rpc::OutgoingRequest req(Variant::null(), "is_done");
   rpc::IncomingResponse resp;
   return send_request(&req, &resp);
 }
@@ -166,6 +177,8 @@ fat_bool_t ConsoleAgent::send_request(rpc::OutgoingRequest *request,
   rpc::IncomingResponse resp = owner()->socket()->send_request(request);
   while (!resp->is_settled())
     F_TRY(owner()->input()->process_next_instruction(NULL));
+  if (resp->is_rejected())
+    return F_FALSE;
   *resp_out = resp;
   return F_TRUE;
 }

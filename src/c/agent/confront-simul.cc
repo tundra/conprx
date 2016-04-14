@@ -26,7 +26,7 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
 #define __DECLARE_CONAPI_METHOD__(Name, name, FLAGS, SIG, PSIG)                \
-  virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS);
+  mfUnlessPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_CONAPI_METHOD__)
 #undef __DECLARE_CONAPI_METHOD__
 
@@ -73,15 +73,6 @@ int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
   } else {
     last_error_ = NtStatus::success();
     return result.value();
-  }
-}
-
-handle_t SimulatingConsoleFrontend::get_std_handle(dword_t n) {
-  int32_t sn = static_cast<int32_t>(n);
-  if (-12 <= sn && sn <= -10) {
-    return reinterpret_cast<handle_t>(static_cast<size_t>(100 - sn));
-  } else {
-    return reinterpret_cast<handle_t>(IF_32_BIT(-1, -1LL));
   }
 }
 
@@ -323,4 +314,27 @@ pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAgent *ag
     ssize_t delta) {
   return new (kDefaultAlloc) SimulatingConsoleFrontend(agent,
       lpc::AddressXform(delta));
+}
+
+class SimulatingConsolePlatform : public ConsolePlatform {
+public:
+  virtual void default_destroy() { default_delete_concrete(this); }
+
+#define __DECLARE_PLATFORM_METHOD__(Name, name, FLAGS, SIG, PSIG)              \
+  mfOnlyPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
+  FOR_EACH_CONAPI_FUNCTION(__DECLARE_PLATFORM_METHOD__)
+#undef __DECLARE_PLATFORM_METHOD__
+};
+
+handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
+  int32_t sn = static_cast<int32_t>(id);
+  if (-12 <= sn && sn <= -10) {
+    return reinterpret_cast<handle_t>(static_cast<size_t>(100 - sn));
+  } else {
+    return reinterpret_cast<handle_t>(IF_32_BIT(-1, -1LL));
+  }
+}
+
+pass_def_ref_t<ConsolePlatform> ConsolePlatform::new_simulating() {
+  return new (kDefaultAlloc) SimulatingConsolePlatform();
 }

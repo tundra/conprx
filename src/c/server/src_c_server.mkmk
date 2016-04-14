@@ -10,6 +10,7 @@ def build_object(filename):
 
 files = [
   "conback.cc",
+  "handman.cc",
   "launch.cc",
 ]
 

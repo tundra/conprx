@@ -132,7 +132,8 @@ public:
   static const int cSuccess = 0x0;
 
   // Install this agent.
-  fat_bool_t install_agent(tclib::InStream *agent_in, tclib::OutStream *agent_out);
+  fat_bool_t install_agent(tclib::InStream *agent_in, tclib::OutStream *agent_out,
+      ConsolePlatform *platform);
 
   // Remove this agent.
   fat_bool_t uninstall_agent();
@@ -181,6 +182,9 @@ private:
   tclib::def_ref_t<StreamServiceConnector> owner_;
   tclib::InStream *agent_in_;
   tclib::OutStream *agent_out_;
+
+  ConsolePlatform *platform() { return platform_; }
+  ConsolePlatform *platform_;
 
   StreamingLog *log() { return &log_; }
   StreamingLog log_;
