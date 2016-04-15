@@ -290,8 +290,6 @@ AGENT_TEST(set_std_modes) {
 
   DriverRequest gsh0 = driver.get_std_handle(conprx::kStdInputHandle);
   Handle input = *gsh0->native_as<Handle>();
-  DriverRequest gcm0 = driver.get_console_mode(input);
-  ASSERT_TRUE(gcm0->is_integer());
 
   if (!input.is_console()) {
     INFO("in: %p", driver.get_std_handle(conprx::kStdInputHandle)->native_as<Handle>()->ptr());
@@ -299,6 +297,9 @@ AGENT_TEST(set_std_modes) {
     INFO("err: %p", driver.get_std_handle(conprx::kStdErrorHandle)->native_as<Handle>()->ptr());
     SKIP_TEST("stdin not input handle");
   }
+
+  DriverRequest gcm0 = driver.get_console_mode(input);
+  ASSERT_TRUE(gcm0->is_integer());
 
   uint32_t old_mode = static_cast<uint32_t>(driver.get_console_mode(input)->integer_value());
   uint32_t enable_mouse_input_mode = 0x0010;
