@@ -379,7 +379,7 @@ public:
 handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
   int32_t sn = static_cast<int32_t>(id);
   if (-12 <= sn && sn <= -10) {
-    return reinterpret_cast<handle_t>(static_cast<size_t>(100 - sn));
+    return reinterpret_cast<handle_t>(static_cast<size_t>((100 - sn) << 2 | 0x3));
   } else {
     return reinterpret_cast<handle_t>(IF_32_BIT(-1, -1LL));
   }

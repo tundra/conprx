@@ -267,6 +267,8 @@ public:
 
   void *ptr() { return reinterpret_cast<void*>(id_); }
 
+  bool is_console() { return (id_ & 0x3) == 0x3; }
+
 private:
   template <typename T> friend class plankton::DefaultSeedType;
 
