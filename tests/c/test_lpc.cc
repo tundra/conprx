@@ -7,7 +7,7 @@
 using namespace lpc;
 
 int fun_three(Vector<void*> trace, fat_bool_t *trace_result) {
-  *trace_result = Interceptor::capture_stacktrace(trace);
+  *trace_result = PatchingInterceptor::capture_stacktrace(trace);
   return 4;
 }
 
@@ -39,7 +39,7 @@ TEST(lpc, infer_unguided_successful) {
   if (!capture_result)
     return;
   void *guided_out = NULL;
-  fat_bool_t guided_result = Interceptor::infer_address_guided(funs, stack, &guided_out);
+  fat_bool_t guided_result = PatchingInterceptor::infer_address_guided(funs, stack, &guided_out);
   if (kIsDebugCodegen)
     ASSERT_F_TRUE(guided_result);
   if (guided_result)

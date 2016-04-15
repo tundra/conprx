@@ -88,19 +88,20 @@ NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
 NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
     lpc::set_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
-  response_t<bool_t> resp = connector()->set_console_mode(
-      payload->handle, payload->mode);
-  req->set_return_value(NtStatus::from_response(resp));
+  NtStatus backend_status = req->send_to_backend();
+  if (!backend_status.is_success())
+    return backend_status;
+  response_t<bool_t> resp = connector()->set_console_mode(payload->handle,
+      payload->mode);
+  if (resp.has_error())
+    req->set_return_value(NtStatus::from_response(resp));
   return NtStatus::success();
 }
 
 NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
     lpc::get_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
-  response_t<uint32_t> resp = connector()->get_console_mode(payload->handle);
-  req->set_return_value(NtStatus::from_response(resp));
-  payload->mode = resp.value();
-  return NtStatus::success();
+  return req->send_to_backend();
 }
 
 NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,

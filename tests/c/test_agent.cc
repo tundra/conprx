@@ -293,8 +293,17 @@ AGENT_TEST(set_std_modes) {
   DriverRequest gcm0 = driver.get_console_mode(input);
   ASSERT_TRUE(gcm0->is_integer());
 
-  ASSERT_TRUE(driver.set_console_mode(input, 0xF00B00)->bool_value());
-  ASSERT_EQ(0xF00B00, driver.get_console_mode(input)->integer_value());
+  uint32_t old_mode = static_cast<uint32_t>(driver.get_console_mode(input)->integer_value());
+  uint32_t enable_mouse_input_mode = 0x0010;
+  uint32_t new_mode = old_mode ^ enable_mouse_input_mode;
+
+  ASSERT_TRUE(driver.set_console_mode(input, new_mode)->bool_value());
+  ASSERT_EQ(new_mode, backend.get_handle_info(input).mode());
+  ASSERT_EQ(new_mode, driver.get_console_mode(input)->integer_value());
+
+  ASSERT_TRUE(driver.set_console_mode(input, old_mode)->bool_value());
+  ASSERT_EQ(old_mode, backend.get_handle_info(input).mode());
+  ASSERT_EQ(old_mode, driver.get_console_mode(input)->integer_value());
 }
 
 class InfoBackend : public BasicConsoleBackend {
@@ -420,12 +429,13 @@ AGENT_TEST(write_console_aw) {
 class FailingConsoleBackend : public ConsoleBackend {
 public:
   FailingConsoleBackend(uint32_t a = 1, uint32_t b = 1) : a_(a), b_(b) { }
+  response_t<bool_t> connect(Handle stdin_handle, Handle stdout_handle,
+      Handle stderr_handle) { return response_t<bool_t>::yes(); }
   response_t<int64_t> poke(int64_t value) { return fail<int64_t>(); }
   response_t<uint32_t> get_console_cp(bool is_output) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_cp(uint32_t value, bool is_output) { return fail<bool_t>(); }
   response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode, size_t *bytes_written_out) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
-  response_t<uint32_t> get_console_mode(Handle handle) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
   response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_infoex_t *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
@@ -482,7 +492,7 @@ AGENT_TEST(failures) {
   ASSERT_EQ(13, get_last_error(driver.get_console_title_a(1)));
   ASSERT_EQ(16, get_last_error(driver.set_console_title_a("foo")));
   Handle dummy_handle(10);
-  ASSERT_EQ(21, get_last_error(driver.get_console_mode(dummy_handle)));
+  ASSERT_EQ(21, backend.gen_error());
   ASSERT_EQ(26, get_last_error(driver.set_console_mode(dummy_handle, 0xFF)));
 
   ASSERT_EQ(34, get_last_error(driver.get_console_screen_buffer_info(dummy_handle)));

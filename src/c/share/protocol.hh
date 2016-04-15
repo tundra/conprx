@@ -16,21 +16,25 @@
 //   - num: api number of the message
 //   - Tr: trace the message, that is, print debugging info for each message.
 //   - Da: disable custom handling of this message.
+//   - Pa: pure-agent function that doesn't involve calling the backend
+//   - Sw: simulate a windows backend handler for this lpc
 //
-//  Name                        name                            num   (Tr Da)
-#define FOR_EACH_LPC_TO_INTERCEPT(F)                                           \
-  F(GetConsoleMode,             get_console_mode,               0x08, (_, _))  \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (_, _))  \
-  F(SetConsoleMode,             set_console_mode,               0x11, (_, _))  \
-  F(ReadConsole,                read_console,                   0x1D, (_, _))  \
-  F(WriteConsole,               write_console,                  0x1E, (_, _))  \
-  F(GetConsoleTitle,            get_console_title,              0x24, (_, _))  \
-  F(SetConsoleTitle,            set_console_title,              0x25, (_, _))  \
-  F(GetConsoleCP,               get_console_cp,                 0x3C, (_, _))  \
-  F(SetConsoleCP,               set_console_cp,                 0x3D, (_, _))
+//  Name                        name                            num   (Tr Da Pa Sw)
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                              \
+  F(GetConsoleMode,             get_console_mode,               0x08, (_, _, X, X))  \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (_, _, _, _))  \
+  F(SetConsoleMode,             set_console_mode,               0x11, (_, _, _, X))  \
+  F(ReadConsole,                read_console,                   0x1D, (_, _, _, _))  \
+  F(WriteConsole,               write_console,                  0x1E, (_, _, _, _))  \
+  F(GetConsoleTitle,            get_console_title,              0x24, (_, _, _, _))  \
+  F(SetConsoleTitle,            set_console_title,              0x25, (_, _, _, _))  \
+  F(GetConsoleCP,               get_console_cp,                 0x3C, (_, _, _, _))  \
+  F(SetConsoleCP,               set_console_cp,                 0x3D, (_, _, _, _))
 
-#define lfTr(TR, DA) TR
-#define lfDa(TR, DA) DA
+#define lfTr(TR, DA, PA, SW) TR
+#define lfDa(TR, DA, PA, SW) DA
+#define lfPa(TR, DA, PA, SW) PA
+#define lpSw(TR, DA, PA, SW) SW
 
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
   F(BaseDllInitHelper,          ,                               76,      )     \

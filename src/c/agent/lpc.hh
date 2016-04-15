@@ -80,22 +80,12 @@ T *AddressXform::local_to_remote(T *arg) {
 // The amount of stack to capture and compare against the template.
 #define kLocateCCCSStackCaptureSize 5
 
-// An interceptor deals with the full process of replacing the implementation of
-// NtRequestWaitReplyPort. There's a few steps to getting everything set up
-// properly and an interceptor deals with all that.
+// An abstract interceptor implementation that can be implemented meaningfully
+// on both windows and linux.
 class Interceptor {
 public:
-  typedef tclib::callback_t<conprx::NtStatus(lpc::Message*)> handler_t;
-
-  // Creates an interceptor that will delegate intercepted calls to the given
-  // handler.
-  Interceptor(handler_t handler);
-
-  // Installs the interceptor.
-  fat_bool_t install();
-
-  // Restores everything to the way it was before the interceptor was installed.
-  fat_bool_t uninstall();
+  virtual ~Interceptor() { }
+  Interceptor();
 
   // Disables redirection for the lifetime of instances, restoring the previous
   // value on destruction.
@@ -107,6 +97,34 @@ public:
     Interceptor *interceptor_;
     bool was_enabled_;
   };
+
+  virtual ntstatus_t delegate_nt_request_wait_reply_port(
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) = 0;
+
+  // Capture the current stack trace, storing it in the given buffer. Returns
+  // true iff enough stack could be captured to fill the buffer.
+  static fat_bool_t capture_stacktrace(Vector<void*> buffer);
+
+protected:
+  bool enabled_;
+};
+
+// An interceptor deals with the full process of replacing the implementation of
+// NtRequestWaitReplyPort. There's a few steps to getting everything set up
+// properly and an interceptor deals with all that.
+class PatchingInterceptor : public Interceptor {
+public:
+  typedef tclib::callback_t<conprx::NtStatus(lpc::Message*)> handler_t;
+
+  // Creates an interceptor that will delegate intercepted calls to the given
+  // handler.
+  PatchingInterceptor(handler_t handler);
+
+  // Installs the interceptor.
+  fat_bool_t install();
+
+  // Restores everything to the way it was before the interceptor was installed.
+  fat_bool_t uninstall();
 
   // Try to infer the address of a function given an array of function pointers
   // that we expect will be present in a stack trace, as well as a stack trace.
@@ -127,9 +145,8 @@ public:
   static fat_bool_t infer_address_from_caller(tclib::Blob function,
       void **result_out, bool return_first);
 
-  // Capture the current stack trace, storing it in the given buffer. Returns
-  // true iff enough stack could be captured to fill the buffer.
-  static fat_bool_t capture_stacktrace(Vector<void*> buffer);
+  virtual ntstatus_t delegate_nt_request_wait_reply_port(
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
 
 private:
   friend class Message;
@@ -142,7 +159,7 @@ private:
   // Sends the calibration message through the built-in message system to set
   // the internal state of the console properly. This must be a static function;
   // see why in process_locate_cccs_message.
-  static fat_bool_t calibrate(Interceptor *interceptor);
+  static fat_bool_t calibrate(PatchingInterceptor *interceptor);
 
   // Does the remaining work of calibrate after it no longer needs to be static.
   fat_bool_t infer_calibration_from_cccs();
@@ -194,7 +211,6 @@ private:
   static const ulong_t kGetConsoleCPApiNumber = 0x3C;
 
   handler_t handler_;
-  bool enabled_;
 
   // Setting this to true enables the special message handling but only for
   // the next call -- the variable will be set back to false as soon as it has
@@ -221,8 +237,8 @@ private:
   conprx::PatchSet *patches() { return &patches_; }
   conprx::PatchSet patches_;
 
-  static Interceptor *current_;
-  static Interceptor *current() { return current_; }
+  static PatchingInterceptor *current_;
+  static PatchingInterceptor *current() { return current_; }
 };
 
 // The lpc message types should match internal types used by the LPC system.
@@ -355,7 +371,7 @@ struct message_data_t {
   port_message_data_t port_message;
   message_data_header_t header;
   union {
-#define __EMIT_ENTRY__(Name, name, DLL, API) name##_m name;
+#define __EMIT_ENTRY__(Name, name, NUM, FLAGS) name##_m name;
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
 #undef __EMIT_ENTRY__
   } payload;

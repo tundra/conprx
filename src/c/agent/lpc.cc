@@ -7,8 +7,12 @@
 
 using namespace lpc;
 using namespace tclib;
+using namespace conprx;
 
-Interceptor *Interceptor::current_ = NULL;
+PatchingInterceptor *PatchingInterceptor::current_ = NULL;
+
+Interceptor::Interceptor()
+  : enabled_(true) { }
 
 Interceptor::Disable::Disable(Interceptor* interceptor)
   : interceptor_(interceptor)
@@ -67,7 +71,7 @@ static bool extract_destination_from_return_pc(address_t caller_pc, void **resul
   return extract_destination_from_call_pc(caller_pc - 5, result_out);
 }
 
-fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
+fat_bool_t PatchingInterceptor::infer_address_guided(Vector<tclib::Blob> functions,
     Vector<void*> stack_trace, void **result_out) {
   size_t depth = functions.length();
   CHECK_REL("not enough stack", stack_trace.length(), >=, depth);
@@ -122,7 +126,7 @@ fat_bool_t Interceptor::infer_address_guided(Vector<tclib::Blob> functions,
   return F_TRUE;
 }
 
-fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
+fat_bool_t PatchingInterceptor::infer_address_from_caller(tclib::Blob function,
     void **result_out, bool return_first) {
   address_t ptr = static_cast<address_t>(function.start());
   fat_bool_t result_on_ret = F_FALSE;
@@ -159,7 +163,6 @@ fat_bool_t Interceptor::infer_address_from_caller(tclib::Blob function,
   return F_FALSE;
 }
 
-
 Message::Message(message_data_t *request, message_data_t *reply,
     Interceptor *interceptor, AddressXform xform)
   : request_(request)
@@ -168,7 +171,7 @@ Message::Message(message_data_t *request, message_data_t *reply,
   , xform_(xform) {
 }
 
-void Message::set_return_value(conprx::NtStatus status) {
+void Message::set_return_value(NtStatus status) {
   reply_->header.return_value = status.to_nt();
 }
 
@@ -185,6 +188,11 @@ void Message::dump(OutStream *out, Blob::DumpStyle style) {
   data.dump(out, style);
   out->printf("\n");
   out->flush();
+}
+
+NtStatus Message::send_to_backend() {
+  ntstatus_t result = interceptor()->delegate_nt_request_wait_reply_port(request_, reply_);
+  return NtStatus::from_nt(result);
 }
 
 #ifdef IS_MSVC

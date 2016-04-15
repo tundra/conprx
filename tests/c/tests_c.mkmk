@@ -9,6 +9,7 @@ filenames = [
   "test_conapi.cc",
   "test_conback.cc",
   "test_driver.cc",
+  "test_handman.cc",
   "test_lpc.cc",
   "test_protocol.cc",
   "test_string.cc",

@@ -41,8 +41,8 @@ private:
   def_ref_t<ConsoleAdaptor> adaptor_;
   def_ref_t<ConsolePlatform> platform_;
 
-  lpc::Interceptor interceptor_;
-  lpc::Interceptor *interceptor() { return &interceptor_; }
+  lpc::PatchingInterceptor interceptor_;
+  lpc::PatchingInterceptor *interceptor() { return &interceptor_; }
 
   def_ref_t<InStream> agent_in_;
   InStream *agent_in() { return *agent_in_; }

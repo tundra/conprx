@@ -28,8 +28,8 @@ ConsoleBackendService::ConsoleBackendService()
   register_method("is_done", new_callback(&ConsoleBackendService::on_is_done, this));
   register_method("poke", new_callback(&ConsoleBackendService::on_poke, this));
 
-#define __GEN_REGISTER__(Name, name, DLL, API)                                 \
-  register_method(#name, new_callback(&ConsoleBackendService::on_##name, this));
+#define __GEN_REGISTER__(Name, name, NUM, FLAGS)                               \
+  lfPa FLAGS (, register_method(#name, new_callback(&ConsoleBackendService::on_##name, this)));
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_REGISTER__)
 #undef __GEN_REGISTER__
 
@@ -68,6 +68,14 @@ BasicConsoleBackend::BasicConsoleBackend()
 
 BasicConsoleBackend::~BasicConsoleBackend() {
   ucs16_default_delete(title_);
+}
+
+response_t<bool_t> BasicConsoleBackend::connect(Handle stdin_handle,
+    Handle stdout_handle, Handle stderr_handle) {
+  handles()->register_std_handle(kStdInputHandle, stdin_handle);
+  handles()->register_std_handle(kStdOutputHandle, stdout_handle);
+  handles()->register_std_handle(kStdErrorHandle, stderr_handle);
+  return response_t<bool_t>::yes();
 }
 
 response_t<int64_t> BasicConsoleBackend::poke(int64_t value) {
@@ -156,14 +164,13 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
   return response_t<bool_t>::yes();
 }
 
-response_t<uint32_t> BasicConsoleBackend::get_console_mode(Handle handle) {
-  WARN("Using stub get_console_mode(%p)", handle.ptr());
-  return response_t<uint32_t>::of(mode_);
+HandleInfo BasicConsoleBackend::get_handle_info(Handle handle) {
+  HandleInfo *info = handles()->get_or_create_info(handle, false);
+  return (info == NULL) ? HandleInfo() : *info;
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t mode) {
-  WARN("Using stub set_console_mode(%p, %x)", handle.ptr(), mode);
-  mode_ = mode;
+  handles()->set_handle_mode(handle, mode);
   return response_t<bool_t>::yes();
 }
 
@@ -197,9 +204,8 @@ void ConsoleBackendService::on_is_ready(rpc::RequestData *data, ResponseCallback
   Handle *stderr_handle = data->argument("stderr").native_as<Handle>();
   if (stdin_handle == NULL || stdout_handle == NULL || stderr_handle == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  handles()->register_std_handle(kStdInputHandle, *stdin_handle);
-  handles()->register_std_handle(kStdOutputHandle, *stdout_handle);
-  handles()->register_std_handle(kStdErrorHandle, *stderr_handle);
+  if (backend() != NULL)
+    backend()->connect(*stdin_handle, *stdout_handle, *stderr_handle);
   agent_is_ready_ = true;
   resp(rpc::OutgoingResponse::success(Variant::null()));
 }
@@ -301,13 +307,6 @@ void ConsoleBackendService::on_set_console_mode(rpc::RequestData *data, Response
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
   uint32_t mode = static_cast<uint32_t>(data->argument(1).integer_value());
   forward_response(backend()->set_console_mode(*handle, mode), resp);
-}
-
-void ConsoleBackendService::on_get_console_mode(rpc::RequestData *data, ResponseCallback resp) {
-  Handle *handle = data->argument(0).native_as<Handle>();
-  if (handle == NULL)
-    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  forward_response(backend()->get_console_mode(*handle), resp);
 }
 
 void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *data,

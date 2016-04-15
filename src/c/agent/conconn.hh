@@ -59,7 +59,7 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   // Generate the handler declarations.
-#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
+#define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
   NtStatus name(lpc::Message *req, lpc::name##_m *data);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__

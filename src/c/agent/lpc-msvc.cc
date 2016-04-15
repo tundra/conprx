@@ -9,10 +9,9 @@ using namespace conprx;
 using namespace lpc;
 using namespace tclib;
 
-Interceptor::Interceptor(handler_t handler)
+PatchingInterceptor::PatchingInterceptor(handler_t handler)
   : handler_(handler)
   , patches_(Platform::get(), Vector<PatchRequest>(patch_requests_, kPatchRequestCount))
-  , enabled_(true)
   , one_shot_special_handler_(false)
   , is_locating_cccs_(false)
   , locate_cccs_result_(F_FALSE)
@@ -25,7 +24,7 @@ Interceptor::Interceptor(handler_t handler)
   CHECK_EQ("stack grows up", -1, infer_stack_direction());
 }
 
-ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_handle,
+ntstatus_t NTAPI PatchingInterceptor::nt_request_wait_reply_port_bridge(handle_t port_handle,
     lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
   // Similarly to Interceptor::calibrate we deliberately do the work here up
   // to the point where we capture the stack trace in a static function such
@@ -37,7 +36,7 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   // in the stack trace. When it simply delegated to the instance method the
   // optimizing compiler made the call into a jump, which is good in general but
   // not what we want here.
-  Interceptor *inter = current();
+  PatchingInterceptor *inter = current();
   if (inter->one_shot_special_handler_) {
     inter->one_shot_special_handler_ = false;
     if (request->header.api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
@@ -61,7 +60,7 @@ ntstatus_t NTAPI Interceptor::nt_request_wait_reply_port_bridge(handle_t port_ha
   }
 }
 
-ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
+ntstatus_t PatchingInterceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *reply) {
   if (enabled_ && port_handle == console_server_port_handle_) {
     lpc::Message message(request, reply, this, port_xform());
@@ -71,7 +70,7 @@ ntstatus_t Interceptor::nt_request_wait_reply_port(handle_t port_handle,
   }
 }
 
-fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
+fat_bool_t PatchingInterceptor::initialize_patch(PatchRequest *request,
     const char *name, address_t replacement, module_t ntdll) {
   address_t original = Code::upcast(GetProcAddress(ntdll, name));
   if (original == NULL) {
@@ -82,13 +81,13 @@ fat_bool_t Interceptor::initialize_patch(PatchRequest *request,
   return F_TRUE;
 }
 
-NtStatus Message::send_to_backend() {
-  ntstatus_t result = interceptor()->nt_request_wait_reply_port_imposter(
-      interceptor()->console_server_port_handle_, request_, reply_);
-  return NtStatus::from_nt(result);
+ntstatus_t PatchingInterceptor::delegate_nt_request_wait_reply_port(
+    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
+  return nt_request_wait_reply_port_imposter(console_server_port_handle_,
+      request, incoming_reply);
 }
 
-fat_bool_t Interceptor::install() {
+fat_bool_t PatchingInterceptor::install() {
   module_t ntdll = GetModuleHandle(TEXT("ntdll.dll"));
   if (ntdll == NULL) {
     WARN("GetModuleHandle(\"ntdll.dll\"): %i", GetLastError());
@@ -107,12 +106,12 @@ fat_bool_t Interceptor::install() {
   return calibrate(this);
 }
 
-fat_bool_t Interceptor::uninstall() {
+fat_bool_t PatchingInterceptor::uninstall() {
   current_ = NULL;
   return patches()->revert();
 }
 
-fat_bool_t Interceptor::calibrate(Interceptor *inter) {
+fat_bool_t PatchingInterceptor::calibrate(PatchingInterceptor *inter) {
   // Okay so this deserves a thorough explanation. What's going on here is that
   // when the connection between the process and the console server is first
   // opened the server describes itself and expects the client, that is the
@@ -157,7 +156,7 @@ fat_bool_t Interceptor::calibrate(Interceptor *inter) {
   return inter->infer_calibration_from_cccs();
 }
 
-fat_bool_t Interceptor::infer_calibration_from_cccs() {
+fat_bool_t PatchingInterceptor::infer_calibration_from_cccs() {
   // Then send the artificial calibration message.
   lpc::message_data_t message;
   struct_zero_fill(message);
@@ -186,11 +185,11 @@ static int32_t calc_stack_direction(size_t *caller_ptr) {
       : ((&var < caller_ptr) ? -1 : 1);
 }
 
-int32_t Interceptor::infer_stack_direction() {
+int32_t PatchingInterceptor::infer_stack_direction() {
   return calc_stack_direction(NULL);
 }
 
-fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
+fat_bool_t PatchingInterceptor::process_locate_cccs_message(handle_t port_handle,
     Vector<void*> stack_trace) {
   locate_cccs_port_handle_ = port_handle;
   tclib::Blob gccp = tclib::Blob(GetConsoleCP, 256);
@@ -239,7 +238,7 @@ fat_bool_t Interceptor::process_locate_cccs_message(handle_t port_handle,
   }
 }
 
-fat_bool_t Interceptor::process_calibration_message(handle_t port_handle,
+fat_bool_t PatchingInterceptor::process_calibration_message(handle_t port_handle,
     message_data_t *message) {
   if (locate_cccs_port_handle_ != port_handle)
     // Definitely both of these messages should be going to the same port so

@@ -40,6 +40,9 @@ class ConsoleBackend {
 public:
   virtual ~ConsoleBackend() { }
 
+  virtual response_t<bool_t> connect(Handle stdin_handle, Handle stdout_handle,
+      Handle stderr_handle) = 0;
+
   // Debug/test call.
   virtual response_t<int64_t> poke(int64_t value) = 0;
 
@@ -56,10 +59,9 @@ public:
   // Set the title to the contents of the given buffer.
   virtual response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) = 0;
 
-  // Returns the current mode of the buffer with the given handle.
-  virtual response_t<uint32_t> get_console_mode(Handle handle) = 0;
-
-  // Sets the mode of the buffer with the given handle.
+  // Notifies this backend that the console mode has been set for the given
+  // handle. Failing this call will not cancel the mode being set, that has
+  // already happened, but it will cause the call to fail.
   virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) = 0;
 
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
@@ -76,6 +78,8 @@ class BasicConsoleBackend : public ConsoleBackend {
 public:
   BasicConsoleBackend();
   virtual ~BasicConsoleBackend();
+  virtual response_t<bool_t> connect(Handle stdin_handle, Handle stdout_handle,
+      Handle stderr_handle);
   virtual response_t<int64_t> poke(int64_t value);
   virtual response_t<uint32_t> get_console_cp(bool is_output);
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
@@ -83,12 +87,13 @@ public:
       bool is_unicode, size_t *bytes_written_out);
   virtual response_t<bool_t> set_console_title(tclib::Blob title,
       bool is_unicode);
-  virtual response_t<uint32_t> get_console_mode(Handle handle);
   virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode);
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       console_screen_buffer_infoex_t *info_out);
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
+
+  HandleInfo get_handle_info(Handle handle);
 
   // Sets the console window backing this backend. If you don't set one a
   // dummy one will be used.
@@ -124,6 +129,8 @@ private:
   //   more nuanced way to set those.
   uint32_t mode_;
   ConsoleWindow *window_;
+  HandleManager *handles() { return &handles_; }
+  HandleManager handles_;
 };
 
 // The service the driver will call back to when it wants to access the manager.
@@ -159,7 +166,7 @@ private:
   // not a plankton blob the empty blob will be returned.
   static tclib::Blob to_blob(Variant value);
 
-#define __GEN_HANDLER__(Name, name, DLL, API)                                  \
+#define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
   void on_##name(plankton::rpc::RequestData*, ResponseCallback);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
@@ -171,9 +178,6 @@ private:
   ConsoleBackend *backend() { return backend_; }
 
   plankton::TypeRegistry registry_;
-
-  HandleManager *handles() { return &handles_; }
-  HandleManager handles_;
 
   bool agent_is_ready_;
   bool agent_is_done_;

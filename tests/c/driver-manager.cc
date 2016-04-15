@@ -133,7 +133,11 @@ Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
 
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
-  ASSERT_TRUE(response_->is_fulfilled());
+  if (response_->is_rejected()) {
+    TextWriter writer;
+    writer.write(response_->peek_error(Variant::null()));
+    FATAL("Unexpected response failure: %s", *writer);
+  }
   return response_->peek_value(Variant::null());
 }
 

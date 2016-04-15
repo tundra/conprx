@@ -16,6 +16,54 @@ using namespace tclib;
 
 class AbstractSimulatedMessage;
 
+class SimulatingInterceptor : public lpc::Interceptor {
+public:
+  virtual ntstatus_t delegate_nt_request_wait_reply_port(
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
+
+  // Generate the handler declarations.
+#define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
+    lpSw FLAGS (NtStatus on_##name(lpc::name##_m *data, lpc::message_data_t *incoming_reply),);
+  FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
+#undef __GEN_HANDLER__
+
+private:
+  platform_hash_map<address_arith_t, uint32_t> modes_;
+};
+
+ntstatus_t SimulatingInterceptor::delegate_nt_request_wait_reply_port(
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
+  uint32_t apinum = request->header.api_number;
+  switch (apinum) {
+#define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lpSw FLAGS (__GEN_DISPATCH__(Name, name),)
+#define __GEN_DISPATCH__(Name, name) case ConsoleAgent::lm##Name:              \
+    return on_##name(&request->payload.name, incoming_reply).to_nt();
+  FOR_EACH_LPC_TO_INTERCEPT(__MAYBE_GEN_DISPATCH__)
+#undef __GEN_DISPATCH__
+#undef __MAYBE_GEN_DISPATCH__
+    default: {
+      WARN("Unknown simulated native backend request 0x02x", apinum);
+      return NtStatus::from(CONPRX_ERROR_NOT_IMPLEMENTED).to_nt();
+    }
+  }
+}
+
+NtStatus SimulatingInterceptor::on_get_console_mode(lpc::get_console_mode_m *data,
+    lpc::message_data_t *incoming_reply) {
+  address_arith_t key = reinterpret_cast<address_arith_t>(data->handle);
+  data->mode = modes_[key];
+  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  return NtStatus::success();
+}
+
+NtStatus SimulatingInterceptor::on_set_console_mode(lpc::set_console_mode_m *data,
+    lpc::message_data_t *incoming_reply) {
+  address_arith_t key = reinterpret_cast<address_arith_t>(data->handle);
+  modes_[key] = data->mode;
+  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  return NtStatus::success();
+}
+
 // The fallback console is a console implementation that works on all platforms.
 // The implementation is just placeholders but they should be functional enough
 // that they can be used for testing.
@@ -48,12 +96,14 @@ public:
   // appropriate as a return value from any boolean console functions.
   bool update_last_error(AbstractSimulatedMessage *message);
 
+  lpc::Interceptor *interceptor() { return &interceptor_; }
+
 private:
   ConsoleAgent *agent() { return agent_; }
   ConsoleAgent *agent_;
   lpc::AddressXform xform_;
   NtStatus last_error_;
-
+  SimulatingInterceptor interceptor_;
 };
 
 SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAgent *agent,
@@ -130,7 +180,7 @@ bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *mess
 }
 
 AbstractSimulatedMessage::AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend)
-  : message_(data(), data(), NULL, frontend->xform()) {
+  : message_(data(), data(), frontend->interceptor(), frontend->xform()) {
   struct_zero_fill(data_);
 }
 
