@@ -88,7 +88,7 @@ NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
 NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
     lpc::set_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
-  NtStatus backend_status = req->send_to_backend();
+  NtStatus backend_status = req->call_native_backend();
   if (!backend_status.is_success())
     return backend_status;
   response_t<bool_t> resp = connector()->set_console_mode(payload->handle,
@@ -101,7 +101,7 @@ NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
 NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
     lpc::get_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
-  return req->send_to_backend();
+  return req->call_native_backend();
 }
 
 NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
@@ -144,7 +144,7 @@ NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
 NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
     lpc::read_console_m *payload) {
   // TODO: implement.
-  return req->send_to_backend();
+  return req->call_native_backend();
 }
 
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {

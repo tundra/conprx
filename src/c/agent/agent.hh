@@ -161,6 +161,8 @@ public:
 #undef __GEN_KEY_ENUM__
   };
 
+  ConsolePlatform *platform() { return platform_; }
+
 protected:
   // Perform the platform-specific part of the agent installation.
   virtual fat_bool_t install_agent_platform() = 0;
@@ -183,7 +185,6 @@ private:
   tclib::InStream *agent_in_;
   tclib::OutStream *agent_out_;
 
-  ConsolePlatform *platform() { return platform_; }
   ConsolePlatform *platform_;
 
   StreamingLog *log() { return &log_; }

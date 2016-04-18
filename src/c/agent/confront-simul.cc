@@ -15,11 +15,20 @@ using namespace conprx;
 using namespace tclib;
 
 class AbstractSimulatedMessage;
+class SimulatingConsoleFrontend;
 
+// Interceptor that fakes calls to the native backend. The actual backend is
+// implemented by the simulating platform which acts as an in-memory windows
+// console server.
 class SimulatingInterceptor : public lpc::Interceptor {
 public:
-  virtual ntstatus_t delegate_nt_request_wait_reply_port(
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
+  SimulatingInterceptor(SimulatingConsoleFrontend *frontend,
+      InMemoryConsolePlatform *platform)
+    : frontend_(frontend)
+    , platform_(platform) { }
+
+  virtual NtStatus call_native_backend(lpc::message_data_t *request,
+      lpc::message_data_t *incoming_reply);
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
@@ -28,40 +37,27 @@ public:
 #undef __GEN_HANDLER__
 
 private:
-  platform_hash_map<address_arith_t, uint32_t> modes_;
+  SimulatingConsoleFrontend *frontend_;
+  SimulatingConsoleFrontend *frontend() { return frontend_; }
+  InMemoryConsolePlatform *platform_;
+  InMemoryConsolePlatform *platform() { return platform_; }
 };
 
-ntstatus_t SimulatingInterceptor::delegate_nt_request_wait_reply_port(
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
+NtStatus SimulatingInterceptor::call_native_backend(lpc::message_data_t *request,
+    lpc::message_data_t *incoming_reply) {
   uint32_t apinum = request->header.api_number;
   switch (apinum) {
 #define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lpSw FLAGS (__GEN_DISPATCH__(Name, name),)
 #define __GEN_DISPATCH__(Name, name) case ConsoleAgent::lm##Name:              \
-    return on_##name(&request->payload.name, incoming_reply).to_nt();
+    return on_##name(&request->payload.name, incoming_reply);
   FOR_EACH_LPC_TO_INTERCEPT(__MAYBE_GEN_DISPATCH__)
 #undef __GEN_DISPATCH__
 #undef __MAYBE_GEN_DISPATCH__
     default: {
       WARN("Unknown simulated native backend request 0x02x", apinum);
-      return NtStatus::from(CONPRX_ERROR_NOT_IMPLEMENTED).to_nt();
+      return NtStatus::from(CONPRX_ERROR_NOT_IMPLEMENTED);
     }
   }
-}
-
-NtStatus SimulatingInterceptor::on_get_console_mode(lpc::get_console_mode_m *data,
-    lpc::message_data_t *incoming_reply) {
-  address_arith_t key = reinterpret_cast<address_arith_t>(data->handle);
-  data->mode = modes_[key];
-  incoming_reply->header.return_value = NtStatus::success().to_nt();
-  return NtStatus::success();
-}
-
-NtStatus SimulatingInterceptor::on_set_console_mode(lpc::set_console_mode_m *data,
-    lpc::message_data_t *incoming_reply) {
-  address_arith_t key = reinterpret_cast<address_arith_t>(data->handle);
-  modes_[key] = data->mode;
-  incoming_reply->header.return_value = NtStatus::success().to_nt();
-  return NtStatus::success();
 }
 
 // The fallback console is a console implementation that works on all platforms.
@@ -69,7 +65,8 @@ NtStatus SimulatingInterceptor::on_set_console_mode(lpc::set_console_mode_m *dat
 // that they can be used for testing.
 class SimulatingConsoleFrontend : public ConsoleFrontend {
 public:
-  SimulatingConsoleFrontend(ConsoleAgent *agent, lpc::AddressXform xform);
+  SimulatingConsoleFrontend(ConsoleAgent *agent, lpc::AddressXform xform,
+      InMemoryConsolePlatform *platform);
   ~SimulatingConsoleFrontend();
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
@@ -98,8 +95,9 @@ public:
 
   lpc::Interceptor *interceptor() { return &interceptor_; }
 
-private:
   ConsoleAgent *agent() { return agent_; }
+
+private:
   ConsoleAgent *agent_;
   lpc::AddressXform xform_;
   NtStatus last_error_;
@@ -107,10 +105,11 @@ private:
 };
 
 SimulatingConsoleFrontend::SimulatingConsoleFrontend(ConsoleAgent *agent,
-    lpc::AddressXform xform)
+    lpc::AddressXform xform, InMemoryConsolePlatform *platform)
   : agent_(agent)
   , xform_(xform)
-  , last_error_(NtStatus::success()) { }
+  , last_error_(NtStatus::success())
+  , interceptor_(this, platform) { }
 
 SimulatingConsoleFrontend::~SimulatingConsoleFrontend() {
 }
@@ -361,12 +360,14 @@ NtStatus SimulatingConsoleFrontend::get_last_error() {
 }
 
 pass_def_ref_t<ConsoleFrontend> ConsoleFrontend::new_simulating(ConsoleAgent *agent,
-    ssize_t delta) {
+    InMemoryConsolePlatform *platform, ssize_t delta) {
   return new (kDefaultAlloc) SimulatingConsoleFrontend(agent,
-      lpc::AddressXform(delta));
+      lpc::AddressXform(delta), platform);
 }
 
-class SimulatingConsolePlatform : public ConsolePlatform {
+namespace conprx {
+
+class SimulatingConsolePlatform : public InMemoryConsolePlatform {
 public:
   virtual void default_destroy() { default_delete_concrete(this); }
 
@@ -374,7 +375,15 @@ public:
   mfOnlyPf(FLAGS, virtual SIG(GET_SIG_RET) name SIG(GET_SIG_PARAMS));
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_PLATFORM_METHOD__)
 #undef __DECLARE_PLATFORM_METHOD__
+
+  virtual uint32_t get_console_mode(Handle handle);
+  virtual void set_console_mode(Handle handle, uint32_t mode);
+
+private:
+  platform_hash_map<address_arith_t, uint32_t> modes_;
 };
+
+} // namespace conprx
 
 handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
   int32_t sn = static_cast<int32_t>(id);
@@ -385,6 +394,30 @@ handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
   }
 }
 
-pass_def_ref_t<ConsolePlatform> ConsolePlatform::new_simulating() {
+uint32_t SimulatingConsolePlatform::get_console_mode(Handle handle) {
+  address_arith_t key = reinterpret_cast<address_arith_t>(handle.ptr());
+  return modes_[key];
+}
+
+void SimulatingConsolePlatform::set_console_mode(Handle handle, uint32_t mode) {
+  address_arith_t key = reinterpret_cast<address_arith_t>(handle.ptr());
+  modes_[key] = mode;
+}
+
+pass_def_ref_t<InMemoryConsolePlatform> InMemoryConsolePlatform::new_simulating() {
   return new (kDefaultAlloc) SimulatingConsolePlatform();
+}
+
+NtStatus SimulatingInterceptor::on_get_console_mode(lpc::get_console_mode_m *data,
+    lpc::message_data_t *incoming_reply) {
+  data->mode = platform()->get_console_mode(data->handle);
+  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  return NtStatus::success();
+}
+
+NtStatus SimulatingInterceptor::on_set_console_mode(lpc::set_console_mode_m *data,
+    lpc::message_data_t *incoming_reply) {
+  platform()->set_console_mode(data->handle, data->mode);
+  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  return NtStatus::success();
 }

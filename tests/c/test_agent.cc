@@ -291,12 +291,10 @@ AGENT_TEST(set_std_modes) {
   DriverRequest gsh0 = driver.get_std_handle(conprx::kStdInputHandle);
   Handle input = *gsh0->native_as<Handle>();
 
-  if (!input.is_console()) {
-    INFO("in: %p", driver.get_std_handle(conprx::kStdInputHandle)->native_as<Handle>()->ptr());
-    INFO("out: %p", driver.get_std_handle(conprx::kStdOutputHandle)->native_as<Handle>()->ptr());
-    INFO("err: %p", driver.get_std_handle(conprx::kStdErrorHandle)->native_as<Handle>()->ptr());
-    SKIP_TEST("stdin not input handle");
-  }
+  if (!input.is_console())
+    // TODO: ensure that stdin is a console. Maybe allocate a fresh console
+    //   for the driver?
+    SKIP_TEST("stdin not console");
 
   DriverRequest gcm0 = driver.get_console_mode(input);
   ASSERT_TRUE(gcm0->is_integer());

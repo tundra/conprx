@@ -118,7 +118,7 @@ fat_bool_t WindowsConsoleAgent::connect(blob_t data_in, blob_t data_out,
   }
   agent_out_ = tclib::InOutStream::from_raw_handle(agent_out_handle);
 
-  platform_ = ConsolePlatform::create();
+  platform_ = ConsolePlatform::new_native();
   F_TRY(install_agent(agent_in(), agent_out(), *platform_));
 
   connector_ = PrpcConsoleConnector::create(owner()->socket(), owner()->input());

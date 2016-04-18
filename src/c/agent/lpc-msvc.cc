@@ -81,10 +81,11 @@ fat_bool_t PatchingInterceptor::initialize_patch(PatchRequest *request,
   return F_TRUE;
 }
 
-ntstatus_t PatchingInterceptor::delegate_nt_request_wait_reply_port(
-    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
-  return nt_request_wait_reply_port_imposter(console_server_port_handle_,
+NtStatus PatchingInterceptor::call_native_backend(lpc::message_data_t *request,
+    lpc::message_data_t *incoming_reply) {
+  ntstatus_t result = nt_request_wait_reply_port_imposter(console_server_port_handle_,
       request, incoming_reply);
+  return NtStatus::from_nt(result);
 }
 
 fat_bool_t PatchingInterceptor::install() {

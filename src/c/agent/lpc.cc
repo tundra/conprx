@@ -190,9 +190,8 @@ void Message::dump(OutStream *out, Blob::DumpStyle style) {
   out->flush();
 }
 
-NtStatus Message::send_to_backend() {
-  ntstatus_t result = interceptor()->delegate_nt_request_wait_reply_port(request_, reply_);
-  return NtStatus::from_nt(result);
+NtStatus Message::call_native_backend() {
+  return interceptor()->call_native_backend(request_, reply_);
 }
 
 #ifdef IS_MSVC

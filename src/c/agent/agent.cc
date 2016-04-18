@@ -97,7 +97,7 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
 #define __EMIT_CASE__(Name, name, NUM, FLAGS) case NUM:
   FOR_EACH_OTHER_KNOWN_LPC(__EMIT_CASE__)
 #undef __EMIT_CASE__
-      return request->send_to_backend();
+      return request->call_native_backend();
     // Unknown messages.
     default: {
       if (kDumpUnknownMessages) {
@@ -107,7 +107,7 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
       if (kSuspendOnUnknownMessages) {
         NativeThread::sleep(Duration::seconds(30));
       }
-      return request->send_to_backend();
+      return request->call_native_backend();
     }
   }
 }

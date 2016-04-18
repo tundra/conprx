@@ -98,8 +98,8 @@ public:
     bool was_enabled_;
   };
 
-  virtual ntstatus_t delegate_nt_request_wait_reply_port(
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) = 0;
+  virtual conprx::NtStatus call_native_backend(lpc::message_data_t *request,
+      lpc::message_data_t *incoming_reply) = 0;
 
   // Capture the current stack trace, storing it in the given buffer. Returns
   // true iff enough stack could be captured to fill the buffer.
@@ -145,8 +145,10 @@ public:
   static fat_bool_t infer_address_from_caller(tclib::Blob function,
       void **result_out, bool return_first);
 
-  virtual ntstatus_t delegate_nt_request_wait_reply_port(
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
+  // Passes a call through this interceptor to the native backend it was
+  // originally intended for.
+  virtual conprx::NtStatus call_native_backend(lpc::message_data_t *request,
+      lpc::message_data_t *incoming_reply);
 
 private:
   friend class Message;
@@ -422,9 +424,12 @@ public:
 
   AddressXform xform() { return xform_; }
 
+  // Returns the interceptor that intercepted this message.
   Interceptor *interceptor() { return interceptor_; }
 
-  conprx::NtStatus send_to_backend();
+  // Sends this message on to the native backend where it was originally
+  // intended to go.
+  conprx::NtStatus call_native_backend();
 
 private:
   message_data_t *request_;

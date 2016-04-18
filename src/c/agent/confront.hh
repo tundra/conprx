@@ -149,6 +149,7 @@ class ConsoleAdaptor;
 #define mfUnlessPf(FLAGS, E) mfPf FLAGS (, E)
 
 class ConsoleAgent;
+class InMemoryConsolePlatform;
 
 // A container that holds the various definitions used by the other console
 // types.
@@ -180,7 +181,7 @@ public:
   // Returns a new simulating console frontend that simulates interaction with
   // the given backend.
   static tclib::pass_def_ref_t<ConsoleFrontend> new_simulating(
-      ConsoleAgent *agent, ssize_t delta = 0);
+      ConsoleAgent *agent, InMemoryConsolePlatform *platform, ssize_t delta = 0);
 };
 
 // A console platform is similar to a console frontend, the difference being
@@ -195,15 +196,17 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_PLATFORM_METHOD__)
 #undef __DECLARE_PLATFORM_METHOD__
 
-  // Creates and returns a new platform simulator.
-  static tclib::pass_def_ref_t<ConsolePlatform> new_simulating();
-
   // Creates and returns a new native platform. Only available on windows.
   static tclib::pass_def_ref_t<ConsolePlatform> new_native();
+};
 
-  // Creates and returns the appropriate platform for where this code is
-  // running.
-  static tclib::pass_def_ref_t<ConsolePlatform> create();
+class InMemoryConsolePlatform : public ConsolePlatform {
+public:
+  virtual uint32_t get_console_mode(Handle handle) = 0;
+  virtual void set_console_mode(Handle handle, uint32_t mode) = 0;
+
+  // Creates and returns a new platform simulator.
+  static tclib::pass_def_ref_t<InMemoryConsolePlatform> new_simulating();
 };
 
 } // conprx

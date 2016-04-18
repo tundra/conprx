@@ -350,6 +350,7 @@ private:
   def_ref_t<FakeConsoleAgent> fake_agent_;
   FakeConsoleAgent *fake_agent() { return *fake_agent_; }
   def_ref_t<ConsolePlatform> platform_;
+  InMemoryConsolePlatform *fake_platform_;
 };
 
 ConsoleDriverMain::ConsoleDriverMain()
@@ -357,7 +358,8 @@ ConsoleDriverMain::ConsoleDriverMain()
   , channel_name_(string_empty())
   , frontend_type_(dfDummy)
   , port_delta_(0)
-  , fake_agent_channel_name_(string_empty()) { }
+  , fake_agent_channel_name_(string_empty())
+  , fake_platform_(NULL) { }
 
 bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
   CommandLine *cmdline = reader_.parse(argc - 1, argv + 1);
@@ -399,12 +401,17 @@ bool ConsoleDriverMain::open_connection() {
   if (silence_log_)
     silent_log_.ensure_installed();
   if (use_fake_agent()) {
+    pass_def_ref_t<InMemoryConsolePlatform> platform = InMemoryConsolePlatform::new_simulating();
+    platform_ = platform;
+    fake_platform_ = platform.peek();
     fake_agent_channel_ = ClientChannel::create();
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
       return false;
     fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
     if (!install_fake_agent())
       return false;
+  } else {
+    platform_ = IF_MSVC(ConsolePlatform::new_native(), InMemoryConsolePlatform::new_simulating());
   }
   channel_ = ClientChannel::create();
   if (!channel()->open(channel_name_))
@@ -416,7 +423,6 @@ bool ConsoleDriverMain::install_fake_agent() {
   if (!use_fake_agent())
     // There is no fake agent so this trivially succeeds.
     return true;
-  platform_ = ConsolePlatform::create();
   return fake_agent()->install_agent(fake_agent_channel()->in(),
       fake_agent_channel()->out(), *platform_);
 }
@@ -445,11 +451,10 @@ bool ConsoleDriverMain::run() {
           fake_agent()->owner()->input());
       condapt = new (kDefaultAlloc) ConsoleAdaptor(*conconn);
       fake_agent()->set_adaptor(*condapt);
-      frontend = ConsoleFrontend::new_simulating(fake_agent(), port_delta_);
+      frontend = ConsoleFrontend::new_simulating(fake_agent(), fake_platform_, port_delta_);
       break;
   }
-  def_ref_t<ConsolePlatform> conplat = ConsolePlatform::create();
-  ConsoleFrontendService driver(*frontend, *conplat);
+  ConsoleFrontendService driver(*frontend, *platform_);
   if (!connector.init(driver.handler()))
     return false;
   bool result = connector.process_all_messages();
