@@ -40,6 +40,7 @@ class ConsoleBackend {
 public:
   virtual ~ConsoleBackend() { }
 
+  // Called by the agent to initialize this backend.
   virtual response_t<bool_t> connect(Handle stdin_handle, Handle stdout_handle,
       Handle stderr_handle) = 0;
 
@@ -93,7 +94,9 @@ public:
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
 
-  HandleInfo get_handle_info(Handle handle);
+  // Returns info about the given handle, if the handle isn't known the default
+  // info is returned.
+  HandleShadow get_handle_shadow(Handle handle);
 
   // Sets the console window backing this backend. If you don't set one a
   // dummy one will be used.

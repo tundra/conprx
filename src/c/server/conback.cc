@@ -164,9 +164,9 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
   return response_t<bool_t>::yes();
 }
 
-HandleInfo BasicConsoleBackend::get_handle_info(Handle handle) {
-  HandleInfo *info = handles()->get_or_create_info(handle, false);
-  return (info == NULL) ? HandleInfo() : *info;
+HandleShadow BasicConsoleBackend::get_handle_shadow(Handle handle) {
+  HandleShadow *info = handles()->get_or_create_shadow(handle, false);
+  return (info == NULL) ? HandleShadow() : *info;
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t mode) {

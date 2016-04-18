@@ -17,7 +17,7 @@
 //   - Tr: trace the message, that is, print debugging info for each message.
 //   - Da: disable custom handling of this message.
 //   - Pa: pure-agent function that doesn't involve calling the backend
-//   - Sw: simulate a windows backend handler for this lpc
+//   - Sw: this message should be implemented in the platform simulator
 //
 //  Name                        name                            num   (Tr Da Pa Sw)
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                              \
@@ -267,6 +267,7 @@ public:
 
   void *ptr() { return reinterpret_cast<void*>(id_); }
 
+  // Does this handle refer to a console input or output buffer?
   bool is_console() { return (id_ & 0x3) == 0x3; }
 
 private:

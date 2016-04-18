@@ -9,9 +9,12 @@
 
 namespace conprx {
 
-class HandleInfo {
+// Server-side information about a handle. It's a shadow because it's not
+// authoritative -- that resides in the native windows handle system -- but it
+// should reflect that info.
+class HandleShadow {
 public:
-  HandleInfo() : mode_(0) { }
+  HandleShadow() : mode_(0) { }
   uint32_t mode() { return mode_; }
   void set_mode(uint32_t value) { mode_ = value; }
 private:
@@ -32,11 +35,11 @@ public:
   // otherwise a new handle info is created and bounds as the mapping for the
   // given handle. The result is only valid until the next call to this method
   // that creates a handle info so watch out.
-  HandleInfo *get_or_create_info(Handle handle, bool create_if_missing);
+  HandleShadow *get_or_create_shadow(Handle handle, bool create_if_missing);
 
 private:
 
-  platform_hash_map<address_arith_t, HandleInfo> handles_;
+  platform_hash_map<address_arith_t, HandleShadow> handles_;
 };
 
 } // namespace conprx

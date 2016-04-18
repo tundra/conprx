@@ -111,7 +111,9 @@ protected:
 
 // An interceptor deals with the full process of replacing the implementation of
 // NtRequestWaitReplyPort. There's a few steps to getting everything set up
-// properly and an interceptor deals with all that.
+// properly and an interceptor deals with all that. It's only fully implemented
+// on windows but much of the code is legal on linux as well so as much as
+// possible is kept platform-independent.
 class PatchingInterceptor : public Interceptor {
 public:
   typedef tclib::callback_t<conprx::NtStatus(lpc::Message*)> handler_t;
