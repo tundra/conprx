@@ -31,17 +31,21 @@
   F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _))  \
   F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _))
 
-#define lfTr(TR, DA, PA, SW) TR
-#define lfDa(TR, DA, PA, SW) DA
-#define lfPa(TR, DA, PA, SW) PA
-#define lpSw(TR, DA, PA, SW) SW
-
+// Messages that we know about and so don't want to dump/suspend on when
+// doing that on unknown messages, but that we also don't have an implementation
+// for.
 #define FOR_EACH_OTHER_KNOWN_LPC(F)                                                    \
   F(FillConsoleOutput,          ,                               0x00007,             ) \
   F(SetConsoleTextAttribute,    ,                               0x0001A,             ) \
   F(GetFileType,                ,                               0x00023,             ) \
   F(BaseDllInitHelper,          ,                               0x0004C,             ) \
   F(NlsGetUserInfo,             ,                               0x1001B,             )
+
+// LPC minor flag extractors.
+#define lfTr(TR, DA, PA, SW) TR
+#define lfDa(TR, DA, PA, SW) DA
+#define lfPa(TR, DA, PA, SW) PA
+#define lpSw(TR, DA, PA, SW) SW
 
 namespace conprx {
 

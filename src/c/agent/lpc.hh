@@ -212,8 +212,8 @@ private:
   FOR_EACH_LPC_FUNCTION(__DECLARE_REPLACEMENT_FUNCTION__)
 #undef __DECLARE_REPLACEMENT_FUNCTION__
 
-  // A message number that, if seen by the message infrastructure, is used to
-  // configure the infrastructure and not sent.
+  // Message numbers that, if seen by the message infrastructure in calibration
+  // mode, are used to configure the infrastructure and not sent.
   static const ulong_t kGetConsoleCPApiNum = 0x0003C;
   static const ulong_t kGetProcessShutdownParametersApiNum = 0x1000D;
 
