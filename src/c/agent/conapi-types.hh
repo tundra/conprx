@@ -9,8 +9,6 @@
 #include "c/stdc.h"
 #include "utils/types.hh"
 
-#define ntSuccess 0
-
 // Include custom headers for each toolchain.
 #ifdef IS_MSVC
 #include "conapi-types-msvc.hh"

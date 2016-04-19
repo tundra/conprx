@@ -21,7 +21,8 @@ using namespace tclib;
 // Set to true to make the message handler print any messages it doesn't
 // understand.
 static const bool kDumpUnknownMessages = false;
-static const bool kSuspendOnUnknownMessages = false;
+static const bool kSuspendOnUnknownConsoleMessages = false;
+static const bool kSuspendOnUnknownOtherMessages = false;
 
 LogEntry::LogEntry() {
   log_entry_default_init(&entry_, llInfo, NULL, 0, string_empty(), string_empty());
@@ -86,7 +87,7 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
     case lm##Name: {                                                           \
       lfTr FLAGS (trace_before(#name, request),);                              \
       NtStatus result = lfDa FLAGS (                                           \
-          request->send_to_backend(),                                          \
+          request->call_native_backend(),                                      \
           adaptor()->name(request, &request->data()->payload.name));           \
       lfTr FLAGS (trace_after(#name, request, result),);                       \
       return result;                                                           \
@@ -104,9 +105,12 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
         lpc::Interceptor::Disable disable(request->interceptor());
         request->dump(FileSystem::native()->std_out());
       }
-      if (kSuspendOnUnknownMessages) {
+      lpc::Message::Destination destination = request->destination();
+      bool should_suspend =
+             ((destination == lpc::Message::mdConsole) && kSuspendOnUnknownConsoleMessages)
+          || ((destination == lpc::Message::mdBase) && kSuspendOnUnknownOtherMessages);
+      if (should_suspend)
         NativeThread::sleep(Duration::seconds(30));
-      }
       return request->call_native_backend();
     }
   }

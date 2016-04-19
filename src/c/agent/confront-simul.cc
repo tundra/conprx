@@ -27,8 +27,8 @@ public:
     : frontend_(frontend)
     , platform_(platform) { }
 
-  virtual NtStatus call_native_backend(lpc::message_data_t *request,
-      lpc::message_data_t *incoming_reply);
+  virtual NtStatus call_native_backend(handle_t port,
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
@@ -43,8 +43,8 @@ private:
   InMemoryConsolePlatform *platform() { return platform_; }
 };
 
-NtStatus SimulatingInterceptor::call_native_backend(lpc::message_data_t *request,
-    lpc::message_data_t *incoming_reply) {
+NtStatus SimulatingInterceptor::call_native_backend(handle_t port,
+    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
   uint32_t apinum = request->header.api_number;
   switch (apinum) {
 #define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lpSw FLAGS (__GEN_DISPATCH__(Name, name),)
@@ -179,7 +179,7 @@ bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *mess
 }
 
 AbstractSimulatedMessage::AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend)
-  : message_(data(), data(), frontend->interceptor(), frontend->xform()) {
+  : message_(NULL, data(), data(), frontend->interceptor(), frontend->xform(), lpc::Message::mdConsole) {
   struct_zero_fill(data_);
 }
 

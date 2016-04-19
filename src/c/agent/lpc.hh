@@ -98,8 +98,8 @@ public:
     bool was_enabled_;
   };
 
-  virtual conprx::NtStatus call_native_backend(lpc::message_data_t *request,
-      lpc::message_data_t *incoming_reply) = 0;
+  virtual conprx::NtStatus call_native_backend(handle_t port,
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) = 0;
 
   // Capture the current stack trace, storing it in the given buffer. Returns
   // true iff enough stack could be captured to fill the buffer.
@@ -149,8 +149,8 @@ public:
 
   // Passes a call through this interceptor to the native backend it was
   // originally intended for.
-  virtual conprx::NtStatus call_native_backend(lpc::message_data_t *request,
-      lpc::message_data_t *incoming_reply);
+  virtual conprx::NtStatus call_native_backend(handle_t port,
+      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
 
 private:
   friend class Message;
@@ -179,6 +179,8 @@ private:
 
   // Process the calibration message sent after we've located CCCS.
   fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);
+
+  fat_bool_t process_base_request_message(handle_t port_handle, message_data_t *message);
 
   // Initialize the given patch.
   fat_bool_t initialize_patch(conprx::PatchRequest *request, const char *name,
@@ -212,7 +214,8 @@ private:
 
   // A message number that, if seen by the message infrastructure, is used to
   // configure the infrastructure and not sent.
-  static const ulong_t kGetConsoleCPApiNumber = 0x3C;
+  static const ulong_t kGetConsoleCPApiNum = 0x0003C;
+  static const ulong_t kGetProcessShutdownParametersApiNum = 0x1000D;
 
   handler_t handler_;
 
@@ -226,6 +229,10 @@ private:
   fat_bool_t locate_cccs_result_;
   cccs_f cccs_;
   handle_t locate_cccs_port_handle_;
+
+  bool is_determining_base_port_;
+  fat_bool_t determine_base_port_result_;
+  handle_t base_port_handle_;
 
   // Data associated with the calibration message.
   static const ulong_t kCalibrationApiNumber = 0xDECADE;
@@ -403,8 +410,14 @@ static size_t total_message_length_from_data_length(size_t data_length) {
 // fields of interest.
 class Message {
 public:
-  Message(message_data_t *request, message_data_t *reply,
-      Interceptor *interceptor, AddressXform xform);
+  // Symbolic representation of the possible destination ports.
+  enum Destination {
+    mdConsole,
+    mdBase
+  };
+
+  Message(handle_t port, message_data_t *request, message_data_t *reply,
+      Interceptor *interceptor, AddressXform xform, Destination destination);
 
   // The total size of the message data, including header and full payload.
   uint16_t total_length() { return data()->port_message.u1.s1.total_length; }
@@ -433,11 +446,19 @@ public:
   // intended to go.
   conprx::NtStatus call_native_backend();
 
+  // Which port was this message sent to?
+  Destination destination() { return destination_; }
+
+  // Handle of the port this message was sent to.
+  handle_t port() { return port_; }
+
 private:
+  handle_t port_;
   message_data_t *request_;
   message_data_t *reply_;
   Interceptor *interceptor_;
   AddressXform xform_;
+  Destination destination_;
 };
 
 } // namespace lpc

@@ -17,6 +17,9 @@ PatchingInterceptor::PatchingInterceptor(handler_t handler)
   , locate_cccs_result_(F_FALSE)
   , cccs_(NULL)
   , locate_cccs_port_handle_(INVALID_HANDLE_VALUE)
+  , is_determining_base_port_(false)
+  , determine_base_port_result_(F_FALSE)
+  , base_port_handle_(INVALID_HANDLE_VALUE)
   , is_calibrating_(false)
   , calibrate_result_(F_FALSE)
   , calibration_capbuf_(NULL)
@@ -39,7 +42,7 @@ ntstatus_t NTAPI PatchingInterceptor::nt_request_wait_reply_port_bridge(handle_t
   PatchingInterceptor *inter = current();
   if (inter->one_shot_special_handler_) {
     inter->one_shot_special_handler_ = false;
-    if (request->header.api_number == kGetConsoleCPApiNumber && inter->is_locating_cccs_) {
+    if (request->header.api_number == kGetConsoleCPApiNum && inter->is_locating_cccs_) {
       void *scratch[kLocateCCCSStackCaptureSize];
       Vector<void*> stack(scratch, kLocateCCCSStackCaptureSize);
       memset(stack.start(), 0, stack.size_bytes());
@@ -48,10 +51,13 @@ ntstatus_t NTAPI PatchingInterceptor::nt_request_wait_reply_port_bridge(handle_t
         // keep going.
         stack = Vector<void*>();
       inter->locate_cccs_result_ = inter->process_locate_cccs_message(port_handle, stack);
-      return ntSuccess;
+      return NtStatus::success().to_nt();
+    } else if (request->header.api_number == kGetProcessShutdownParametersApiNum && inter->is_determining_base_port_) {
+      inter->determine_base_port_result_ = inter->process_base_request_message(port_handle, request);
+      return NtStatus::success().to_nt();
     } else if (request->header.api_number == kCalibrationApiNumber && inter->is_calibrating_) {
       inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
-      return ntSuccess;
+      return NtStatus::success().to_nt();
     } else {
       return inter->nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
     }
@@ -62,12 +68,22 @@ ntstatus_t NTAPI PatchingInterceptor::nt_request_wait_reply_port_bridge(handle_t
 
 ntstatus_t PatchingInterceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *reply) {
-  if (enabled_ && port_handle == console_server_port_handle_) {
-    lpc::Message message(request, reply, this, port_xform());
+  if (enabled_) {
+    lpc::Message::Destination destination;
+    if (port_handle == console_server_port_handle_) {
+      destination = lpc::Message::Destination::mdConsole;
+    } else if (port_handle == base_port_handle_) {
+      destination = lpc::Message::Destination::mdBase;
+    } else {
+      // TODO: what's a cleaner way to express this control flow that doesn't
+      //   use goto?
+      goto pass_through;
+    }
+    lpc::Message message(port_handle, request, reply, this, port_xform(), destination);
     return handler_(&message).to_nt();
-  } else {
-    return nt_request_wait_reply_port_imposter(port_handle, request, reply);
   }
+ pass_through:
+  return nt_request_wait_reply_port_imposter(port_handle, request, reply);
 }
 
 fat_bool_t PatchingInterceptor::initialize_patch(PatchRequest *request,
@@ -81,10 +97,9 @@ fat_bool_t PatchingInterceptor::initialize_patch(PatchRequest *request,
   return F_TRUE;
 }
 
-NtStatus PatchingInterceptor::call_native_backend(lpc::message_data_t *request,
-    lpc::message_data_t *incoming_reply) {
-  ntstatus_t result = nt_request_wait_reply_port_imposter(console_server_port_handle_,
-      request, incoming_reply);
+NtStatus PatchingInterceptor::call_native_backend(handle_t port,
+    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
+  ntstatus_t result = nt_request_wait_reply_port_imposter(port, request, incoming_reply);
   return NtStatus::from_nt(result);
 }
 
@@ -151,6 +166,14 @@ fat_bool_t PatchingInterceptor::calibrate(PatchingInterceptor *inter) {
   GetConsoleCP();
   inter->is_locating_cccs_ = false;
   F_TRY(inter->locate_cccs_result_);
+
+  // Then try determining the base port. We do this by intercepting a call
+  // expected to go through that port.
+  inter->one_shot_special_handler_ = inter->is_determining_base_port_ = true;
+  dword_t dummy0 = 0;
+  dword_t dummy1 = 0;
+  GetProcessShutdownParameters(&dummy0, &dummy1);
+  F_TRY(inter->determine_base_port_result_);
 
   // From here on we don't need to be in a static function so we let a method
   // do the rest.
@@ -246,6 +269,12 @@ fat_bool_t PatchingInterceptor::process_calibration_message(handle_t port_handle
     // if they're not something is not right and we abort.
     return F_FALSE;
   calibration_capbuf_ = message->header.capture_buffer;
+  return F_TRUE;
+}
+
+fat_bool_t PatchingInterceptor::process_base_request_message(handle_t port_handle,
+    message_data_t *message) {
+  base_port_handle_ = port_handle;
   return F_TRUE;
 }
 

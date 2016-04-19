@@ -163,12 +163,14 @@ fat_bool_t PatchingInterceptor::infer_address_from_caller(tclib::Blob function,
   return F_FALSE;
 }
 
-Message::Message(message_data_t *request, message_data_t *reply,
-    Interceptor *interceptor, AddressXform xform)
-  : request_(request)
+Message::Message(handle_t port, message_data_t *request, message_data_t *reply,
+    Interceptor *interceptor, AddressXform xform, Destination destination)
+  : port_(port)
+  , request_(request)
   , reply_(reply)
   , interceptor_(interceptor)
-  , xform_(xform) {
+  , xform_(xform)
+  , destination_(destination) {
 }
 
 void Message::set_return_value(NtStatus status) {
@@ -191,7 +193,7 @@ void Message::dump(OutStream *out, Blob::DumpStyle style) {
 }
 
 NtStatus Message::call_native_backend() {
-  return interceptor()->call_native_backend(request_, reply_);
+  return interceptor()->call_native_backend(port_, request_, reply_);
 }
 
 #ifdef IS_MSVC

@@ -19,26 +19,29 @@
 //   - Pa: pure-agent function that doesn't involve calling the backend
 //   - Sw: this message should be implemented in the platform simulator
 //
-//  Name                        name                            num   (Tr Da Pa Sw)
-#define FOR_EACH_LPC_TO_INTERCEPT(F)                                              \
-  F(GetConsoleMode,             get_console_mode,               0x08, (_, _, X, X))  \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0B, (_, _, _, _))  \
-  F(SetConsoleMode,             set_console_mode,               0x11, (_, _, _, X))  \
-  F(ReadConsole,                read_console,                   0x1D, (_, _, _, _))  \
-  F(WriteConsole,               write_console,                  0x1E, (_, _, _, _))  \
-  F(GetConsoleTitle,            get_console_title,              0x24, (_, _, _, _))  \
-  F(SetConsoleTitle,            set_console_title,              0x25, (_, _, _, _))  \
-  F(GetConsoleCP,               get_console_cp,                 0x3C, (_, _, _, _))  \
-  F(SetConsoleCP,               set_console_cp,                 0x3D, (_, _, _, _))
+//  Name                        name                            apinum   (Tr Da Pa Sw)
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                                    \
+  F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X))  \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _))  \
+  F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X))  \
+  F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _))  \
+  F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _))  \
+  F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _))  \
+  F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _))  \
+  F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _))  \
+  F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _))
 
 #define lfTr(TR, DA, PA, SW) TR
 #define lfDa(TR, DA, PA, SW) DA
 #define lfPa(TR, DA, PA, SW) PA
 #define lpSw(TR, DA, PA, SW) SW
 
-#define FOR_EACH_OTHER_KNOWN_LPC(F)                                            \
-  F(BaseDllInitHelper,          ,                               76,      )     \
-  F(GetFileType,                ,                               35,      )
+#define FOR_EACH_OTHER_KNOWN_LPC(F)                                                    \
+  F(FillConsoleOutput,          ,                               0x00007,             ) \
+  F(SetConsoleTextAttribute,    ,                               0x0001A,             ) \
+  F(GetFileType,                ,                               0x00023,             ) \
+  F(BaseDllInitHelper,          ,                               0x0004C,             ) \
+  F(NlsGetUserInfo,             ,                               0x1001B,             )
 
 namespace conprx {
 
