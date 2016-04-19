@@ -14,11 +14,14 @@ namespace conprx {
 // should reflect that info.
 class HandleShadow {
 public:
-  HandleShadow() : mode_(0) { }
+  HandleShadow() : mode_(0), is_error_(false) { }
   uint32_t mode() { return mode_; }
   void set_mode(uint32_t value) { mode_ = value; }
+  bool is_error() { return is_error_; }
+  void set_is_error(bool value) { is_error_ = value; }
 private:
   uint32_t mode_;
+  bool is_error_;
 };
 
 // A handle manager keeps track of the active handles in a process.
@@ -26,7 +29,7 @@ class HandleManager {
 public:
   // Notifies this manager that the given handle is that process' representation
   // of the indicated standard handle type.
-  void register_std_handle(standard_handle_t type, Handle handle);
+  void register_std_handle(standard_handle_t type, Handle handle, uint32_t mode);
 
   void set_handle_mode(Handle handle, uint32_t mode);
 
@@ -36,6 +39,10 @@ public:
   // given handle. The result is only valid until the next call to this method
   // that creates a handle info so watch out.
   HandleShadow *get_or_create_shadow(Handle handle, bool create_if_missing);
+
+  // Returns the given handle's shadow. A shadow should exist, it's an error if
+  // it doesn't, but if it really doesn't a default shadow is returned.
+  HandleShadow get_shadow(Handle handle);
 
 private:
 

@@ -44,13 +44,18 @@ public:
   virtual word_t attributes() { return 0; }
   virtual small_rect_t position() { return small_rect_zero(); }
   virtual coord_t maximum_window_size() { return coord_zero(); }
+  virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
   static NoConsoleWindow *get();
 
 private:
   static NoConsoleWindow instance;
-  static coord_t coord_zero() { coord_t result = {0, 0}; return result; }
-  static small_rect_t small_rect_zero() { small_rect_t result = {0, 0, 0, 0}; return result; }
+  static coord_t coord_zero() { return coord_new(0, 0); }
+  static small_rect_t small_rect_zero() { return small_rect_new(0, 0, 0, 0); }
 };
+
+response_t<uint32_t> NoConsoleWindow::write(tclib::Blob blob, bool is_unicode, bool is_error) {
+  return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
+}
 
 NoConsoleWindow NoConsoleWindow::instance;
 
@@ -72,9 +77,9 @@ BasicConsoleBackend::~BasicConsoleBackend() {
 
 response_t<bool_t> BasicConsoleBackend::connect(Handle stdin_handle,
     Handle stdout_handle, Handle stderr_handle) {
-  handles()->register_std_handle(kStdInputHandle, stdin_handle);
-  handles()->register_std_handle(kStdOutputHandle, stdout_handle);
-  handles()->register_std_handle(kStdErrorHandle, stderr_handle);
+  handles()->register_std_handle(kStdInputHandle, stdin_handle, 0);
+  handles()->register_std_handle(kStdOutputHandle, stdout_handle, 0);
+  handles()->register_std_handle(kStdErrorHandle, stderr_handle, 0);
   return response_t<bool_t>::yes();
 }
 
@@ -165,8 +170,7 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
 }
 
 HandleShadow BasicConsoleBackend::get_handle_shadow(Handle handle) {
-  HandleShadow *info = handles()->get_or_create_shadow(handle, false);
-  return (info == NULL) ? HandleShadow() : *info;
+  return handles()->get_shadow(handle);
 }
 
 response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t mode) {
@@ -187,8 +191,8 @@ response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
 
 response_t<uint32_t> BasicConsoleBackend::write_console(Handle output,
     tclib::Blob data, bool is_unicode) {
-  // TODO: delegate to some I/O abstraction.
-  return response_t<uint32_t>::error(101);
+  HandleShadow shadow = get_handle_shadow(output);
+  return window()->write(data, is_unicode, shadow.is_error());
 }
 
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
@@ -291,8 +295,7 @@ void ConsoleBackendService::on_write_console(rpc::RequestData *data, ResponseCal
 }
 
 void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCallback resp) {
-  // TODO: implement.
-  resp(rpc::OutgoingResponse::failure(10002));
+  resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_NOT_IMPLEMENTED));
 }
 
 void ConsoleBackendService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {

@@ -32,6 +32,8 @@ public:
   virtual word_t attributes() = 0;
   virtual small_rect_t position() = 0;
   virtual coord_t maximum_window_size() = 0;
+  virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode,
+      bool is_error) = 0;
 };
 
 // Virtual type, implementations of which can be used as the implementation of

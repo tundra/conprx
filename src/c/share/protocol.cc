@@ -132,7 +132,7 @@ ConcreteSeedType<console_screen_buffer_infoex_t> *default_seed_type<console_scre
 
 static coord_t *new_coord(Variant header, Factory *factory) {
   coord_t *result = new (factory) coord_t;
-  struct_zero_fill(*result);
+  *result = coord_new(0, 0);
   return result;
 }
 
@@ -157,7 +157,7 @@ ConcreteSeedType<coord_t> *default_seed_type<coord_t>::get() {
 
 static small_rect_t *new_small_rect(Variant header, Factory *factory) {
   small_rect_t *result = new (factory) small_rect_t;
-  struct_zero_fill(*result);
+  *result = small_rect_new(0, 0, 0, 0);
   return result;
 }
 

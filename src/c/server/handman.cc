@@ -9,9 +9,11 @@ END_C_INCLUDES
 
 using namespace conprx;
 
-void HandleManager::register_std_handle(standard_handle_t type, Handle handle) {
-  get_or_create_shadow(handle, true);
-  // TODO: set the handle's initial mode.
+void HandleManager::register_std_handle(standard_handle_t type, Handle handle,
+    uint32_t mode) {
+  HandleShadow *shadow = get_or_create_shadow(handle, true);
+  shadow->set_mode(mode);
+  shadow->set_is_error(type == kStdErrorHandle);
 }
 
 void HandleManager::set_handle_mode(Handle handle, uint32_t mode) {
@@ -31,4 +33,9 @@ HandleShadow *HandleManager::get_or_create_shadow(Handle handle, bool create_if_
   } else {
     return &iter->second;
   }
+}
+
+HandleShadow HandleManager::get_shadow(Handle handle) {
+  HandleShadow *shadow = get_or_create_shadow(handle, false);
+  return (shadow == NULL) ? HandleShadow() : *shadow;
 }
