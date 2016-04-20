@@ -77,6 +77,16 @@ Variant DriverRequest::write_console_w(Handle output, tclib::Blob data) {
   return send("write_console_w", output_var, from_blob(data));
 }
 
+Variant DriverRequest::read_console_a(Handle input, uint32_t bufsize) {
+  NativeVariant input_var(&input);
+  return send("read_console_a", input_var, bufsize);
+}
+
+Variant DriverRequest::read_console_w(Handle input, uint32_t bufsize) {
+  NativeVariant input_var(&input);
+  return send("read_console_w", input_var, bufsize);
+}
+
 Variant DriverRequest::get_console_title_a(int64_t bufsize) {
   return send("get_console_title_a", bufsize);
 }

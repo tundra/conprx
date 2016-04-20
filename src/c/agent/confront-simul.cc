@@ -82,6 +82,11 @@ public:
   bool_t write_console_aw(handle_t output, const void *buffer, dword_t chars_to_write,
       dword_t *chars_written, bool is_unicode);
 
+  // Same principle as write_console_aw.
+  bool_t read_console_aw(handle_t input, void *buffer, dword_t chars_to_read,
+      dword_t *chars_read, console_readconsole_control_t *input_control,
+      bool is_unicode);
+
   virtual NtStatus get_last_error();
 
   virtual int64_t poke_backend(int64_t value);
@@ -294,6 +299,39 @@ bool_t SimulatingConsoleFrontend::write_console_aw(handle_t output, const void *
   agent()->on_message(message.message());
   if (chars_written != NULL)
     *chars_written = static_cast<dword_t>(payload->size_in_bytes / char_size);
+  return update_last_error(&message);
+}
+
+bool_t SimulatingConsoleFrontend::read_console_a(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  return read_console_aw(input, buffer, chars_to_read, chars_read, input_control, false);
+}
+
+bool_t SimulatingConsoleFrontend::read_console_w(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  return read_console_aw(input, buffer, chars_to_read, chars_read, input_control, true);
+}
+
+bool_t SimulatingConsoleFrontend::read_console_aw(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control,
+    bool is_unicode) {
+  SimulatedMessage<ConsoleAgent::lmReadConsole> message(this);
+  lpc::read_console_m *payload = message.payload();
+  size_t wide_char_size = sizeof(wide_char_t);
+  size_t char_size = is_unicode ? wide_char_size : 1;
+  // For some reason the buffer size is always set as if we're reading in
+  // unicode mode even if in ansi mode there is no opportunity to use the other
+  // half of the buffer. Go figure.
+  size_t buffer_size = chars_to_read * wide_char_size;
+  payload->is_unicode = is_unicode;
+  payload->buffer = (buffer_size <= lpc::kMaxInlineBytes)
+      ? buffer
+      : xform().local_to_remote(buffer);
+  payload->buffer_size = payload->size_in_bytes = static_cast<dword_t>(buffer_size);
+  payload->size_in_bytes = payload->buffer_size;
+  agent()->on_message(message.message());
+  if (chars_read != NULL)
+    *chars_read = static_cast<dword_t>(payload->size_in_bytes / char_size);
   return update_last_error(&message);
 }
 

@@ -142,6 +142,29 @@ void ConsoleFrontendService::write_console_w(rpc::RequestData *data, ResponseCal
   callback(rpc::OutgoingResponse::success(chars_written));
 }
 
+void ConsoleFrontendService::read_console_a(rpc::RequestData *data, ResponseCallback callback) {
+  handle_t input = data->argument(0).native_as<Handle>()->ptr();
+  dword_t chars_to_read = to_dword(data->argument(1));
+  TempBuffer<ansi_char_t> scratch(chars_to_read + 1);
+  dword_t chars_read = 0;
+  if (!frontend()->read_console_a(input, *scratch, chars_to_read, &chars_read, NULL))
+    return fail_request(data, callback);
+  Variant result = data->factory()->new_blob(*scratch, chars_read);
+  callback(rpc::OutgoingResponse::success(result));
+}
+
+void ConsoleFrontendService::read_console_w(rpc::RequestData *data, ResponseCallback callback) {
+  handle_t input = data->argument(0).native_as<Handle>()->ptr();
+  dword_t chars_to_read = to_dword(data->argument(1));
+  TempBuffer<wide_char_t> scratch(chars_to_read + 1);
+  dword_t chars_read = 0;
+  if (!frontend()->read_console_w(input, *scratch, chars_to_read, &chars_read, NULL))
+    return fail_request(data, callback);
+  uint32_t bytes_read = static_cast<uint32_t>(chars_read * sizeof(wide_char_t));
+  Variant result = data->factory()->new_blob(*scratch, bytes_read);
+  callback(rpc::OutgoingResponse::success(result));
+}
+
 void ConsoleFrontendService::get_console_title_a(rpc::RequestData *data, ResponseCallback callback) {
   dword_t chars_to_read = to_dword(data->argument(0));
   TempBuffer<ansi_char_t> scratch(chars_to_read + 1);

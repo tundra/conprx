@@ -48,6 +48,9 @@ public:
 
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode) = 0;
+
+  virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
+      bool is_unicode) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -87,6 +90,8 @@ public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       console_screen_buffer_infoex_t *info_out);
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
+      bool is_unicode);
+  virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
       bool is_unicode);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(

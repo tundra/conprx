@@ -430,6 +430,90 @@ AGENT_TEST(write_console_aw) {
   }
 }
 
+class ReadConsoleBackend : public BasicConsoleBackend {
+public:
+  ReadConsoleBackend()
+    : contents(ucs16_empty())
+    , last_request_size(0)
+    , last_is_unicode(false) { }
+
+  ~ReadConsoleBackend() { ucs16_default_delete(contents); }
+  response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
+      bool is_unicode, size_t *bytes_read_out);
+
+  void set_contents(const char *str) {
+    ucs16_default_delete(contents);
+    contents = blob_to_ucs16(StringUtils::as_blob(str, false), false);
+  }
+
+  ucs16_t contents;
+  size_t last_request_size;
+  bool last_is_unicode;
+};
+
+response_t<uint32_t> ReadConsoleBackend::read_console(Handle output,
+    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out) {
+  last_request_size = buffer.size();
+  last_is_unicode = is_unicode;
+  size_t read = ucs16_to_blob(contents, buffer, is_unicode);
+  *bytes_read_out = read;
+  return response_t<uint32_t>::of(static_cast<uint32_t>(read));
+}
+
+AGENT_TEST(read_console_aw) {
+  ReadConsoleBackend backend;
+  AGENT_TEST_PREAMBLE(&backend, use_real);
+
+  ansi_char_t ansi_chars[256];
+  wide_char_t wide_chars[256];
+  for (size_t i = 0; i < 255; i++) {
+    ansi_char_t c = static_cast<ansi_char_t>('A' + (i % 26));
+    ansi_chars[i] = c;
+    wide_chars[i] = c;
+  }
+  wide_chars[255] = ansi_chars[255] = 0;
+
+  backend.set_contents(ansi_chars);
+
+  DriverRequest gsh0 = driver.get_std_handle(conprx::kStdInputHandle);
+  Handle input = *gsh0->native_as<Handle>();
+  ASSERT_EQ(0, backend.last_request_size);
+  ASSERT_EQ(false, backend.last_is_unicode);
+
+  for (uint32_t i = 0; i < 255; i += 13) {
+    DriverRequest rca = driver.read_console_a(input, i);
+    ASSERT_EQ(i, backend.last_request_size);
+    ASSERT_EQ(false, backend.last_is_unicode);
+    ASSERT_TRUE(rca->is_blob());
+    ASSERT_EQ(i, rca->blob_size());
+    ASSERT_BLOBEQ(tclib::Blob(ansi_chars, i), as_blob(*rca));
+  }
+
+  for (uint32_t i = 0; i < 255; i += 17) {
+    size_t size_in_bytes = i * sizeof(wide_char_t);
+    DriverRequest rcw = driver.read_console_w(input, i);
+    ASSERT_EQ(size_in_bytes, backend.last_request_size);
+    ASSERT_EQ(true, backend.last_is_unicode);
+    ASSERT_TRUE(rcw->is_blob());
+    ASSERT_EQ(size_in_bytes, rcw->blob_size());
+    ASSERT_BLOBEQ(tclib::Blob(wide_chars, size_in_bytes), as_blob(*rcw));
+  }
+
+  const char *not_long = "SHORT";
+  backend.set_contents(not_long);
+
+  DriverRequest rca0 = driver.read_console_a(input, 100);
+  ASSERT_EQ(100, backend.last_request_size);
+  ASSERT_EQ(false, backend.last_is_unicode);
+  ASSERT_BLOBEQ(StringUtils::as_blob(not_long, false), as_blob(*rca0));
+
+  DriverRequest rcw0 = driver.read_console_w(input, 100);
+  ASSERT_EQ(200, backend.last_request_size);
+  ASSERT_EQ(true, backend.last_is_unicode);
+  wide_char_t not_long_wide[] = {'S', 'H', 'O', 'R', 'T', 0};
+  ASSERT_BLOBEQ(StringUtils::as_blob(not_long_wide, false), as_blob(*rcw0));
+}
+
 // A backend that fails on *everything*. Don't forget to add a test when you
 // add a new method.
 class FailingConsoleBackend : public ConsoleBackend {
@@ -445,6 +529,7 @@ public:
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
   response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_infoex_t *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
+  response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read) { return fail<uint32_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();
@@ -509,4 +594,6 @@ AGENT_TEST(failures) {
 
   ASSERT_EQ(70, get_last_error(driver.write_console_a(dummy_handle, StringUtils::as_blob("Foo"))));
   ASSERT_EQ(90, get_last_error(driver.write_console_w(dummy_handle, StringUtils::as_blob(wide_foo))));
+  ASSERT_EQ(115, get_last_error(driver.read_console_a(dummy_handle, 10)));
+  ASSERT_EQ(147, get_last_error(driver.read_console_w(dummy_handle, 10)));
 }

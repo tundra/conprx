@@ -45,6 +45,7 @@ public:
   virtual small_rect_t position() { return small_rect_zero(); }
   virtual coord_t maximum_window_size() { return coord_zero(); }
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
   static NoConsoleWindow *get();
 
 private:
@@ -54,6 +55,10 @@ private:
 };
 
 response_t<uint32_t> NoConsoleWindow::write(tclib::Blob blob, bool is_unicode, bool is_error) {
+  return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
+}
+
+response_t<uint32_t> NoConsoleWindow::read(tclib::Blob buffer, bool is_unicode) {
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
@@ -162,6 +167,20 @@ ucs16_t BasicConsoleBackend::blob_to_ucs16(tclib::Blob blob, bool is_unicode) {
   }
 }
 
+size_t BasicConsoleBackend::ucs16_to_blob(ucs16_t str, tclib::Blob blob, bool is_unicode) {
+  if (is_unicode) {
+    size_t size = min_size(str.length * sizeof(wide_char_t), blob.size());
+    memcpy(blob.start(), str.chars, size);
+    return size;
+  } else {
+    size_t length = min_size(blob.size(), str.length);
+    ansi_str_t astr = static_cast<ansi_str_t>(blob.start());
+    for (size_t i = 0; i < length; i++)
+      astr[i] = MsDosCodec::wide_to_ansi_char(str.chars[i]);
+    return length;
+  }
+}
+
 response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
     bool is_unicode) {
   ucs16_default_delete(title_);
@@ -193,6 +212,15 @@ response_t<uint32_t> BasicConsoleBackend::write_console(Handle output,
     tclib::Blob data, bool is_unicode) {
   HandleShadow shadow = get_handle_shadow(output);
   return window()->write(data, is_unicode, shadow.is_error());
+}
+
+response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
+    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out) {
+  response_t<uint32_t> resp = window()->read(buffer, is_unicode);
+  if (resp.has_error())
+    return resp;
+  *bytes_read_out = resp.value();
+  return resp;
 }
 
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
@@ -295,7 +323,27 @@ void ConsoleBackendService::on_write_console(rpc::RequestData *data, ResponseCal
 }
 
 void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCallback resp) {
-  resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_NOT_IMPLEMENTED));
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
+  uint32_t byte_size = static_cast<uint32_t>(data->argument(1).integer_value());
+  bool is_unicode = data->argument(2).bool_value();
+  plankton::Blob scratch_blob = data->factory()->new_blob(byte_size);
+  tclib::Blob scratch(scratch_blob.mutable_data(), byte_size);
+  blob_fill(scratch, 0);
+  size_t bytes_read = 0;
+  response_t<uint32_t> result = backend()->read_console(*handle, scratch, is_unicode,
+      &bytes_read);
+  if (result.has_error()) {
+    resp(rpc::OutgoingResponse::failure(Variant::integer(result.error_code())));
+  } else {
+    plankton::Blob response_blob = Variant::blob(scratch_blob.data(),
+        static_cast<uint32_t>(bytes_read));
+    Array pair = data->factory()->new_array(2);
+    pair.add(response_blob);
+    pair.add(result.value());
+    resp(rpc::OutgoingResponse::success(pair));
+  }
 }
 
 void ConsoleBackendService::on_set_console_title(rpc::RequestData *data, ResponseCallback resp) {

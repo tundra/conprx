@@ -23,6 +23,7 @@ public:
   virtual coord_t maximum_window_size() { return size(); }
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode,
       bool is_error);
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
 };
 
 response_t<uint32_t> HostWindow::write(tclib::Blob blob, bool is_unicode,
@@ -35,6 +36,10 @@ response_t<uint32_t> HostWindow::write(tclib::Blob blob, bool is_unicode,
     fflush(stream);
     return response_t<uint32_t>::of(static_cast<uint32_t>(blob.size()));
   }
+}
+
+response_t<uint32_t> HostWindow::read(tclib::Blob buffer, bool is_unicode) {
+  return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
 static bool should_trace() {

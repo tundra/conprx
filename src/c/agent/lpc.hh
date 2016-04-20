@@ -348,7 +348,21 @@ struct write_console_m {
   int32_t unused_3;
 };
 
-struct read_console_m { };
+struct read_console_m {
+  handle_t input;
+  ushort_t padding_1;
+  union {
+    uint8_t inline_ansi_buffer[kMaxInlineBytes];
+    uint16_t inline_wide_buffer[kMaxInlineBytes / sizeof(uint16_t)];
+  };
+  void *buffer;
+  uint32_t size_in_bytes;
+  uint32_t buffer_size;
+  uint32_t padding_2;
+  uint32_t padding_3;
+  uint32_t padding_4;
+  bool is_unicode;
+};
 
 struct message_data_header_t {
   capture_buffer_data_t *capture_buffer;

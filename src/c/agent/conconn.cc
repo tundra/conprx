@@ -143,8 +143,20 @@ NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
 
 NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
     lpc::read_console_m *payload) {
-  // TODO: implement.
-  return req->call_native_backend();
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  bool is_inline = payload->buffer_size <= lpc::kMaxInlineBytes;
+  void *start = is_inline
+      ? payload->buffer
+      : req->xform().remote_to_local(payload->buffer);
+  size_t real_bufsize = payload->is_unicode
+      ? payload->buffer_size
+      : payload->buffer_size / sizeof(wide_char_t);
+  tclib::Blob scratch(start, real_bufsize);
+  response_t<uint32_t> resp = connector()->read_console(payload->input, scratch,
+      payload->is_unicode);
+  req->set_return_value(NtStatus::from_response(resp));
+  payload->size_in_bytes = resp.value();
+  return NtStatus::success();
 }
 
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
@@ -293,6 +305,24 @@ response_t<uint32_t> PrpcConsoleConnector::write_console(Handle output,
   rpc::OutgoingRequest req(Variant::null(), "write_console", 3, args);
   rpc::IncomingResponse resp;
   return send_request_default<uint32_t>(&req, &resp);
+}
+
+response_t<uint32_t> PrpcConsoleConnector::read_console(Handle input,
+    tclib::Blob buffer, bool is_unicode) {
+  NativeVariant input_var(&input);
+  Variant args[3] = {input_var, buffer.size(), Variant::boolean(is_unicode)};
+  rpc::OutgoingRequest req(Variant::null(), "read_console", 3, args);
+  rpc::IncomingResponse resp;
+  response_t<Variant> result = send_request_default<Variant>(&req, &resp);
+  if (result.has_error())
+    return response_t<uint32_t>::error(result);
+  Array pair = result.value();
+  plankton::Blob presult = pair[0];
+  // size_t char_size = is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
+  uint32_t return_value = static_cast<uint32_t>(pair[1].integer_value());
+  uint32_t bytes_to_write = static_cast<uint32_t>(min_size(presult.size(), buffer.size()));
+  blob_copy_to(tclib::Blob(presult.data(), bytes_to_write), buffer);
+  return response_t<uint32_t>::of(return_value);
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

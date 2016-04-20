@@ -34,6 +34,7 @@ public:
   virtual coord_t maximum_window_size() = 0;
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode,
       bool is_error) = 0;
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode) = 0;
 };
 
 // Virtual type, implementations of which can be used as the implementation of
@@ -70,6 +71,9 @@ public:
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode) = 0;
 
+  virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
+      bool is_unicode, size_t *bytes_read_out) = 0;
+
   // Fill in the given output parameter with information about the buffer with
   // the given handle.
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
@@ -95,6 +99,8 @@ public:
       console_screen_buffer_infoex_t *info_out);
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
+  virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
+      bool is_unicode, size_t *bytes_read_out);
 
   // Returns info about the given handle, if the handle isn't known the default
   // info is returned.
@@ -112,6 +118,12 @@ public:
 
   // Converts a blob that may or may not be unicode to a ucs16-string.
   static ucs16_t blob_to_ucs16(tclib::Blob blob, bool is_unicode);
+
+  // Writes as much as will fit of the given string to the given blob that may
+  // or may not be viewed as unicode. Returns the number of bytes written. All
+  // the string's data is written and not null terminator is written into the
+  // blob.
+  size_t ucs16_to_blob(ucs16_t str, tclib::Blob blob, bool is_unicode);
 
   // Returns the size of an individual character under unicode/non-unicode.
   static size_t get_char_size(bool is_unicode);

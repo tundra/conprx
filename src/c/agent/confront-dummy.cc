@@ -53,6 +53,18 @@ bool_t DummyConsoleFrontend::write_console_w(handle_t output, const void *buffer
   return false;
 }
 
+bool_t DummyConsoleFrontend::read_console_a(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  *chars_read = 0;
+  return false;
+}
+
+bool_t DummyConsoleFrontend::read_console_w(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  *chars_read = 0;
+  return false;
+}
+
 static size_t min_size(size_t a, size_t b) {
   return (a < b) ? a : b;
 }

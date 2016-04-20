@@ -41,6 +41,16 @@ bool_t WindowsConsoleFrontend::write_console_w(handle_t output, const void *buff
   return WriteConsoleW(output, buffer, chars_to_write, chars_written, reserved);
 }
 
+bool_t WindowsConsoleFrontend::read_console_a(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  return ReadConsoleA(input, buffer, chars_to_read, chars_read, input_control);
+}
+
+bool_t WindowsConsoleFrontend::read_console_w(handle_t input, void *buffer,
+    dword_t chars_to_read, dword_t *chars_read, console_readconsole_control_t *input_control) {
+  return ReadConsoleW(input, buffer, chars_to_read, chars_read, input_control);
+}
+
 dword_t WindowsConsoleFrontend::get_console_title_a(ansi_str_t str, dword_t n) {
   return GetConsoleTitleA(str, n);
 }
