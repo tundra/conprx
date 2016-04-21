@@ -379,6 +379,85 @@ AGENT_TEST(get_info) {
     ASSERT_EQ(0x0DECADE0 + i, i1->ColorTable[i]);
 }
 
+// Helper that makes it easy to build a list of integer ranges to use as test
+// cases. Honestly it's gratuitously, unnecessarily general with the whole
+// quadratic/cubic thing but I just needed to take the opportunity to implement
+// a difference engine when I could.
+class CaseMaker {
+public:
+  typedef std::vector<size_t>::iterator iterator;
+  iterator begin() { return entries_.begin(); }
+  iterator end() { return entries_.end(); }
+
+  // Adds a linear range of cases, starting with first, then next, and then
+  // continuing at the same interval until reaching the limit. The limit itself
+  // is not added.
+  void add_cases(size_t a, size_t b, size_t limit);
+
+  // Adds a quadratic range.
+  void add_cases(size_t a, size_t b, size_t c, size_t limit);
+
+  // Adds a cubic range.
+  void add_cases(size_t a, size_t b, size_t c, size_t d, size_t limit);
+
+  // Adds an individual case.
+  void add_case(size_t value) { entries_.push_back(value); }
+
+private:
+  void run_difference_engine(size_t diffc, size_t *diffv, size_t limit);
+
+  std::vector<size_t> entries_;
+};
+
+void CaseMaker::add_cases(size_t a, size_t b, size_t limit) {
+  size_t valv[2] = {a, b};
+  run_difference_engine(2, valv, limit);
+}
+
+void CaseMaker::add_cases(size_t a, size_t b, size_t c, size_t limit) {
+  size_t valv[3] = {a, b, c};
+  run_difference_engine(3, valv, limit);
+}
+
+void CaseMaker::add_cases(size_t a, size_t b, size_t c, size_t d, size_t limit) {
+  size_t valv[4] = {a, b, c, d};
+  run_difference_engine(4, valv, limit);
+}
+
+void CaseMaker::run_difference_engine(size_t valc, size_t *valv, size_t limit) {
+  ASSERT_REL(valc, <=, 16);
+  // Calculate the n'th order differences.
+  size_t diffa[16];
+  size_t diffb[16];
+  memcpy(diffa, valv, sizeof(size_t) * valc);
+  size_t diffv[16];
+  for (size_t io = 0; io < valc; io++) {
+    size_t *from = ((io & 1) == 0) ? diffa : diffb;
+    size_t *to = ((io & 1) == 0) ? diffb : diffa;
+    diffv[io] = from[0];
+    for (size_t iw = 0; iw < (valc - io); iw++) {
+      to[iw] = from[iw + 1] - from[iw];
+    }
+  }
+  // Then run the difference calculation!
+  while (diffv[0] < limit) {
+    add_case(diffv[0]);
+    for (size_t i = 0; i < valc - 1; i++)
+      diffv[i] += diffv[i + 1];
+  }
+}
+
+// Adds test cases that cover the range between 0 and 255 with special emphasis
+// around the message inline limits, 80 (ansi chars) and 40 (wide).
+static void add_inline_limit_cases(CaseMaker *cases) {
+  cases->add_cases(0, 5, 35); // Skim over the short strings
+  cases->add_cases(35, 36, 45); // Slowly over the first inline/noninline boundary
+  cases->add_cases(45, 50, 75); // Skim
+  cases->add_cases(75, 76, 85); // Slowly over the second inline/noninline boundary
+  cases->add_cases(85, 92, 255); // Fast to the end
+  cases->add_case(255); // Remember the boundary.
+}
+
 class WriteConsoleBackend : public BasicConsoleBackend {
 public:
   WriteConsoleBackend() : last_written(ucs16_empty()) { }
@@ -411,20 +490,25 @@ AGENT_TEST(write_console_aw) {
   }
   wide_chars[255] = ansi_chars[255] = 0;
 
-  for (size_t i = 0; i < 255; i += 13) {
-    size_t wide_size = i * sizeof(wide_char_t);
-    DriverRequest wca0 = driver.write_console_a(output, tclib::Blob(ansi_chars, i));
-    ASSERT_EQ(i, wca0->integer_value());
-    ASSERT_EQ(i, backend.last_written.length);
+  CaseMaker cases;
+  add_inline_limit_cases(&cases);
+
+  for (CaseMaker::iterator i = cases.begin(); i != cases.end(); i++) {
+    size_t chars = *i;
+    size_t wide_size = chars * sizeof(wide_char_t);
+    DriverRequest wca0 = driver.write_console_a(output, tclib::Blob(ansi_chars, chars));
+    ASSERT_EQ(chars, wca0->integer_value());
+    ASSERT_EQ(chars, backend.last_written.length);
     ASSERT_BLOBEQ(tclib::Blob(backend.last_written.chars, wide_size),
         tclib::Blob(wide_chars, wide_size));
   }
 
-  for (size_t i = 0; i < 255; i += 17) {
-    size_t wide_size = i * sizeof(wide_char_t);
+  for (CaseMaker::iterator i = cases.begin(); i != cases.end(); i++) {
+    size_t chars = *i;
+    size_t wide_size = chars * sizeof(wide_char_t);
     DriverRequest wcw0 = driver.write_console_w(output, tclib::Blob(wide_chars, wide_size));
-    ASSERT_EQ(i, wcw0->integer_value());
-    ASSERT_EQ(i, backend.last_written.length);
+    ASSERT_EQ(chars, wcw0->integer_value());
+    ASSERT_EQ(chars, backend.last_written.length);
     ASSERT_BLOBEQ(tclib::Blob(backend.last_written.chars, wide_size),
         tclib::Blob(wide_chars, wide_size));
   }
@@ -460,6 +544,34 @@ response_t<uint32_t> ReadConsoleBackend::read_console(Handle output,
   return response_t<uint32_t>::of(static_cast<uint32_t>(read));
 }
 
+TEST(agent, case_maker) {
+  CaseMaker l;
+  l.add_cases(10, 12, 20);
+  l.add_cases(101, 104, 109, 150);
+  l.add_cases(1001, 1008, 1027, 1064, 1400);
+  CaseMaker::iterator li = l.begin();
+  ASSERT_EQ(10, *li); li++;
+  ASSERT_EQ(12, *li); li++;
+  ASSERT_EQ(14, *li); li++;
+  ASSERT_EQ(16, *li); li++;
+  ASSERT_EQ(18, *li); li++;
+  ASSERT_EQ(101, *li); li++;
+  ASSERT_EQ(104, *li); li++;
+  ASSERT_EQ(109, *li); li++;
+  ASSERT_EQ(116, *li); li++;
+  ASSERT_EQ(125, *li); li++;
+  ASSERT_EQ(136, *li); li++;
+  ASSERT_EQ(149, *li); li++;
+  ASSERT_EQ(1001, *li); li++;
+  ASSERT_EQ(1008, *li); li++;
+  ASSERT_EQ(1027, *li); li++;
+  ASSERT_EQ(1064, *li); li++;
+  ASSERT_EQ(1125, *li); li++;
+  ASSERT_EQ(1216, *li); li++;
+  ASSERT_EQ(1343, *li); li++;
+  ASSERT_TRUE(li == l.end());
+}
+
 AGENT_TEST(read_console_aw) {
   ReadConsoleBackend backend;
   AGENT_TEST_PREAMBLE(&backend, use_real);
@@ -480,18 +592,23 @@ AGENT_TEST(read_console_aw) {
   ASSERT_EQ(0, backend.last_request_size);
   ASSERT_EQ(false, backend.last_is_unicode);
 
-  for (uint32_t i = 0; i < 255; i += 13) {
-    DriverRequest rca = driver.read_console_a(input, i);
-    ASSERT_EQ(i, backend.last_request_size);
+  CaseMaker cases;
+  add_inline_limit_cases(&cases);
+
+  for (CaseMaker::iterator i = cases.begin(); i != cases.end(); i++) {
+    uint32_t chars = static_cast<uint32_t>(*i);
+    DriverRequest rca = driver.read_console_a(input, chars);
+    ASSERT_EQ(chars, backend.last_request_size);
     ASSERT_EQ(false, backend.last_is_unicode);
     ASSERT_TRUE(rca->is_blob());
-    ASSERT_EQ(i, rca->blob_size());
-    ASSERT_BLOBEQ(tclib::Blob(ansi_chars, i), as_blob(*rca));
+    ASSERT_EQ(chars, rca->blob_size());
+    ASSERT_BLOBEQ(tclib::Blob(ansi_chars, chars), as_blob(*rca));
   }
 
-  for (uint32_t i = 0; i < 255; i += 17) {
-    size_t size_in_bytes = i * sizeof(wide_char_t);
-    DriverRequest rcw = driver.read_console_w(input, i);
+  for (CaseMaker::iterator i = cases.begin(); i != cases.end(); i++) {
+    uint32_t chars = static_cast<uint32_t>(*i);
+    size_t size_in_bytes = chars * sizeof(wide_char_t);
+    DriverRequest rcw = driver.read_console_w(input, chars);
     ASSERT_EQ(size_in_bytes, backend.last_request_size);
     ASSERT_EQ(true, backend.last_is_unicode);
     ASSERT_TRUE(rcw->is_blob());
