@@ -17,7 +17,7 @@ Launcher::Launcher()
   : state_(lsConstructed)
   , agent_monitor_done_(Drawbridge::dsLowered)
   , backend_(NULL) {
-  process_.set_flags(pfStartSuspendedOnWindows);
+  process_.set_flags(pfStartSuspendedOnWindows | pfNewHiddenConsoleOnWindows);
 }
 
 fat_bool_t InjectingLauncher::prepare_start() {

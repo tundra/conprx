@@ -347,19 +347,12 @@ public:
   // Main entry-point.
   fat_bool_t inner_main(int argc, const char **argv);
 
-  // If required, allocate a new console for this driver.
-  fat_bool_t maybe_alloc_console();
-
-  // If we allocated a new console earlier, free it now.
-  fat_bool_t maybe_free_console();
-
   // Sets up allocators, crash handling, etc, before calling the inner main.
   static int outer_main(int argc, const char **argv);
 
 private:
   CommandLineReader reader_;
   bool silence_log_;
-  bool alloc_console_;
   SilentLog silent_log_;
 
   // The channel through which the client communicates with this driver.
@@ -385,7 +378,6 @@ private:
 
 ConsoleDriverMain::ConsoleDriverMain()
   : silence_log_(false)
-  , alloc_console_(true)
   , channel_name_(string_empty())
   , frontend_type_(dfDummy)
   , port_delta_(0)
@@ -402,7 +394,6 @@ fat_bool_t ConsoleDriverMain::parse_args(int argc, const char **argv) {
   }
 
   silence_log_ = cmdline->option("silence-log").bool_value(silence_log_);
-  alloc_console_ = cmdline->option("alloc-console").bool_value(alloc_console_);
 
   const char *channel = cmdline->option("channel").string_chars();
   if (channel == NULL) {
@@ -498,10 +489,8 @@ fat_bool_t ConsoleDriverMain::run() {
 
 fat_bool_t ConsoleDriverMain::inner_main(int argc, const char **argv) {
   F_TRY(parse_args(argc, argv));
-  F_TRY(maybe_alloc_console());
   F_TRY(open_connection());
   F_TRY(run());
-  F_TRY(maybe_free_console());
   return F_TRUE;
 }
 
@@ -535,9 +524,3 @@ int ConsoleDriverMain::outer_main(int argc, const char **argv) {
 int main(int argc, const char *argv[]) {
   return ConsoleDriverMain::outer_main(argc, argv);
 }
-
-#ifdef IS_MSVC
-#  include "driver-msvc.cc"
-#else
-#  include "driver-posix.cc"
-#endif
