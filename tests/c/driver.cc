@@ -334,18 +334,24 @@ public:
   ConsoleDriverMain();
 
   // Parse command-line arguments and store their values in the fields.
-  bool parse_args(int argc, const char **argv);
+  fat_bool_t parse_args(int argc, const char **argv);
 
   // Open the connection to the server.
-  bool open_connection();
+  fat_bool_t open_connection();
 
   // Runs the driver service.
-  bool run();
+  fat_bool_t run();
 
   bool install_fake_agent();
 
   // Main entry-point.
-  bool inner_main(int argc, const char **argv);
+  fat_bool_t inner_main(int argc, const char **argv);
+
+  // If required, allocate a new console for this driver.
+  fat_bool_t maybe_alloc_console();
+
+  // If we allocated a new console earlier, free it now.
+  fat_bool_t maybe_free_console();
 
   // Sets up allocators, crash handling, etc, before calling the inner main.
   static int outer_main(int argc, const char **argv);
@@ -353,6 +359,7 @@ public:
 private:
   CommandLineReader reader_;
   bool silence_log_;
+  bool alloc_console_;
   SilentLog silent_log_;
 
   // The channel through which the client communicates with this driver.
@@ -378,27 +385,29 @@ private:
 
 ConsoleDriverMain::ConsoleDriverMain()
   : silence_log_(false)
+  , alloc_console_(true)
   , channel_name_(string_empty())
   , frontend_type_(dfDummy)
   , port_delta_(0)
   , fake_agent_channel_name_(string_empty())
   , fake_platform_(NULL) { }
 
-bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
+fat_bool_t ConsoleDriverMain::parse_args(int argc, const char **argv) {
   CommandLine *cmdline = reader_.parse(argc - 1, argv + 1);
   if (!cmdline->is_valid()) {
     SyntaxError *error = cmdline->error();
     LOG_ERROR("Error parsing command-line at %i (char '%c')", error->offset(),
         error->offender());
-    return false;
+    return F_FALSE;
   }
 
-  silence_log_ = cmdline->option("silence-log").bool_value();
+  silence_log_ = cmdline->option("silence-log").bool_value(silence_log_);
+  alloc_console_ = cmdline->option("alloc-console").bool_value(alloc_console_);
 
   const char *channel = cmdline->option("channel").string_chars();
   if (channel == NULL) {
     LOG_ERROR("No channel name specified");
-    return false;
+    return F_FALSE;
   }
   channel_name_ = new_c_string(channel);
 
@@ -417,10 +426,10 @@ bool ConsoleDriverMain::parse_args(int argc, const char **argv) {
   Variant port_delta = cmdline->option("port-delta");
   port_delta_ = static_cast<ssize_t>(port_delta.integer_value());
 
-  return true;
+  return F_TRUE;
 }
 
-bool ConsoleDriverMain::open_connection() {
+fat_bool_t ConsoleDriverMain::open_connection() {
   if (silence_log_)
     silent_log_.ensure_installed();
   if (use_fake_agent()) {
@@ -429,17 +438,17 @@ bool ConsoleDriverMain::open_connection() {
     fake_platform_ = platform.peek();
     fake_agent_channel_ = ClientChannel::create();
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
-      return false;
+      return F_FALSE;
     fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
     if (!install_fake_agent())
-      return false;
+      return F_FALSE;
   } else {
     platform_ = IF_MSVC(ConsolePlatform::new_native(), InMemoryConsolePlatform::new_simulating());
   }
   channel_ = ClientChannel::create();
   if (!channel()->open(channel_name_))
-    return false;
-  return true;
+    return F_FALSE;
+  return F_TRUE;
 }
 
 bool ConsoleDriverMain::install_fake_agent() {
@@ -450,7 +459,7 @@ bool ConsoleDriverMain::install_fake_agent() {
       fake_agent_channel()->out(), *platform_);
 }
 
-bool ConsoleDriverMain::run() {
+fat_bool_t ConsoleDriverMain::run() {
   // Hook up the console service to the main channel.
   rpc::StreamServiceConnector connector(channel()->in(), channel()->out());
   connector.set_default_type_registry(ConsoleTypes::registry());
@@ -479,16 +488,21 @@ bool ConsoleDriverMain::run() {
   }
   ConsoleFrontendService driver(*frontend, *platform_);
   if (!connector.init(driver.handler()))
-    return false;
-  bool result = connector.process_all_messages();
+    return F_FALSE;
+  fat_bool_t result = connector.process_all_messages();
   channel()->out()->close();
   if (use_fake_agent())
     F_TRY(fake_agent()->uninstall_agent());
   return result;
 }
 
-bool ConsoleDriverMain::inner_main(int argc, const char **argv) {
-  return parse_args(argc, argv) && open_connection() && run();
+fat_bool_t ConsoleDriverMain::inner_main(int argc, const char **argv) {
+  F_TRY(parse_args(argc, argv));
+  F_TRY(maybe_alloc_console());
+  F_TRY(open_connection());
+  F_TRY(run());
+  F_TRY(maybe_free_console());
+  return F_TRUE;
 }
 
 int ConsoleDriverMain::outer_main(int argc, const char **argv) {
@@ -498,13 +512,17 @@ int ConsoleDriverMain::outer_main(int argc, const char **argv) {
   fingerprinting_allocator_install(&fingerprinter);
   install_crash_handler();
 
-  bool result;
+  fat_bool_t result;
   {
     ConsoleDriverMain main;
     result = main.inner_main(argc, argv);
   }
-  if (!result)
+
+  if (!result) {
+    LOG_ERROR("Driver failed: " kFatBoolFileLine, fat_bool_file(result),
+        fat_bool_line(result));
     return 1;
+  }
 
   if (fingerprinting_allocator_uninstall(&fingerprinter)
       && limited_allocator_uninstall(&limiter)) {
@@ -517,3 +535,9 @@ int ConsoleDriverMain::outer_main(int argc, const char **argv) {
 int main(int argc, const char *argv[]) {
   return ConsoleDriverMain::outer_main(argc, argv);
 }
+
+#ifdef IS_MSVC
+#  include "driver-msvc.cc"
+#else
+#  include "driver-posix.cc"
+#endif

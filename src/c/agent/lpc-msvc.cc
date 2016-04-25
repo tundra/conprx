@@ -9,6 +9,11 @@ using namespace conprx;
 using namespace lpc;
 using namespace tclib;
 
+PortView::PortView()
+  : calibration_result_(F_FALSE)
+  , calibration_capbuf_(NULL)
+  , handle_(INVALID_HANDLE_VALUE) { }
+
 PatchingInterceptor::PatchingInterceptor(handler_t handler)
   : handler_(handler)
   , patches_(Platform::get(), Vector<PatchRequest>(patch_requests_, kPatchRequestCount))
@@ -20,10 +25,7 @@ PatchingInterceptor::PatchingInterceptor(handler_t handler)
   , is_determining_base_port_(false)
   , determine_base_port_result_(F_FALSE)
   , base_port_handle_(INVALID_HANDLE_VALUE)
-  , is_calibrating_(false)
-  , calibrate_result_(F_FALSE)
-  , calibration_capbuf_(NULL)
-  , console_server_port_handle_(INVALID_HANDLE_VALUE) {
+  , active_calibration_(NULL) {
   CHECK_EQ("stack grows up", -1, infer_stack_direction());
 }
 
@@ -55,8 +57,8 @@ ntstatus_t NTAPI PatchingInterceptor::nt_request_wait_reply_port_bridge(handle_t
     } else if (request->header.api_number == kGetProcessShutdownParametersApiNum && inter->is_determining_base_port_) {
       inter->determine_base_port_result_ = inter->process_base_request_message(port_handle, request);
       return NtStatus::success().to_nt();
-    } else if (request->header.api_number == kCalibrationApiNumber && inter->is_calibrating_) {
-      inter->calibrate_result_ = inter->process_calibration_message(port_handle, request);
+    } else if (inter->active_calibration() != NULL && request->header.api_number == inter->active_calibration()->apinum()) {
+      inter->active_calibration()->process_calibration_message(port_handle, request);
       return NtStatus::success().to_nt();
     } else {
       return inter->nt_request_wait_reply_port_imposter(port_handle, request, incoming_reply);
@@ -70,7 +72,7 @@ ntstatus_t PatchingInterceptor::nt_request_wait_reply_port(handle_t port_handle,
     message_data_t *request, message_data_t *reply) {
   if (enabled_) {
     lpc::Message::Destination destination;
-    if (port_handle == console_server_port_handle_) {
+    if (port_handle == console_port_handle()) {
       destination = lpc::Message::Destination::mdConsole;
     } else if (port_handle == base_port_handle_) {
       destination = lpc::Message::Destination::mdBase;
@@ -181,24 +183,43 @@ fat_bool_t PatchingInterceptor::calibrate(PatchingInterceptor *inter) {
 }
 
 fat_bool_t PatchingInterceptor::infer_calibration_from_cccs() {
+  return console_port()->infer_calibration(this);
+}
+
+fat_bool_t PatchingInterceptor::calibrate_console_port() {
+  console_port_ = PortView();
+  return infer_calibration_from_cccs();
+}
+
+fat_bool_t PortView::infer_calibration(PatchingInterceptor *inter) {
   // Then send the artificial calibration message.
   lpc::message_data_t message;
   struct_zero_fill(message);
   lpc::capture_buffer_data_t capbuf;
   struct_zero_fill(capbuf);
-  one_shot_special_handler_ = is_calibrating_ = true;
-  (cccs_)(reinterpret_cast<lpc::message_data_t*>(&message), &capbuf,
+
+  inter->one_shot_special_handler_ = true;
+  inter->active_calibration_ = this;
+  (inter->cccs_)(reinterpret_cast<lpc::message_data_t*>(&message), &capbuf,
       kCalibrationApiNumber, sizeof(message.payload.get_console_cp));
-  is_calibrating_ = false;
-  F_TRY(calibrate_result_);
+  inter->active_calibration_ = NULL;
+  F_TRY(calibration_result_);
 
   // The calibration message appears to have gone well. Now we have the info we
   // need to calibration.
   address_t local_address = reinterpret_cast<address_t>(&capbuf);
   address_t remote_address = reinterpret_cast<address_t>(calibration_capbuf_);
-  port_xform_ = AddressXform(local_address - remote_address);
-  console_server_port_handle_ = locate_cccs_port_handle_;
+  xform_ = AddressXform(local_address - remote_address);
+  calibration_capbuf_ = NULL;
 
+  return F_TRUE;
+}
+
+fat_bool_t PortView::process_calibration_message(handle_t port_handle,
+    message_data_t *message) {
+  calibration_capbuf_ = message->header.capture_buffer;
+  handle_ = port_handle;
+  calibration_result_ = F_TRUE;
   return F_TRUE;
 }
 
@@ -260,16 +281,6 @@ fat_bool_t PatchingInterceptor::process_locate_cccs_message(handle_t port_handle
     // If they both failed we can only return one so return this one.
     return caller_result;
   }
-}
-
-fat_bool_t PatchingInterceptor::process_calibration_message(handle_t port_handle,
-    message_data_t *message) {
-  if (locate_cccs_port_handle_ != port_handle)
-    // Definitely both of these messages should be going to the same port so
-    // if they're not something is not right and we abort.
-    return F_FALSE;
-  calibration_capbuf_ = message->header.capture_buffer;
-  return F_TRUE;
 }
 
 fat_bool_t PatchingInterceptor::process_base_request_message(handle_t port_handle,

@@ -50,14 +50,17 @@ TEST(driver, get_std_handle) {
   ASSERT_TRUE(driver.start());
   ASSERT_TRUE(driver.connect());
 
-  DriverRequest gsh10 = driver.get_std_handle(-10);
+  DriverRequest gsh10 = driver.get_std_handle(kStdInputHandle);
   ASSERT_TRUE(gsh10->native_as<Handle>()->is_valid());
+  ASSERT_TRUE(gsh10->native_as<Handle>()->is_console());
 
-  DriverRequest gsh11 = driver.get_std_handle(-11);
+  DriverRequest gsh11 = driver.get_std_handle(kStdOutputHandle);
   ASSERT_TRUE(gsh11->native_as<Handle>()->is_valid());
+  ASSERT_TRUE(gsh11->native_as<Handle>()->is_console());
 
-  DriverRequest gsh12 = driver.get_std_handle(-12);
+  DriverRequest gsh12 = driver.get_std_handle(kStdErrorHandle);
   ASSERT_TRUE(gsh12->native_as<Handle>()->is_valid());
+  ASSERT_TRUE(gsh12->native_as<Handle>()->is_console());
 
   DriverRequest gsh1000 = driver.get_std_handle(1000);
   ASSERT_FALSE(gsh1000->native_as<Handle>()->is_valid());

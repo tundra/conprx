@@ -159,6 +159,21 @@ NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
   return NtStatus::success();
 }
 
+NtStatus ConsoleAdaptor::console_connect(lpc::Message *req,
+    lpc::console_connect_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  NtStatus result = req->call_native_backend();
+  if (!result.is_success())
+    return result;
+  // TODO: We're reconnecting so we need to infer new port values. However, it's
+  //   unclear whether this is the optimal place to do it. Need more test
+  //   coverage, also of stuff like FreeConsole, to get a better sense for that.
+  //   Also more tests in the simulator, it doesn't simulate this stuff at all.
+  return req->interceptor()->calibrate_console_port()
+      ? result
+      : NtStatus::from(CONPRX_ERROR_CALIBRATION_FAILED);
+}
+
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
   return connector()->poke(value);
 }

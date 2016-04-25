@@ -101,12 +101,49 @@ public:
   virtual conprx::NtStatus call_native_backend(handle_t port,
       lpc::message_data_t *request, lpc::message_data_t *incoming_reply) = 0;
 
+  // Attempt to infer the console port calibration.
+  virtual fat_bool_t calibrate_console_port() = 0;
+
   // Capture the current stack trace, storing it in the given buffer. Returns
   // true iff enough stack could be captured to fill the buffer.
   static fat_bool_t capture_stacktrace(Vector<void*> buffer);
 
 protected:
   bool enabled_;
+};
+
+class PatchingInterceptor;
+
+// Encapsulates information about an lpc port and is responsible for inferring
+// the values. The reason for splitting this out into a separate class from the
+// interceptor is that sometimes it's useful to be able to run the inference
+// separately from configuring the interceptor and without modifying its state.
+class PortView {
+public:
+  PortView();
+
+  // Send a message through the interceptor that configures this view.
+  fat_bool_t infer_calibration(PatchingInterceptor *inter);
+
+  // Called through the lpc handling system during inference.
+  fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);
+
+  // The handle of the console port.
+  handle_t handle() { return handle_; }
+
+  // The address transformation that maps between local and remote data.
+  AddressXform xform() { return xform_; }
+
+  // The api number sent through the lpc system to configure this port view.
+  ulong_t apinum() { return kCalibrationApiNumber; }
+
+private:
+  static const ulong_t kCalibrationApiNumber = 0xDECADE;
+  fat_bool_t calibration_result() { return calibration_result_; }
+  fat_bool_t calibration_result_;
+  capture_buffer_data_t *calibration_capbuf_;
+  handle_t handle_;
+  AddressXform xform_;
 };
 
 // An interceptor deals with the full process of replacing the implementation of
@@ -152,8 +189,11 @@ public:
   virtual conprx::NtStatus call_native_backend(handle_t port,
       lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
 
+  virtual fat_bool_t calibrate_console_port();
+
 private:
   friend class Message;
+  friend class PortView;
 
   // The type of ConsoleClientCallServer. Should really be called
   // console_client_call_server_f but that's just sooo verbose.
@@ -234,16 +274,13 @@ private:
   fat_bool_t determine_base_port_result_;
   handle_t base_port_handle_;
 
-  // Data associated with the calibration message.
-  static const ulong_t kCalibrationApiNumber = 0xDECADE;
-  bool is_calibrating_;
-  fat_bool_t calibrate_result_;
-  capture_buffer_data_t *calibration_capbuf_;
-
   // The transform to apply when sending addresses through the console port.
-  AddressXform port_xform_;
-  AddressXform port_xform() { return port_xform_; }
-  handle_t console_server_port_handle_;
+  PortView console_port_;
+  PortView *console_port() { return &console_port_; }
+  PortView *active_calibration() { return active_calibration_; }
+  PortView *active_calibration_;
+  AddressXform port_xform() { return console_port()->xform(); }
+  handle_t console_port_handle() { return console_port()->handle(); }
 
   conprx::PatchSet *patches() { return &patches_; }
   conprx::PatchSet patches_;
@@ -382,6 +419,24 @@ struct get_console_screen_buffer_info_m {
   word_t popup_attributes;
   bool_t fullscreen_supported;
   colorref_t color_table[16];
+};
+
+struct api_connectinfo_t {
+  handle_t ObjectDirectory;
+  void *SharedSectionBase;
+  void *SharedStaticServerData;
+  void *SharedSectionHeap;
+  ulong_t DebugFlags;
+  ulong_t SizeOfPebData;
+  ulong_t SizeOfTebData;
+  ulong_t NumberOfServerDllNames;
+  handle_t ServerProcessId;
+};
+
+struct console_connect_m {
+  void *ptr;
+  // TODO: can we extract useful information from this pointer? Is it even a
+  //   pointer?
 };
 
 // How these are actually declared in the windows implementation I have no idea

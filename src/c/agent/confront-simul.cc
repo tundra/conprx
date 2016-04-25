@@ -27,12 +27,14 @@ public:
     : frontend_(frontend)
     , platform_(platform) { }
 
+  virtual fat_bool_t calibrate_console_port() { return F_TRUE; }
+
   virtual NtStatus call_native_backend(handle_t port,
       lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
-    lpSw FLAGS (NtStatus on_##name(lpc::name##_m *data, lpc::message_data_t *incoming_reply),);
+    lfSw FLAGS (NtStatus on_##name(lpc::name##_m *data, lpc::message_data_t *incoming_reply),);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 
@@ -47,7 +49,7 @@ NtStatus SimulatingInterceptor::call_native_backend(handle_t port,
     lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
   uint32_t apinum = request->header.api_number;
   switch (apinum) {
-#define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lpSw FLAGS (__GEN_DISPATCH__(Name, name),)
+#define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lfSw FLAGS (__GEN_DISPATCH__(Name, name),)
 #define __GEN_DISPATCH__(Name, name) case ConsoleAgent::lm##Name:              \
     return on_##name(&request->payload.name, incoming_reply);
   FOR_EACH_LPC_TO_INTERCEPT(__MAYBE_GEN_DISPATCH__)

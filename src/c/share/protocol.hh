@@ -18,34 +18,39 @@
 //   - Da: disable custom handling of this message.
 //   - Pa: pure-agent function that doesn't involve calling the backend
 //   - Sw: this message should be implemented in the platform simulator
+//   - Sp: suspend on calls to this message
 //
-//  Name                        name                            apinum   (Tr Da Pa Sw)
-#define FOR_EACH_LPC_TO_INTERCEPT(F)                                                    \
-  F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X))  \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _))  \
-  F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X))  \
-  F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _))  \
-  F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _))  \
-  F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _))  \
-  F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _))  \
-  F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _))  \
-  F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _))
+//  Name                        name                            apinum   (Tr Da Pa Sw Sp)
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                                      \
+  F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X, _)) \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _, _)) \
+  F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X, _)) \
+  F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _, _)) \
+  F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _, _)) \
+  F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _, _)) \
+  F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _, _)) \
+  F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _, _)) \
+  F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _, _)) \
+  F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _))
 
 // Messages that we know about and so don't want to dump/suspend on when
 // doing that on unknown messages, but that we also don't have an implementation
 // for.
-#define FOR_EACH_OTHER_KNOWN_LPC(F)                                                    \
-  F(FillConsoleOutput,          ,                               0x00007,             ) \
-  F(SetConsoleTextAttribute,    ,                               0x0001A,             ) \
-  F(GetFileType,                ,                               0x00023,             ) \
-  F(BaseDllInitHelper,          ,                               0x0004C,             ) \
-  F(NlsGetUserInfo,             ,                               0x1001B,             )
+#define FOR_EACH_OTHER_KNOWN_LPC(F)                                                       \
+  F(ConsoleClientConnect,       ,                               0x00000,                ) \
+  F(FillConsoleOutput,          ,                               0x00007,                ) \
+  F(GetConsoleWindow,           ,                               0x00043,                ) \
+  F(SetConsoleTextAttribute,    ,                               0x0001A,                ) \
+  F(GetFileType,                ,                               0x00023,                ) \
+  F(BaseDllInitHelper,          ,                               0x0004C,                ) \
+  F(NlsGetUserInfo,             ,                               0x1001B,                )
 
 // LPC minor flag extractors.
-#define lfTr(TR, DA, PA, SW) TR
-#define lfDa(TR, DA, PA, SW) DA
-#define lfPa(TR, DA, PA, SW) PA
-#define lpSw(TR, DA, PA, SW) SW
+#define lfTr(TR, DA, PA, SW, SP) TR
+#define lfDa(TR, DA, PA, SW, SP) DA
+#define lfPa(TR, DA, PA, SW, SP) PA
+#define lfSw(TR, DA, PA, SW, SP) SW
+#define lfSp(TR, DA, PA, SW, SP) SP
 
 namespace conprx {
 
@@ -83,7 +88,8 @@ enum conprx_error_t {
   CONPRX_ERROR_NOT_IMPLEMENTED = 0x0003,
   CONPRX_ERROR_EXPECTED_HANDLE = 0x0004,
   CONPRX_ERROR_PROCESSING_INSTRUCTIONS = 0x0005,
-  CONPRX_ERROR_INVALID_RESPONSE = 0x0006
+  CONPRX_ERROR_INVALID_RESPONSE = 0x0006,
+  CONPRX_ERROR_CALIBRATION_FAILED = 0x0007
 };
 
 // A wrapper around an nt status code that makes it easier to dissect the value
@@ -316,5 +322,16 @@ template <> struct default_seed_type<console_screen_buffer_info_t> {
 template <> struct default_seed_type<console_screen_buffer_infoex_t> {
   static plankton::ConcreteSeedType<console_screen_buffer_infoex_t> *get();
 };
+
+// "Soft" suspend that sleeps the program for 30s on windows and does nothing
+// elsewhere. We could also use NativeThread::sleep but that requires a header
+// whereas this should always work.
+#define SLEEP_SUSPEND ONLY_MSVC(Sleep(30000))
+
+// Alias for sleep-suspend that only works when devutils are allowed so we're
+// sure not to commit uses.
+#ifdef ALLOW_DEVUTILS
+#  define DEBUG_SUSPEND SLEEP_SUSPEND
+#endif
 
 #endif // _CONPRX_SHARE_PROTOCOL_HH

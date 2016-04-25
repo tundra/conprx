@@ -21,8 +21,8 @@ using namespace tclib;
 // Set to true to make the message handler print any messages it doesn't
 // understand.
 static const bool kDumpUnknownMessages = false;
-static const bool kSuspendOnUnknownConsoleMessages = false;
-static const bool kSuspendOnUnknownOtherMessages = false;
+static const bool kSuspendOnUnknownConsoleMessages = true;
+static const bool kSuspendOnUnknownOtherMessages = true;
 
 LogEntry::LogEntry() {
   log_entry_default_init(&entry_, llInfo, NULL, 0, string_empty(), string_empty());
@@ -85,6 +85,7 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
     // The messages we want to handle.
 #define __EMIT_CASE__(Name, name, NUM, FLAGS)                                  \
     case lm##Name: {                                                           \
+      lfSp FLAGS (NativeThread::sleep(Duration::seconds(30)),);                \
       lfTr FLAGS (trace_before(#name, request),);                              \
       NtStatus result = lfDa FLAGS (                                           \
           request->call_native_backend(),                                      \
