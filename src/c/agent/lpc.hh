@@ -274,7 +274,7 @@ private:
   fat_bool_t determine_base_port_result_;
   handle_t base_port_handle_;
 
-  // The transform to apply when sending addresses through the console port.
+  // Info about the port on which to communicate with the console.
   PortView console_port_;
   PortView *console_port() { return &console_port_; }
   PortView *active_calibration() { return active_calibration_; }
@@ -419,18 +419,6 @@ struct get_console_screen_buffer_info_m {
   word_t popup_attributes;
   bool_t fullscreen_supported;
   colorref_t color_table[16];
-};
-
-struct api_connectinfo_t {
-  handle_t ObjectDirectory;
-  void *SharedSectionBase;
-  void *SharedStaticServerData;
-  void *SharedSectionHeap;
-  ulong_t DebugFlags;
-  ulong_t SizeOfPebData;
-  ulong_t SizeOfTebData;
-  ulong_t NumberOfServerDllNames;
-  handle_t ServerProcessId;
 };
 
 struct console_connect_m {

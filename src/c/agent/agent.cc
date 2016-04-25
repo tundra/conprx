@@ -21,8 +21,8 @@ using namespace tclib;
 // Set to true to make the message handler print any messages it doesn't
 // understand.
 static const bool kDumpUnknownMessages = false;
-static const bool kSuspendOnUnknownConsoleMessages = true;
-static const bool kSuspendOnUnknownOtherMessages = true;
+static const bool kSuspendOnUnknownConsoleMessages = false;
+static const bool kSuspendOnUnknownOtherMessages = false;
 
 LogEntry::LogEntry() {
   log_entry_default_init(&entry_, llInfo, NULL, 0, string_empty(), string_empty());
