@@ -8,13 +8,13 @@
 using namespace conprx;
 using namespace tclib;
 
-CONBACK_TEST(manual, simple) {
+CONBACK_TEST(conback, read_console) {
   CONBACK_TEST_PREAMBLE();
   if (!use_native)
     SKIP_TEST("need to hook up basic backend");
 
   LOG_INFO("Type foo<enter>");
-  handle_t std_in = multiplexer.platform()->get_std_handle(kStdInputHandle);
+  handle_t std_in = platform->get_std_handle(kStdInputHandle);
   uint8_t buf[128];
   dword_t chars_read = 0;
   frontend->read_console_a(std_in, buf, 128, &chars_read, NULL);

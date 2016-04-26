@@ -12,6 +12,7 @@
 
 namespace conprx {
 
+// The minimum of agent-like behavior that makes the simulating frontend work.
 class SimulatedAgent : public ConsoleAgent {
 public:
   SimulatedAgent(ConsoleConnector *connector) : adaptor_(connector) { }
@@ -54,9 +55,7 @@ private:
 };
 
 // A class that holds a frontend, either a native one (only on windows) or a
-// simulated one on top of a basic backend. This also takes care of saving
-// and restoring the state so mutating the native console doesn't mess up the
-// window the test is running in.
+// simulated one on top of a basic backend.
 class FrontendMultiplexer {
 public:
   FrontendMultiplexer(bool use_native)
@@ -88,17 +87,24 @@ private:
 // native and basic backend.
 #define CONBACK_TEST(SUITE, NAME) MULTITEST(SUITE, NAME, bool_t, use_native, ("native", true), ("basic", false))
 
-#define CONBACK_TEST_PREAMBLE()                                                \
-  SKIP_IF_CONBACK_UNSUPPORTED();                                               \
-  FrontendMultiplexer multiplexer(use_native);                                 \
-  ASSERT_F_TRUE(multiplexer.initialize());                                     \
-  ConsoleFrontend *frontend = multiplexer.frontend();
+// Dummy function to suppress unused variable warnings.
+template <typename T>
+static inline void use(const T &value) { }
 
-#define SKIP_IF_CONBACK_UNSUPPORTED() do {                                     \
+// Put this at the beginning of a test to get a frontend and platform that have
+// been suitably initialized.
+#define CONBACK_TEST_PREAMBLE()                                                \
   if (use_native && !kIsMsvc)                                                  \
     SKIP_TEST("msvc only");                                                    \
-} while (false)
-
-
+  FrontendMultiplexer __multiplexer__(use_native);                             \
+  ASSERT_F_TRUE(__multiplexer__.initialize());                                 \
+  ConsoleFrontend *frontend = __multiplexer__.frontend();                      \
+  ConsolePlatform *platform = __multiplexer__.platform();                      \
+  do {                                                                         \
+    if (false) {                                                               \
+      use(platform);                                                           \
+      use(frontend);                                                           \
+    }                                                                          \
+  } while (false)
 
 #endif // _CONPRX_CONBACK_UTILS_HH
