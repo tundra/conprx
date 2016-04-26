@@ -69,6 +69,9 @@
 /// instance, the registry editor is blacklisted because if the agent misbehaves
 /// we may need to disable it by setting registry values.
 
+#ifndef _CONPRX_AGENT_AGENT_HH
+#define _CONPRX_AGENT_AGENT_HH
+
 #include "binpatch.hh"
 #include "confront.hh"
 #include "io/stream.hh"
@@ -191,3 +194,5 @@ private:
 };
 
 } // namespace conprx
+
+#endif // _CONPRX_AGENT_AGENT_HH

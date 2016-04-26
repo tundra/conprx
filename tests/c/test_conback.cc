@@ -1,14 +1,10 @@
 //- Copyright 2016 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#include "agent/agent.hh"
-#include "agent/conconn.hh"
-#include "agent/confront.hh"
-#include "bytestream.hh"
 #include "rpc.hh"
-#include "server/conback.hh"
 #include "test.hh"
 #include "utils/string.hh"
+#include "conback-utils.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/string-inl.h"
@@ -18,154 +14,6 @@ END_C_INCLUDES
 using namespace tclib;
 using namespace plankton;
 using namespace conprx;
-
-class SimulatedAgent : public ConsoleAgent {
-public:
-  SimulatedAgent(ConsoleConnector *connector) : adaptor_(connector) { }
-  virtual void default_destroy() { tclib::default_delete_concrete(this); }
-  virtual fat_bool_t install_agent_platform() { return F_TRUE; }
-  virtual fat_bool_t uninstall_agent_platform() { return F_TRUE; }
-  virtual ConsoleAdaptor *adaptor() { return &adaptor_; }
-
-private:
-  ConsoleAdaptor adaptor_;
-};
-
-// An in-memory adaptor that provides a front-end backed by simulating requests
-// to the given backend. The reason for testing backends by calling a frontend
-// instead of calls to the backend directly is that it allows the tests to be
-// run both against the simulated frontend but also the actual windows console,
-// that way ensuring that they behave the same way which is what we're really
-// interested in.
-class SimulatedFrontendAdaptor : public tclib::DefaultDestructable {
-public:
-  SimulatedFrontendAdaptor(ConsoleBackend *backend);
-  void set_trace(bool value) { trace_ = value; }
-  virtual ~SimulatedFrontendAdaptor() { }
-  virtual void default_destroy() { tclib::default_delete_concrete(this); }
-  fat_bool_t initialize();
-  ConsoleFrontend *operator->() { return frontend(); }
-  ConsoleFrontend *frontend() { return *frontend_; }
-private:
-  ConsoleBackend *backend_;
-  ByteBufferStream buffer_;
-  rpc::StreamServiceConnector streams_;
-  PrpcConsoleConnector connector_;
-  SimulatedAgent agent_;
-  def_ref_t<ConsoleFrontend> frontend_;
-  ConsoleBackendService service_;
-  bool trace_;
-  rpc::TracingMessageSocketObserver tracer_;
-};
-
-SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
-  : backend_(backend)
-  , buffer_(1024)
-  , streams_(&buffer_, &buffer_)
-  , connector_(streams_.socket(), streams_.input())
-  , agent_(&connector_)
-  , trace_(false)
-  , tracer_("SB") {
-  frontend_ = ConsoleFrontend::new_simulating(&agent_, 0);
-  service_.set_backend(backend_);
-}
-
-fat_bool_t SimulatedFrontendAdaptor::initialize() {
-  if (trace_)
-    tracer_.install(streams_.socket());
-  if (!buffer_.initialize())
-    return F_FALSE;
-  F_TRY(streams_.init(service_.handler()));
-  return F_TRUE;
-}
-
-// Records all relevant state about a frontend (within reason) by querying the
-// frontend and can restore the state.
-class FrontendSnapshot {
-public:
-  FrontendSnapshot();
-
-  // Records the state of the given frontend into this snapshot.
-  void save(ConsoleFrontend *frontend);
-
-  // Updates the state of the given frontend to match this snapshot.
-  void restore(ConsoleFrontend *frontend);
-
-  // Print the state of this snapshot on the given stream.
-  void dump(OutStream *out);
-
-private:
-  uint32_t input_codepage_;
-  uint32_t output_codepage_;
-  char title_[1024];
-};
-
-FrontendSnapshot::FrontendSnapshot()
-  : input_codepage_(0)
-  , output_codepage_(0) {
-  struct_zero_fill(title_);
-}
-
-void FrontendSnapshot::save(ConsoleFrontend *frontend) {
-  input_codepage_ = frontend->get_console_cp();
-  output_codepage_ = frontend->get_console_output_cp();
-  frontend->get_console_title_a(title_, 1024);
-}
-
-void FrontendSnapshot::restore(ConsoleFrontend *frontend) {
-  frontend->set_console_cp(input_codepage_);
-  frontend->set_console_output_cp(output_codepage_);
-  frontend->set_console_title_a(title_);
-}
-
-void FrontendSnapshot::dump(OutStream *out) {
-  out->printf("input_codepage: %i\n", input_codepage_);
-  out->printf("output_codepage: %i\n", output_codepage_);
-  out->printf("title: [%s]\n", title_);
-}
-
-// A class that holds a frontend, either a native one (only on windows) or a
-// simulated one on top of a basic backend. This also takes care of saving
-// and restoring the state so mutating the native console doesn't mess up the
-// window the test is running in.
-class FrontendMultiplexer {
-public:
-  FrontendMultiplexer(bool use_native)
-    : use_native_(use_native)
-    , frontend_(NULL)
-    , trace_(false) { }
-  ~FrontendMultiplexer();
-  ConsoleFrontend *operator->() { return frontend_; }
-  fat_bool_t initialize();
-  void set_trace(bool value) { trace_ = value; }
-
-private:
-  bool use_native_;
-  ConsoleFrontend *frontend_;
-  BasicConsoleBackend backend_;
-  def_ref_t<SimulatedFrontendAdaptor> fake_;
-  def_ref_t<ConsoleFrontend> native_;
-  FrontendSnapshot initial_state_;
-  bool trace_;
-};
-
-fat_bool_t FrontendMultiplexer::initialize() {
-  if (use_native_) {
-    native_ = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>::null());
-    frontend_ = *native_;
-  } else {
-    fake_ = new (kDefaultAlloc) SimulatedFrontendAdaptor(&backend_);
-    fake_->set_trace(trace_);
-    F_TRY(fake_->initialize());
-    frontend_ = fake_->frontend();
-  }
-  initial_state_.save(frontend_);
-  return F_TRUE;
-}
-
-FrontendMultiplexer::~FrontendMultiplexer() {
-  initial_state_.restore(frontend_);
-}
 
 TEST(conback, simulated) {
   BasicConsoleBackend backend;
@@ -177,19 +25,8 @@ TEST(conback, simulated) {
   ASSERT_EQ(374, backend.last_poke());
 }
 
-// Declare a console backend test that runs both the same tests against the
-// native and basic backend.
-#define CONBACK_TEST(NAME) MULTITEST(conback, NAME, bool_t, use_native, ("native", true), ("basic", false))
-
-#define SKIP_IF_UNSUPPORTED() do {                                             \
-  if (use_native && !kIsMsvc)                                                  \
-    SKIP_TEST("msvc only");                                                    \
-} while (false)
-
-CONBACK_TEST(cp) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, cp) {
+  CONBACK_TEST_PREAMBLE();
 
   ASSERT_TRUE(frontend->set_console_cp(cpUtf8));
   ASSERT_TRUE(frontend->set_console_output_cp(cpUtf8));
@@ -205,10 +42,8 @@ CONBACK_TEST(cp) {
   ASSERT_EQ(cpUsAscii, frontend->get_console_output_cp());
 }
 
-CONBACK_TEST(title_a) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, title_a) {
+  CONBACK_TEST_PREAMBLE();
 
   ansi_cstr_t letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   ASSERT_TRUE(frontend->set_console_title_a(letters));
@@ -239,10 +74,8 @@ CONBACK_TEST(title_a) {
   ASSERT_C_STREQ(letters, buf);
 }
 
-CONBACK_TEST(title_w) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, title_w) {
+  CONBACK_TEST_PREAMBLE();
 
   const wide_char_t letters[27] = {
       'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
@@ -290,10 +123,8 @@ CONBACK_TEST(title_w) {
   ASSERT_EQ(wide_minus_1, buf[27]);
 }
 
-CONBACK_TEST(title_aw_ascii) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, title_aw_ascii) {
+  CONBACK_TEST_PREAMBLE();
 
   const wide_char_t wide_alphabet[27] = {
       'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
@@ -331,10 +162,8 @@ CONBACK_TEST(title_aw_ascii) {
       StringUtils::as_blob(widebuf, false));
 }
 
-CONBACK_TEST(title_aw_unicode) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, title_aw_unicode) {
+  CONBACK_TEST_PREAMBLE();
 
   // Ἀλέξ Alex Алекс
   const wide_char_t wide_names[16] = {
@@ -373,10 +202,8 @@ CONBACK_TEST(title_aw_unicode) {
       StringUtils::as_blob(widebuf, false));
 }
 
-CONBACK_TEST(title_aw_complete) {
-  SKIP_IF_UNSUPPORTED();
-  FrontendMultiplexer frontend(use_native);
-  ASSERT_F_TRUE(frontend.initialize());
+CONBACK_TEST(conback, title_aw_complete) {
+  CONBACK_TEST_PREAMBLE();
 
   ansi_char_t all_chars[256];
   for (size_t i = 0; i < 256; i++)

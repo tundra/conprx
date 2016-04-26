@@ -9,4 +9,4 @@ run_tests.add_dependency(get_external("tests", "c", "run-tests"))
 run_tests.add_dependency(get_external("tests", "py", "run-tests"))
 
 all = get_group("all")
-all.add_member(get_external("tests", "c", "main"))
+all.add_member(get_external("tests", "c", "all"))
