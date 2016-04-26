@@ -188,6 +188,10 @@ response_t<bool_t> BasicConsoleBackend::set_console_title(tclib::Blob title,
   return response_t<bool_t>::yes();
 }
 
+void BasicConsoleBackend::set_title(const char *value) {
+  set_console_title(StringUtils::as_blob(value, false), false);
+}
+
 HandleShadow BasicConsoleBackend::get_handle_shadow(Handle handle) {
   return handles()->get_shadow(handle);
 }

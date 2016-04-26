@@ -113,8 +113,12 @@ public:
   // Returns the value of the last poke that was sent.
   int64_t last_poke() { return last_poke_; }
 
-  // The current title encoded as utf-8.
+  // The current title encoded as ucs16.
   ucs16_t title() { return title_; }
+
+  // Sets the console title. The value gets copied so it only has to be valid
+  // for the duration of this call.
+  void set_title(const char *value);
 
   // Converts a blob that may or may not be unicode to a ucs16-string.
   static ucs16_t blob_to_ucs16(tclib::Blob blob, bool is_unicode);
