@@ -16,8 +16,6 @@
 
 namespace conprx {
 
-
-
 // A windows-compatible terminal i/o abstraction that can be used as the backend
 // for console functions.
 class WinTty : public tclib::DefaultDestructable {
