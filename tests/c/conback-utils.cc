@@ -15,6 +15,7 @@ SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
   , agent_(&connector_)
   , trace_(false)
   , tracer_("SB") {
+  streams_.set_default_type_registry(ConsoleTypes::registry());
   platform_ = InMemoryConsolePlatform::new_simulating();
   frontend_ = ConsoleFrontend::new_simulating(&agent_, *platform_);
   service_.set_backend(backend_);
@@ -31,9 +32,9 @@ fat_bool_t SimulatedFrontendAdaptor::initialize() {
 
 fat_bool_t FrontendMultiplexer::initialize() {
   if (use_native_) {
-    native_frontend_ = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>::null());
+    native_frontend_ = ConsoleFrontend::new_native();
     frontend_ = *native_frontend_;
-    native_platform_ = IF_MSVC(ConsolePlatform::new_native(), pass_def_ref_t<ConsolePlatform>::null());
+    native_platform_ = ConsolePlatform::new_native();
     platform_ = *native_platform_;
   } else {
     fake_frontend_ = new (kDefaultAlloc) SimulatedFrontendAdaptor(&backend_);

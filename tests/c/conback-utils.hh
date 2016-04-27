@@ -69,6 +69,7 @@ public:
 
   ConsolePlatform *platform() { return platform_; }
   ConsoleFrontend *frontend() { return frontend_; }
+  void set_wty(WinTty *wty) { backend_.set_wty(wty); }
 
 private:
   bool use_native_;

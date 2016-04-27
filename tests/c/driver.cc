@@ -463,7 +463,7 @@ fat_bool_t ConsoleDriverMain::run() {
       // The else-part shouldn't ever be run but we need the new_native part to
       // not be present on non-msvc platforms because it hasn't been implemented
       // there.
-      frontend = IF_MSVC(ConsoleFrontend::new_native(), pass_def_ref_t<ConsoleFrontend>::null());
+      frontend = ConsoleFrontend::new_native();
       break;
     case dfDummy:
       frontend = ConsoleFrontend::new_dummy();

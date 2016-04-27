@@ -10,9 +10,15 @@ using namespace tclib;
 
 CONBACK_TEST(conback, read_console) {
   CONBACK_TEST_PREAMBLE();
-  if (!use_native)
-    SKIP_TEST("need to hook up basic backend");
-
+  def_ref_t<ConsoleFrontend> native_frontend;
+  def_ref_t<ConsolePlatform> native_platform;
+  def_ref_t<WinTty> wty;
+  if (!use_native) {
+    native_frontend = ConsoleFrontend::new_native();
+    native_platform = ConsolePlatform::new_native();
+    wty = WinTty::new_adapted(*native_frontend, *native_platform);
+    __multiplexer__.set_wty(*wty);
+  }
   LOG_INFO("Type foo<enter>");
   handle_t std_in = platform->get_std_handle(kStdInputHandle);
   uint8_t buf[128];

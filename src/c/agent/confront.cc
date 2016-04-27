@@ -22,4 +22,6 @@ using namespace tclib;
 
 #ifdef IS_MSVC
 #  include "confront-msvc.cc"
+#else
+#  include "confront-posix.cc"
 #endif

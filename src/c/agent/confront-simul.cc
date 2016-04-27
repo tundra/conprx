@@ -325,6 +325,7 @@ bool_t SimulatingConsoleFrontend::read_console_aw(handle_t input, void *buffer,
   // unicode mode even if in ansi mode there is no opportunity to use the other
   // half of the buffer. Go figure.
   size_t buffer_size = chars_to_read * wide_char_size;
+  payload->input = input;
   payload->is_unicode = is_unicode;
   payload->buffer = (buffer_size <= lpc::kMaxInlineBytes)
       ? buffer

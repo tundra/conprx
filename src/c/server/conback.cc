@@ -37,8 +37,9 @@ ConsoleBackendService::ConsoleBackendService()
 }
 
 // Dummy implementation used when none has been explicitly specified.
-class NoConsoleWindow : public ConsoleWindow {
+class NoWinTty : public WinTty {
 public:
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
   virtual coord_t size() { return coord_zero(); }
   virtual coord_t cursor_position() { return coord_zero(); }
   virtual word_t attributes() { return 0; }
@@ -46,25 +47,25 @@ public:
   virtual coord_t maximum_window_size() { return coord_zero(); }
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
-  static NoConsoleWindow *get();
+  static NoWinTty *get();
 
 private:
-  static NoConsoleWindow instance;
+  static NoWinTty instance;
   static coord_t coord_zero() { return coord_new(0, 0); }
   static small_rect_t small_rect_zero() { return small_rect_new(0, 0, 0, 0); }
 };
 
-response_t<uint32_t> NoConsoleWindow::write(tclib::Blob blob, bool is_unicode, bool is_error) {
+response_t<uint32_t> NoWinTty::write(tclib::Blob blob, bool is_unicode, bool is_error) {
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
-response_t<uint32_t> NoConsoleWindow::read(tclib::Blob buffer, bool is_unicode) {
+response_t<uint32_t> NoWinTty::read(tclib::Blob buffer, bool is_unicode) {
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
-NoConsoleWindow NoConsoleWindow::instance;
+NoWinTty NoWinTty::instance;
 
-NoConsoleWindow *NoConsoleWindow::get() {
+NoWinTty *NoWinTty::get() {
   return &instance;
 }
 
@@ -74,7 +75,7 @@ BasicConsoleBackend::BasicConsoleBackend()
   , output_codepage_(cpUtf8)
   , title_(ucs16_empty())
   , mode_(0)
-  , window_(NoConsoleWindow::get()) { }
+  , wty_(NoWinTty::get()) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
   ucs16_default_delete(title_);
@@ -204,23 +205,23 @@ response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t
 response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
     Handle buffer, console_screen_buffer_infoex_t *info_out) {
   struct_zero_fill(*info_out);
-  info_out->dwSize = window()->size();
-  info_out->dwCursorPosition = window()->cursor_position();
-  info_out->wAttributes = window()->attributes();
-  info_out->srWindow = window()->position();
-  info_out->dwMaximumWindowSize = window()->maximum_window_size();
+  info_out->dwSize = wty()->size();
+  info_out->dwCursorPosition = wty()->cursor_position();
+  info_out->wAttributes = wty()->attributes();
+  info_out->srWindow = wty()->position();
+  info_out->dwMaximumWindowSize = wty()->maximum_window_size();
   return response_t<bool_t>::yes();
 }
 
 response_t<uint32_t> BasicConsoleBackend::write_console(Handle output,
     tclib::Blob data, bool is_unicode) {
   HandleShadow shadow = get_handle_shadow(output);
-  return window()->write(data, is_unicode, shadow.is_error());
+  return wty()->write(data, is_unicode, shadow.is_error());
 }
 
 response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
     tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out) {
-  response_t<uint32_t> resp = window()->read(buffer, is_unicode);
+  response_t<uint32_t> resp = wty()->read(buffer, is_unicode);
   if (resp.has_error())
     return resp;
   *bytes_read_out = resp.value();

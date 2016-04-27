@@ -12,6 +12,7 @@ files = [
   "conback.cc",
   "handman.cc",
   "launch.cc",
+  "wty.cc",
 ]
 
 objects = get_group("objects")
@@ -32,6 +33,7 @@ host_files = [
 host = c.get_executable("host")
 host.add_object(get_external("src", "c", "utils", "objects"))
 host.add_object(get_external("src", "c", "disass", "objects"))
+host.add_object(get_external("src", "c", "agent", "objects"))
 host.add_object(server)
 for filename in host_files:
   host.add_object(build_object(filename))

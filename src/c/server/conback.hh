@@ -6,6 +6,7 @@
 
 #include "rpc.hh"
 #include "server/handman.hh"
+#include "server/wty.hh"
 #include "share/protocol.hh"
 #include "sync/pipe.hh"
 #include "sync/process.hh"
@@ -21,21 +22,6 @@ using plankton::Factory;
 using plankton::Arena;
 
 class Launcher;
-
-// A console window provides the information the console api needs about the
-// window it's running in.
-class ConsoleWindow {
-public:
-  virtual ~ConsoleWindow() { }
-  virtual coord_t size() = 0;
-  virtual coord_t cursor_position() = 0;
-  virtual word_t attributes() = 0;
-  virtual small_rect_t position() = 0;
-  virtual coord_t maximum_window_size() = 0;
-  virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode,
-      bool is_error) = 0;
-  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode) = 0;
-};
 
 // Virtual type, implementations of which can be used as the implementation of
 // a console.
@@ -108,7 +94,7 @@ public:
 
   // Sets the console window backing this backend. If you don't set one a
   // dummy one will be used.
-  void set_window(ConsoleWindow *window) { window_ = window; }
+  void set_wty(WinTty *wty) { wty_ = wty; }
 
   // Returns the value of the last poke that was sent.
   int64_t last_poke() { return last_poke_; }
@@ -141,7 +127,7 @@ private:
   response_t<uint32_t> get_console_title_wide(tclib::Blob buffer,
       size_t *bytes_written_out);
 
-  ConsoleWindow *window() { return window_; }
+  WinTty *wty() { return wty_; }
   int64_t last_poke_;
   uint32_t input_codepage_;
   uint32_t output_codepage_;
@@ -149,7 +135,7 @@ private:
   // TODO: for now all handles have the same mode value. There needs to be a
   //   more nuanced way to set those.
   uint32_t mode_;
-  ConsoleWindow *window_;
+  WinTty *wty_;
   HandleManager *handles() { return &handles_; }
   HandleManager handles_;
 };
