@@ -70,7 +70,7 @@ enum standard_handle_t {
 // The block of data passed through to the agent's dll connector.
 struct connect_data_t {
   int32_t magic;
-  standalone_dword_t parent_process_id;
+  uint32_t parent_process_id;
   tclib::naked_file_handle_t agent_in_handle;
   tclib::naked_file_handle_t agent_out_handle;
 

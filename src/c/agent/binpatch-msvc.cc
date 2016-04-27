@@ -10,15 +10,15 @@ using namespace conprx;
 class WindowsMemoryManager : public MemoryManager {
 public:
   virtual fat_bool_t open_for_writing(tclib::Blob region,
-      standalone_dword_t *old_perms);
+      uint32_t *old_perms);
   virtual fat_bool_t close_for_writing(tclib::Blob region,
-      standalone_dword_t old_perms);
+      uint32_t old_perms);
   virtual fat_bool_t alloc_executable(address_t addr, size_t size, Blob *blob_out);
   virtual fat_bool_t free_block(tclib::Blob block);
 };
 
 fat_bool_t WindowsMemoryManager::open_for_writing(tclib::Blob region,
-    standalone_dword_t *old_perms) {
+    uint32_t *old_perms) {
   dword_t temp_old_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), PAGE_EXECUTE_READWRITE,
       &temp_old_perms);
@@ -31,7 +31,7 @@ fat_bool_t WindowsMemoryManager::open_for_writing(tclib::Blob region,
 }
 
 fat_bool_t WindowsMemoryManager::close_for_writing(tclib::Blob region,
-    standalone_dword_t old_perms) {
+    uint32_t old_perms) {
   dword_t dummy_perms = 0;
   bool result = VirtualProtect(region.start(), region.size(), old_perms, &dummy_perms);
   if (!result) {
