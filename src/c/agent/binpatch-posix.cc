@@ -15,8 +15,8 @@ class PosixMemoryManager : public MemoryManager {
 public:
   PosixMemoryManager();
   virtual fat_bool_t ensure_initialized();
-  virtual fat_bool_t open_for_writing(tclib::Blob region, standalone_dword_t *old_perms);
-  virtual fat_bool_t close_for_writing(tclib::Blob region, standalone_dword_t old_perms);
+  virtual fat_bool_t open_for_writing(tclib::Blob region, uint32_t *old_perms);
+  virtual fat_bool_t close_for_writing(tclib::Blob region, uint32_t old_perms);
   virtual fat_bool_t alloc_executable(address_t addr, size_t size, Blob *blob_out);
   virtual fat_bool_t free_block(Blob block);
 private:
@@ -47,7 +47,7 @@ fat_bool_t PosixMemoryManager::ensure_initialized() {
 }
 
 fat_bool_t PosixMemoryManager::open_for_writing(tclib::Blob region,
-    standalone_dword_t *old_perms) {
+    uint32_t *old_perms) {
   // TODO: store the old permissions rather than assume they're read+exec. As
   //   far as I've been able to determine you're meant to get this info by
   //   parsing stuff from /proc which seems ridiculous.
@@ -56,7 +56,7 @@ fat_bool_t PosixMemoryManager::open_for_writing(tclib::Blob region,
 }
 
 fat_bool_t PosixMemoryManager::close_for_writing(tclib::Blob region,
-    standalone_dword_t old_perms) {
+    uint32_t old_perms) {
   return set_permissions(region, old_perms);
 }
 
