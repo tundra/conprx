@@ -513,11 +513,12 @@ public:
   ReadConsoleBackend()
     : contents(ucs16_empty())
     , last_request_size(0)
-    , last_is_unicode(false) { }
+    , last_is_unicode(false)
+    , control_key_state(0) { }
 
   ~ReadConsoleBackend() { ucs16_default_delete(contents); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
-      bool is_unicode, size_t *bytes_read_out);
+      bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control);
 
   void set_contents(const char *str) {
     ucs16_default_delete(contents);
@@ -527,12 +528,17 @@ public:
   ucs16_t contents;
   size_t last_request_size;
   bool last_is_unicode;
+  ReadConsoleControl last_control;
+  ulong_t control_key_state;
 };
 
 response_t<uint32_t> ReadConsoleBackend::read_console(Handle output,
-    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out) {
+    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out,
+    ReadConsoleControl *input_control) {
   last_request_size = buffer.size();
   last_is_unicode = is_unicode;
+  last_control = *input_control;
+  input_control->set_control_key_state(control_key_state);
   size_t read = ucs16_to_blob(contents, buffer, is_unicode);
   *bytes_read_out = read;
   return response_t<uint32_t>::of(static_cast<uint32_t>(read));
@@ -587,7 +593,8 @@ AGENT_TEST(read_console_aw) {
   ASSERT_EQ(false, backend.last_is_unicode);
 
   CaseMaker cases;
-  add_inline_limit_cases(&cases);
+  cases.add_case(10);
+  // add_inline_limit_cases(&cases);
 
   for (CaseMaker::iterator i = cases.begin(); i != cases.end(); i++) {
     uint32_t chars = static_cast<uint32_t>(*i);
@@ -623,6 +630,25 @@ AGENT_TEST(read_console_aw) {
   ASSERT_EQ(true, backend.last_is_unicode);
   wide_char_t not_long_wide[] = {'S', 'H', 'O', 'R', 'T', 0};
   ASSERT_BLOBEQ(StringUtils::as_blob(not_long_wide, false), as_blob(*rcw0));
+
+  ASSERT_EQ(0, backend.last_control.as_winapi()->dwControlKeyState);
+  ASSERT_EQ(0, backend.last_control.as_winapi()->dwCtrlWakeupMask);
+  ASSERT_EQ(0, backend.last_control.as_winapi()->nInitialChars);
+
+  ReadConsoleControl control;
+  control.set_ctrl_wakeup_mask(0xBCCB);
+  control.set_initial_chars(0xA);
+  control.set_control_key_state(0);
+  backend.control_key_state = 0xABBA;
+
+  DriverRequest rcw1 = driver.read_console_w(input, 100, &control);
+  ASSERT_EQ(200, backend.last_request_size);
+  ASSERT_EQ(true, backend.last_is_unicode);
+  ASSERT_BLOBEQ(StringUtils::as_blob(not_long_wide, false), as_blob(*rcw1));
+  ASSERT_EQ(0xABBA, control.as_winapi()->dwControlKeyState);
+  ASSERT_EQ(0xBCCB, backend.last_control.as_winapi()->dwCtrlWakeupMask);
+  ASSERT_EQ(10, backend.last_control.as_winapi()->nInitialChars);
+
 }
 
 // A backend that fails on *everything*. Don't forget to add a test when you
@@ -640,7 +666,7 @@ public:
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
   response_t<bool_t> get_console_screen_buffer_info(Handle buffer, ConsoleScreenBufferInfo *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
-  response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read) { return fail<uint32_t>(); }
+  response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read, ReadConsoleControl *input_control) { return fail<uint32_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();

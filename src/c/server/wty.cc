@@ -18,7 +18,8 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
   virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
       ConsoleScreenBufferInfo *info_out);
-  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
+      ReadConsoleControl *input_control);
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
 
 private:
@@ -38,16 +39,22 @@ response_t<bool_t> AdaptedWinTty::get_screen_buffer_info(bool is_error,
   }
 }
 
-response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode) {
+response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode,
+    ReadConsoleControl *input_control) {
   handle_t handle = platform()->get_std_handle(kStdInputHandle);
   dword_t chars_read = 0;
   bool read_succeeded = false;
+  console_readconsole_control_t *win_control = (input_control == NULL)
+      ? NULL
+      : input_control->as_winapi();
   if (is_unicode) {
     read_succeeded = frontend()->read_console_w(handle, buffer.start(),
-        static_cast<dword_t>(buffer.size() / sizeof(wide_char_t)), &chars_read, NULL);
+        static_cast<dword_t>(buffer.size() / sizeof(wide_char_t)), &chars_read,
+        win_control);
   } else {
     read_succeeded = frontend()->read_console_a(handle, buffer.start(),
-        static_cast<dword_t>(buffer.size()), &chars_read, NULL);
+        static_cast<dword_t>(buffer.size()), &chars_read,
+        win_control);
   }
   return read_succeeded
       ? response_t<uint32_t>::of(chars_read)

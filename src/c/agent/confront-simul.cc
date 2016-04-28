@@ -283,7 +283,7 @@ bool_t SimulatingConsoleFrontend::write_console_aw(handle_t output, const void *
     dword_t chars_to_write, dword_t *chars_written, bool is_unicode) {
   SimulatedMessage<ConsoleAgent::lmWriteConsole> message(this);
   lpc::write_console_m *payload = message.payload();
-  size_t char_size = is_unicode ? sizeof(wide_char_t) : 1;
+  size_t char_size = StringUtils::char_size(is_unicode);
   size_t size_in_bytes = chars_to_write * char_size;
   payload->output = output;
   payload->size_in_bytes = static_cast<uint32_t>(size_in_bytes);
@@ -320,7 +320,7 @@ bool_t SimulatingConsoleFrontend::read_console_aw(handle_t input, void *buffer,
   SimulatedMessage<ConsoleAgent::lmReadConsole> message(this);
   lpc::read_console_m *payload = message.payload();
   size_t wide_char_size = sizeof(wide_char_t);
-  size_t char_size = is_unicode ? wide_char_size : 1;
+  size_t char_size = StringUtils::char_size(is_unicode);
   // For some reason the buffer size is always set as if we're reading in
   // unicode mode even if in ansi mode there is no opportunity to use the other
   // half of the buffer. Go figure.
@@ -332,9 +332,16 @@ bool_t SimulatingConsoleFrontend::read_console_aw(handle_t input, void *buffer,
       : xform().local_to_remote(buffer);
   payload->buffer_size = payload->size_in_bytes = static_cast<dword_t>(buffer_size);
   payload->size_in_bytes = payload->buffer_size;
+  if (input_control != NULL) {
+    payload->initial_size = static_cast<ulong_t>(input_control->nInitialChars * char_size);
+    payload->ctrl_wakeup_mask = input_control->dwCtrlWakeupMask;
+    payload->control_key_state = input_control->dwControlKeyState;
+  }
   agent()->on_message(message.message());
   if (chars_read != NULL)
     *chars_read = static_cast<dword_t>(payload->size_in_bytes / char_size);
+  if (input_control != NULL)
+    input_control->dwControlKeyState = payload->control_key_state;
   return update_last_error(&message);
 }
 

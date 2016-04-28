@@ -17,6 +17,12 @@ using namespace tclib;
 
 ConsoleScreenBufferInfo::ConsoleScreenBufferInfo() {
   struct_zero_fill(info_);
+  info_.cbSize = sizeof(info_);
+}
+
+ReadConsoleControl::ReadConsoleControl() {
+  struct_zero_fill(control_);
+  control_.nLength = sizeof(control_);
 }
 
 TypeRegistry *ConsoleTypes::registry() {
@@ -28,6 +34,7 @@ TypeRegistry *ConsoleTypes::registry() {
     instance->register_type<small_rect_t>();
     instance->register_type<console_screen_buffer_info_t>();
     instance->register_type<console_screen_buffer_infoex_t>();
+    instance->register_type<console_readconsole_control_t>();
   }
   return instance;
 }
@@ -185,4 +192,34 @@ static plankton::SeedType<small_rect_t> small_rect_seed_type("winapi.SMALL_RECT"
 
 ConcreteSeedType<small_rect_t> *default_seed_type<small_rect_t>::get() {
   return &small_rect_seed_type;
+}
+
+static console_readconsole_control_t *new_readcontrol(Variant header, Factory *factory) {
+  console_readconsole_control_t *result = new (factory) console_readconsole_control_t;
+  struct_zero_fill(*result);
+  return result;
+}
+
+static void init_readcontrol(console_readconsole_control_t *control, Seed payload, Factory *factory) {
+  control->nLength = static_cast<ulong_t>(payload.get_field("nLength").integer_value());
+  control->nInitialChars = static_cast<ulong_t>(payload.get_field("nInitialChars").integer_value());
+  control->dwCtrlWakeupMask = static_cast<ulong_t>(payload.get_field("dwCtrlWakeupMask").integer_value());
+  control->dwControlKeyState = static_cast<ulong_t>(payload.get_field("dwControlKeyState").integer_value());
+}
+
+static Variant readcontrol_to_seed(console_readconsole_control_t *control, Factory *factory) {
+  Seed seed = factory->new_seed(default_seed_type<console_readconsole_control_t>::get());
+  seed.set_field("nLength", control->nLength);
+  seed.set_field("nInitialChars", control->nInitialChars);
+  seed.set_field("dwCtrlWakeupMask", control->dwCtrlWakeupMask);
+  seed.set_field("dwControlKeyState", control->dwControlKeyState);
+  return seed;
+}
+
+static plankton::SeedType<console_readconsole_control_t> readcontrol_seed_type(
+    "winapi.CONSOLE_READCONSOLE_CONTROL",
+    &new_readcontrol, &init_readcontrol, &readcontrol_to_seed);
+
+ConcreteSeedType<console_readconsole_control_t> *default_seed_type<console_readconsole_control_t>::get() {
+  return &readcontrol_seed_type;
 }

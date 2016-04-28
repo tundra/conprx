@@ -156,12 +156,16 @@ void ConsoleFrontendService::read_console_a(rpc::RequestData *data, ResponseCall
 void ConsoleFrontendService::read_console_w(rpc::RequestData *data, ResponseCallback callback) {
   handle_t input = data->argument(0).native_as<Handle>()->ptr();
   dword_t chars_to_read = to_dword(data->argument(1));
+  console_readconsole_control_t *input_control = data->argument(2).native_as<console_readconsole_control_t>();
   TempBuffer<wide_char_t> scratch(chars_to_read + 1);
   dword_t chars_read = 0;
-  if (!frontend()->read_console_w(input, *scratch, chars_to_read, &chars_read, NULL))
+  if (!frontend()->read_console_w(input, *scratch, chars_to_read, &chars_read, input_control))
     return fail_request(data, callback);
+  Array result = data->factory()->new_array(2);
   uint32_t bytes_read = static_cast<uint32_t>(chars_read * sizeof(wide_char_t));
-  Variant result = data->factory()->new_blob(*scratch, bytes_read);
+  result.add(data->factory()->new_blob(*scratch, bytes_read));
+  NativeVariant control_var(input_control);
+  result.add(control_var);
   callback(rpc::OutgoingResponse::success(result));
 }
 

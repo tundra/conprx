@@ -58,7 +58,7 @@ public:
       bool is_unicode) = 0;
 
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
-      bool is_unicode, size_t *bytes_read_out) = 0;
+      bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control) = 0;
 
   // Fill in the given output parameter with information about the buffer with
   // the given handle.
@@ -86,7 +86,7 @@ public:
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
-      bool is_unicode, size_t *bytes_read_out);
+      bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control);
 
   // Returns info about the given handle, if the handle isn't known the default
   // info is returned.

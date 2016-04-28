@@ -43,7 +43,8 @@ public:
   virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
       ConsoleScreenBufferInfo *info_out);
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
-  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
+      ReadConsoleControl *input_control);
   static NoWinTty *get();
 
 private:
@@ -61,7 +62,8 @@ response_t<uint32_t> NoWinTty::write(tclib::Blob blob, bool is_unicode, bool is_
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
-response_t<uint32_t> NoWinTty::read(tclib::Blob buffer, bool is_unicode) {
+response_t<uint32_t> NoWinTty::read(tclib::Blob buffer, bool is_unicode,
+    ReadConsoleControl *input_control) {
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
@@ -217,8 +219,9 @@ response_t<uint32_t> BasicConsoleBackend::write_console(Handle output,
 }
 
 response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
-    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out) {
-  response_t<uint32_t> resp = wty()->read(buffer, is_unicode);
+    tclib::Blob buffer, bool is_unicode, size_t *bytes_read_out,
+    ReadConsoleControl *input_control) {
+  response_t<uint32_t> resp = wty()->read(buffer, is_unicode, input_control);
   if (resp.has_error())
     return resp;
   *bytes_read_out = resp.value();
@@ -330,21 +333,27 @@ void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCall
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
   uint32_t byte_size = static_cast<uint32_t>(data->argument(1).integer_value());
   bool is_unicode = data->argument(2).bool_value();
+  console_readconsole_control_t *control_in = data->argument(3).native_as<console_readconsole_control_t>();
+  if (control_in == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_INVALID_ARGUMENT));
+  ReadConsoleControl control_out(control_in);
   plankton::Blob scratch_blob = data->factory()->new_blob(byte_size);
   tclib::Blob scratch(scratch_blob.mutable_data(), byte_size);
   blob_fill(scratch, 0);
   size_t bytes_read = 0;
   response_t<uint32_t> result = backend()->read_console(*handle, scratch, is_unicode,
-      &bytes_read);
+      &bytes_read, &control_out);
   if (result.has_error()) {
     resp(rpc::OutgoingResponse::failure(Variant::integer(result.error_code())));
   } else {
     plankton::Blob response_blob = Variant::blob(scratch_blob.data(),
         static_cast<uint32_t>(bytes_read));
-    Array pair = data->factory()->new_array(2);
-    pair.add(response_blob);
-    pair.add(result.value());
-    resp(rpc::OutgoingResponse::success(pair));
+    Map response = data->factory()->new_map();
+    response.set("data", response_blob);
+    response.set("result", result.value());
+    NativeVariant control_var(control_out.as_winapi());
+    response.set("input_control", control_var);
+    resp(rpc::OutgoingResponse::success(response));
   }
 }
 

@@ -10,6 +10,7 @@
 #include "marshal-inl.hh"
 #include "plankton-inl.hh"
 #include "utils/misc-inl.h"
+#include "utils/string.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/log.h"
@@ -80,7 +81,7 @@ NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
   tclib::Blob scratch(start, payload->size_in_bytes_in);
   response_t<uint32_t> resp = connector()->get_console_title(scratch, payload->is_unicode);
   req->set_return_value(NtStatus::from_response(resp));
-  size_t char_size = payload->is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
+  size_t char_size = StringUtils::char_size(payload->is_unicode);
   payload->length_in_chars_out = static_cast<uint32_t>(resp.value() / char_size);
   return NtStatus::success();
 }
@@ -148,14 +149,21 @@ NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
   void *start = is_inline
       ? payload->buffer
       : req->xform().remote_to_local(payload->buffer);
-  size_t real_bufsize = payload->is_unicode
-      ? payload->buffer_size
-      : payload->buffer_size / sizeof(wide_char_t);
+  bool_t is_unicode = payload->is_unicode;
+  size_t char_size = StringUtils::char_size(is_unicode);
+  size_t real_bufsize = payload->buffer_size / StringUtils::char_size(!is_unicode);
   tclib::Blob scratch(start, real_bufsize);
+  console_readconsole_control_t input_control;
+  struct_zero_fill(input_control);
+  input_control.nLength = sizeof(input_control);
+  input_control.nInitialChars = static_cast<ulong_t>(payload->initial_size / char_size);
+  input_control.dwCtrlWakeupMask = payload->ctrl_wakeup_mask;
+  input_control.dwControlKeyState = payload->control_key_state;
   response_t<uint32_t> resp = connector()->read_console(payload->input, scratch,
-      payload->is_unicode);
+      payload->is_unicode, &input_control);
   req->set_return_value(NtStatus::from_response(resp));
   payload->size_in_bytes = resp.value();
+  payload->control_key_state = input_control.dwControlKeyState;
   return NtStatus::success();
 }
 
@@ -265,7 +273,7 @@ response_t<uint32_t> PrpcConsoleConnector::get_console_title(tclib::Blob buffer,
     return response_t<uint32_t>::error(result);
   Array pair = result.value();
   plankton::Blob presult = pair[0];
-  size_t char_size = is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
+  size_t char_size = StringUtils::char_size(is_unicode);
   uint32_t return_value = static_cast<uint32_t>(pair[1].integer_value());
   if (buffer.size() >= char_size) {
     // There is always an implicit null terminator after the response's contents
@@ -323,20 +331,23 @@ response_t<uint32_t> PrpcConsoleConnector::write_console(Handle output,
 }
 
 response_t<uint32_t> PrpcConsoleConnector::read_console(Handle input,
-    tclib::Blob buffer, bool is_unicode) {
+    tclib::Blob buffer, bool is_unicode, console_readconsole_control_t *input_control) {
   NativeVariant input_var(&input);
-  Variant args[3] = {input_var, buffer.size(), Variant::boolean(is_unicode)};
-  rpc::OutgoingRequest req(Variant::null(), "read_console", 3, args);
+  NativeVariant control_var(input_control);
+  Variant args[4] = {input_var, buffer.size(), Variant::boolean(is_unicode),
+      control_var};
+  rpc::OutgoingRequest req(Variant::null(), "read_console", 4, args);
   rpc::IncomingResponse resp;
   response_t<Variant> result = send_request_default<Variant>(&req, &resp);
   if (result.has_error())
     return response_t<uint32_t>::error(result);
-  Array pair = result.value();
-  plankton::Blob presult = pair[0];
-  // size_t char_size = is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t);
-  uint32_t return_value = static_cast<uint32_t>(pair[1].integer_value());
+  Map response = result.value();
+  plankton::Blob presult = response["data"];
+  uint32_t return_value = static_cast<uint32_t>(response["result"].integer_value());
   uint32_t bytes_to_write = static_cast<uint32_t>(min_size(presult.size(), buffer.size()));
   blob_copy_to(tclib::Blob(presult.data(), bytes_to_write), buffer);
+  console_readconsole_control_t *input_control_out = response["input_control"].native_as<console_readconsole_control_t>();
+  *input_control = *input_control_out;
   return response_t<uint32_t>::of(return_value);
 }
 

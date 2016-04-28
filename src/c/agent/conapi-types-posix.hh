@@ -13,7 +13,10 @@ struct console_cursor_info_t {
 
 // CONSOLE_READCONSOLE_CONTROL
 struct console_readconsole_control_t {
-
+  ulong_t nLength;
+  ulong_t nInitialChars;
+  ulong_t dwCtrlWakeupMask;
+  ulong_t dwControlKeyState;
 };
 
 // COORD

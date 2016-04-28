@@ -27,7 +27,8 @@ public:
       ConsoleScreenBufferInfo *info_out) = 0;
 
   // Read up to to the buffer's capacity from the wty's input.
-  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode) = 0;
+  virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
+      ReadConsoleControl *input_control) = 0;
 
   // Write up to the buffer's capacity to the wty's output, either standard or
   // error.

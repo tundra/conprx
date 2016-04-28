@@ -92,7 +92,8 @@ enum conprx_error_t {
   CONPRX_ERROR_INVALID_RESPONSE = 0x0006,
   CONPRX_ERROR_CALIBRATION_FAILED = 0x0007,
   CONPRX_ERROR_WRITE_FAILED = 0x0008,
-  CONPRX_ERROR_READ_FAILED = 0x0009
+  CONPRX_ERROR_READ_FAILED = 0x0009,
+  CONPRX_ERROR_INVALID_ARGUMENT = 0x0010
 };
 
 // A wrapper around an nt status code that makes it easier to dissect the value
@@ -323,6 +324,19 @@ private:
   console_screen_buffer_infoex_t info_;
 };
 
+class ReadConsoleControl {
+public:
+  ReadConsoleControl();
+  ReadConsoleControl(console_readconsole_control_t *prototype) : control_(*prototype) { }
+  console_readconsole_control_t *as_winapi() { return &control_; }
+  void set_control_key_state(ulong_t value) { as_winapi()->dwControlKeyState = value; }
+  void set_ctrl_wakeup_mask(ulong_t value) { as_winapi()->dwCtrlWakeupMask = value; }
+  void set_initial_chars(ulong_t value) { as_winapi()->nInitialChars = value; }
+
+private:
+  console_readconsole_control_t control_;
+};
+
 // Stuff relating to the console protocol types that doesn't fit anywhere else.
 class ConsoleTypes {
 public:
@@ -347,6 +361,10 @@ template <> struct default_seed_type<console_screen_buffer_info_t> {
 
 template <> struct default_seed_type<console_screen_buffer_infoex_t> {
   static plankton::ConcreteSeedType<console_screen_buffer_infoex_t> *get();
+};
+
+template <> struct default_seed_type<console_readconsole_control_t> {
+  static plankton::ConcreteSeedType<console_readconsole_control_t> *get();
 };
 
 // "Soft" suspend that sleeps the program for 30s on windows and does nothing

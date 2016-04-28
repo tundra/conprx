@@ -395,9 +395,9 @@ struct read_console_m {
   void *buffer;
   uint32_t size_in_bytes;
   uint32_t buffer_size;
-  uint32_t padding_2;
-  uint32_t padding_3;
-  uint32_t padding_4;
+  uint32_t initial_size;
+  uint32_t ctrl_wakeup_mask;
+  uint32_t control_key_state;
   bool is_unicode;
 };
 

@@ -102,6 +102,7 @@ class ConsoleAdaptor;
 #define psigHandle(F) F(_, (Handle handle), (handle))
 #define psigHandleBlob(F) F(_, (Handle output, tclib::Blob data), (output, data))
 #define psigHandleUInt32(F) F(_, (Handle output, uint32_t size), (output, size))
+#define psigHandleUInt32ReadControl(F) F(_, (Handle output, uint32_t size, ReadConsoleControl *control=NULL), (output, size, control))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -114,7 +115,7 @@ class ConsoleAdaptor;
   F(WriteConsoleA,                write_console_a,                   (_), sigWriteConsoleA,                psigHandleBlob)        \
   F(WriteConsoleW,                write_console_w,                   (_), sigWriteConsoleW,                psigHandleBlob)        \
   F(ReadConsoleA,                 read_console_a,                    (_), sigReadConsoleA,                 psigHandleUInt32)      \
-  F(ReadConsoleW,                 read_console_w,                    (_), sigReadConsoleW,                 psigHandleUInt32)      \
+  F(ReadConsoleW,                 read_console_w,                    (_), sigReadConsoleW,                 psigHandleUInt32ReadControl) \
   F(GetConsoleTitleA,             get_console_title_a,               (_), sigAnsiStrDwordToDWord,          psigInt64)             \
   F(SetConsoleTitleA,             set_console_title_a,               (_), sigAnsiCStrToBool,               psigAnsiCStr)          \
   F(GetConsoleTitleW,             get_console_title_w,               (_), sigWideStrDWordToDWord,          psigInt64)             \

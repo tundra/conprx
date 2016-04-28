@@ -50,7 +50,7 @@ public:
       bool is_unicode) = 0;
 
   virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
-      bool is_unicode) = 0;
+      bool is_unicode, console_readconsole_control_t *input_control) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -92,7 +92,7 @@ public:
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
-      bool is_unicode);
+      bool is_unicode, console_readconsole_control_t *input_control);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);

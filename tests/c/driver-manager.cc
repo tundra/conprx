@@ -82,9 +82,16 @@ Variant DriverRequest::read_console_a(Handle input, uint32_t bufsize) {
   return send("read_console_a", input_var, bufsize);
 }
 
-Variant DriverRequest::read_console_w(Handle input, uint32_t bufsize) {
+Variant DriverRequest::read_console_w(Handle input, uint32_t bufsize,
+    ReadConsoleControl *control) {
   NativeVariant input_var(&input);
-  return send("read_console_w", input_var, bufsize);
+  NativeVariant control_var(control == NULL ? NULL : control->as_winapi());
+  Array pair = send("read_console_w", input_var, bufsize, control_var);
+  if (control != NULL) {
+    console_readconsole_control_t *control_out = pair[1].native_as<console_readconsole_control_t>();
+    *control->as_winapi() = *control_out;
+  }
+  return pair[0];
 }
 
 Variant DriverRequest::get_console_title_a(int64_t bufsize) {
@@ -148,7 +155,7 @@ const Variant &DriverRequest::operator*() {
     writer.write(response_->peek_error(Variant::null()));
     FATAL("Unexpected response failure: %s", *writer);
   }
-  return response_->peek_value(Variant::null());
+  return result_;
 }
 
 const Variant &DriverRequest::error() {

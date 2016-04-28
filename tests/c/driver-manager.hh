@@ -82,6 +82,7 @@ private:
   bool is_used_;
   DriverManager *manager_;
   IncomingResponse response_;
+  Variant result_;
   Arena arena_;
 };
 
@@ -188,7 +189,7 @@ public:
 #define __DECL_PROXY_METHOD__(name, SIG, ARGS)                                 \
   DriverRequest name SIG {                                                     \
     DriverRequest req(this);                                                   \
-    req.name ARGS;                                                             \
+    req.result_ = req.name ARGS;                                               \
     return req;                                                                \
   }
   FOR_EACH_REMOTE_MESSAGE(__DECL_PROXY_METHOD__)
@@ -197,7 +198,7 @@ public:
 #define __DECL_PROXY_METHOD__(Name, name, FLAGS, SIG, PSIG)                    \
   DriverRequest name PSIG(GET_SIG_PARAMS) {                                    \
     DriverRequest req(this);                                                   \
-    req.name PSIG(GET_SIG_ARGS);                                               \
+    req.result_ = req.name PSIG(GET_SIG_ARGS);                                 \
     return req;                                                                \
   }
   FOR_EACH_CONAPI_FUNCTION(__DECL_PROXY_METHOD__)

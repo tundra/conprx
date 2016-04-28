@@ -30,6 +30,9 @@ public:
   // Returns a blob that extends from the beginning of the given string to the
   // end, optionally including the null terminator.
   static tclib::Blob as_blob(wide_cstr_t str, bool include_null=false);
+
+  // Returns the size in bytes of characters in ansi/unicode mode.
+  static inline uint32_t char_size(bool is_unicode) { return static_cast<uint32_t>(is_unicode ? sizeof(wide_char_t) : sizeof(ansi_char_t)); }
 };
 
 // Functions related to the default ms-dos (aka IBM PC, aka CP437, aka OEM-US,
