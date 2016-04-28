@@ -63,7 +63,7 @@ public:
   // Fill in the given output parameter with information about the buffer with
   // the given handle.
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_infoex_t *info_out) = 0;
+      ConsoleScreenBufferInfo *info_out) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -82,7 +82,7 @@ public:
       bool is_unicode);
   virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode);
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_infoex_t *info_out);
+      ConsoleScreenBufferInfo *info_out);
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,

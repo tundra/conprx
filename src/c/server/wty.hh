@@ -22,23 +22,9 @@ class WinTty : public tclib::DefaultDestructable {
 public:
   virtual ~WinTty() { }
 
-  // TODO: wrap all the size/position etc. functions into a single call that
-  //   gets all the info at once.
-
-  // The size of this terminal window.
-  virtual coord_t size() = 0;
-
-  // The position within the terminal window of the cursor.
-  virtual coord_t cursor_position() = 0;
-
-  // ?
-  virtual word_t attributes() = 0;
-
-  // The position on the screen of the terminal window.
-  virtual small_rect_t position() = 0;
-
-  // As large as the system allows this window to become.
-  virtual coord_t maximum_window_size() = 0;
+  // Write information about this wty into the given screen buffer info.
+  virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
+      ConsoleScreenBufferInfo *info_out) = 0;
 
   // Read up to to the buffer's capacity from the wty's input.
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode) = 0;

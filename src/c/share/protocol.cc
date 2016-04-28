@@ -15,6 +15,10 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
+ConsoleScreenBufferInfo::ConsoleScreenBufferInfo() {
+  struct_zero_fill(info_);
+}
+
 TypeRegistry *ConsoleTypes::registry() {
   static TypeRegistry *instance = NULL;
   if (instance == NULL) {
@@ -27,7 +31,6 @@ TypeRegistry *ConsoleTypes::registry() {
   }
   return instance;
 }
-
 
 DefaultSeedType<Handle> Handle::kSeedType("winapi.HANDLE");
 

@@ -16,11 +16,8 @@ public:
     : frontend_(frontend)
     , platform_(platform) { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
-  virtual coord_t size() { return coord_new(80, 25); }
-  virtual coord_t cursor_position() { return coord_new(0, 0); }
-  virtual word_t attributes() { return 0; }
-  virtual small_rect_t position() { return small_rect_new(0, 0, 80, 25); }
-  virtual coord_t maximum_window_size() { return size(); }
+  virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
+      ConsoleScreenBufferInfo *info_out);
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode);
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
 
@@ -30,6 +27,16 @@ private:
   ConsolePlatform *platform() { return platform_; }
   ConsolePlatform *platform_;
 };
+
+response_t<bool_t> AdaptedWinTty::get_screen_buffer_info(bool is_error,
+    ConsoleScreenBufferInfo *info_out) {
+  handle_t handle = platform()->get_std_handle(is_error ? kStdErrorHandle : kStdOutputHandle);
+  if (frontend()->get_console_screen_buffer_info_ex(handle, info_out->as_ex())) {
+    return response_t<bool_t>::yes();
+  } else {
+    return response_t<bool_t>::error(frontend()->get_last_error().to_nt());
+  }
+}
 
 response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode) {
   handle_t handle = platform()->get_std_handle(kStdInputHandle);

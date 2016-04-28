@@ -315,26 +315,20 @@ AGENT_TEST(set_std_modes) {
 class InfoBackend : public BasicConsoleBackend {
 public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_infoex_t *info_out);
+      ConsoleScreenBufferInfo *info_out);
 };
 
 response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
-      console_screen_buffer_infoex_t *info_out) {
-  info_out->dwSize.X = 0x0FEE;
-  info_out->dwSize.Y = 0x0BAA;
-  info_out->dwCursorPosition.X = 0x0EFF;
-  info_out->dwCursorPosition.Y = 0x0ABB;
-  info_out->wAttributes = 0x0CAB;
-  info_out->dwMaximumWindowSize.X = 0x0F00;
-  info_out->dwMaximumWindowSize.Y = 0x0BAD;
-  info_out->srWindow.Left = 0x0DAB;
-  info_out->srWindow.Top = 0x0ABD;
-  info_out->srWindow.Right = 0x0BAB;
-  info_out->srWindow.Bottom = 0x0D0B;
-  info_out->wPopupAttributes = 0x0B00;
-  info_out->bFullscreenSupported = true;
+    ConsoleScreenBufferInfo *info_out) {
+  info_out->set_size(coord_new(0x0FEE, 0x0BAA));
+  info_out->set_cursor_position(coord_new(0x0EFF, 0x0ABB));
+  info_out->set_attributes(0x0CAB);
+  info_out->set_maximum_window_size(coord_new(0x0F00, 0x0BAD));
+  info_out->set_window(small_rect_new(0x0DAB, 0x0ABD, 0x0BAB, 0x0D0B));
+  info_out->set_popup_attributes(0x0B00);
+  info_out->set_fullscreen_supported(true);
   for (size_t i = 0; i < 16; i++)
-    info_out->ColorTable[i] = static_cast<colorref_t>(0x0DECADE0 + i);
+    info_out->color_table()[i] = static_cast<colorref_t>(0x0DECADE0 + i);
   return response_t<bool_t>::yes();
 }
 
@@ -644,7 +638,7 @@ public:
   response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode, size_t *bytes_written_out) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
-  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, console_screen_buffer_infoex_t *info_out) { return fail<bool_t>(); }
+  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, ConsoleScreenBufferInfo *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read) { return fail<uint32_t>(); }
 

@@ -5,6 +5,7 @@
 
 #include "rpc.hh"
 #include "agent/conapi-types.hh"
+#include "utils/vector.hh"
 
 #ifndef _CONPRX_SHARE_PROTOCOL_HH
 #define _CONPRX_SHARE_PROTOCOL_HH
@@ -297,6 +298,29 @@ private:
 
   static plankton::DefaultSeedType<Handle> kSeedType;
   int64_t id_;
+};
+
+// A convenience wrapper around a screen buffer info struct.
+class ConsoleScreenBufferInfo {
+public:
+  ConsoleScreenBufferInfo();
+
+  // Returns a view of this info as a windows infoex. Changing the infoex
+  // affects the original info.
+  console_screen_buffer_infoex_t *as_ex() { return &info_; }
+
+  // Accessors for the different fields.
+  void set_size(coord_t value) { as_ex()->dwSize = value; }
+  void set_cursor_position(coord_t value) { as_ex()->dwCursorPosition = value; }
+  void set_attributes(word_t value) { as_ex()->wAttributes = value; }
+  void set_window(small_rect_t value) { as_ex()->srWindow = value; }
+  void set_maximum_window_size(coord_t value) { as_ex()->dwMaximumWindowSize = value; }
+  void set_popup_attributes(word_t value) { as_ex()->wPopupAttributes = value; }
+  void set_fullscreen_supported(bool_t value) { as_ex()->bFullscreenSupported = value; }
+  Vector<colorref_t> color_table() { return Vector<colorref_t>(as_ex()->ColorTable, 16); }
+
+private:
+  console_screen_buffer_infoex_t info_;
 };
 
 // Stuff relating to the console protocol types that doesn't fit anywhere else.
