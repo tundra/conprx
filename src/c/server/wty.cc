@@ -2,6 +2,7 @@
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #include "server/wty.hh"
+#include "utils/string.hh"
 
 using namespace conprx;
 using namespace tclib;
@@ -54,7 +55,7 @@ response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode,
         input_control->raw());
   }
   return read_succeeded
-      ? response_t<uint32_t>::of(chars_read)
+      ? response_t<uint32_t>::of(chars_read * StringUtils::char_size(is_unicode))
       : response_t<uint32_t>::error(frontend()->get_last_error().to_nt());
 }
 
@@ -72,7 +73,7 @@ response_t<uint32_t> AdaptedWinTty::write(tclib::Blob blob, bool is_unicode,
         static_cast<dword_t>(blob.size()), &chars_written, NULL);
   }
   return write_succeeded
-      ? response_t<uint32_t>::of(chars_written)
+      ? response_t<uint32_t>::of(chars_written * StringUtils::char_size(is_unicode))
       : response_t<uint32_t>::error(frontend()->get_last_error().to_nt());
 }
 
