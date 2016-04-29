@@ -24,6 +24,9 @@ public:
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
   virtual response_t<bool_t> set_cursor_position(coord_t position, bool is_error);
 
+  template <typename T>
+  response_t<T> last_error();
+
 private:
   ConsoleFrontend *frontend() { return frontend_; }
   ConsoleFrontend *frontend_;
@@ -31,14 +34,17 @@ private:
   ConsolePlatform *platform_;
 };
 
+template <typename T>
+response_t<T> AdaptedWinTty::last_error() {
+  return response_t<T>::error(frontend()->get_last_error().to_nt());
+}
+
 response_t<bool_t> AdaptedWinTty::get_screen_buffer_info(bool is_error,
     ScreenBufferInfo *info_out) {
   handle_t handle = platform()->get_std_handle(is_error ? kStdErrorHandle : kStdOutputHandle);
-  if (frontend()->get_console_screen_buffer_info_ex(handle, info_out->raw())) {
-    return response_t<bool_t>::yes();
-  } else {
-    return response_t<bool_t>::error(frontend()->get_last_error().to_nt());
-  }
+  return frontend()->get_console_screen_buffer_info_ex(handle, info_out->raw())
+      ? response_t<bool_t>::yes()
+      : last_error<bool_t>();
 }
 
 response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode,
@@ -57,7 +63,7 @@ response_t<uint32_t> AdaptedWinTty::read(tclib::Blob buffer, bool is_unicode,
   }
   return read_succeeded
       ? response_t<uint32_t>::of(chars_read * StringUtils::char_size(is_unicode))
-      : response_t<uint32_t>::error(frontend()->get_last_error().to_nt());
+      : last_error<uint32_t>();
 }
 
 response_t<uint32_t> AdaptedWinTty::write(tclib::Blob blob, bool is_unicode,
@@ -75,14 +81,14 @@ response_t<uint32_t> AdaptedWinTty::write(tclib::Blob blob, bool is_unicode,
   }
   return write_succeeded
       ? response_t<uint32_t>::of(chars_written * StringUtils::char_size(is_unicode))
-      : response_t<uint32_t>::error(frontend()->get_last_error().to_nt());
+      : last_error<uint32_t>();
 }
 
 response_t<bool_t> AdaptedWinTty::set_cursor_position(coord_t position, bool is_error) {
   handle_t handle = platform()->get_std_handle(is_error ? kStdErrorHandle : kStdOutputHandle);
   return frontend()->set_console_cursor_position(handle, position)
       ? response_t<bool_t>::yes()
-      : response_t<bool_t>::error(frontend()->get_last_error().to_nt());
+      : last_error<bool_t>();
 }
 
 pass_def_ref_t<WinTty> WinTty::new_adapted(ConsoleFrontend *frontend,
