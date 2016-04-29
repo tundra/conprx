@@ -41,7 +41,7 @@ class NoWinTty : public WinTty {
 public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
   virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
-      ConsoleScreenBufferInfo *info_out);
+      ScreenBufferInfo *info_out);
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
       ReadConsoleControl *input_control);
@@ -54,7 +54,7 @@ private:
 };
 
 response_t<bool_t> NoWinTty::get_screen_buffer_info(bool is_error,
-    ConsoleScreenBufferInfo *info_out) {
+    ScreenBufferInfo *info_out) {
   return response_t<bool_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
 
@@ -207,7 +207,7 @@ response_t<bool_t> BasicConsoleBackend::set_console_mode(Handle handle, uint32_t
 }
 
 response_t<bool_t> BasicConsoleBackend::get_console_screen_buffer_info(
-    Handle buffer, ConsoleScreenBufferInfo *info_out) {
+    Handle buffer, ScreenBufferInfo *info_out) {
   HandleShadow shadow = get_handle_shadow(buffer);
   return wty()->get_screen_buffer_info(shadow.is_error(), info_out);
 }
@@ -351,7 +351,7 @@ void ConsoleBackendService::on_read_console(rpc::RequestData *data, ResponseCall
     Map response = data->factory()->new_map();
     response.set("data", response_blob);
     response.set("result", result.value());
-    NativeVariant control_var(control_out.as_winapi());
+    NativeVariant control_var(control_out.raw());
     response.set("input_control", control_var);
     resp(rpc::OutgoingResponse::success(response));
   }
@@ -376,12 +376,12 @@ void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *
   Handle *output = data->argument(0).native_as<Handle>();
   if (output == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
-  ConsoleScreenBufferInfo *info = new (data->factory()) ConsoleScreenBufferInfo();
+  ScreenBufferInfo *info = new (data->factory()) ScreenBufferInfo();
   response_t<bool_t> result = backend()->get_console_screen_buffer_info(*output, info);
   if (result.has_error()) {
     return resp(rpc::OutgoingResponse::failure(result.error_code()));
   } else {
-    NativeVariant info_var(info->as_ex());
+    NativeVariant info_var(info->raw());
     return resp(rpc::OutgoingResponse::success(info_var));
   }
 }

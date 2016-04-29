@@ -302,39 +302,47 @@ private:
 };
 
 // A convenience wrapper around a screen buffer info struct.
-class ConsoleScreenBufferInfo {
+class ScreenBufferInfo {
 public:
-  ConsoleScreenBufferInfo();
+  ScreenBufferInfo();
 
-  // Returns a view of this info as a windows infoex. Changing the infoex
-  // affects the original info.
-  console_screen_buffer_infoex_t *as_ex() { return &info_; }
+  // Returns the raw struct underlying this wrapper.
+  console_screen_buffer_infoex_t *raw() { return &raw_; }
 
   // Accessors for the different fields.
-  void set_size(coord_t value) { as_ex()->dwSize = value; }
-  void set_cursor_position(coord_t value) { as_ex()->dwCursorPosition = value; }
-  void set_attributes(word_t value) { as_ex()->wAttributes = value; }
-  void set_window(small_rect_t value) { as_ex()->srWindow = value; }
-  void set_maximum_window_size(coord_t value) { as_ex()->dwMaximumWindowSize = value; }
-  void set_popup_attributes(word_t value) { as_ex()->wPopupAttributes = value; }
-  void set_fullscreen_supported(bool_t value) { as_ex()->bFullscreenSupported = value; }
-  Vector<colorref_t> color_table() { return Vector<colorref_t>(as_ex()->ColorTable, 16); }
+  void set_size(coord_t value) { raw()->dwSize = value; }
+  void set_cursor_position(coord_t value) { raw()->dwCursorPosition = value; }
+  void set_attributes(word_t value) { raw()->wAttributes = value; }
+  void set_window(small_rect_t value) { raw()->srWindow = value; }
+  void set_maximum_window_size(coord_t value) { raw()->dwMaximumWindowSize = value; }
+  void set_popup_attributes(word_t value) { raw()->wPopupAttributes = value; }
+  void set_fullscreen_supported(bool_t value) { raw()->bFullscreenSupported = value; }
+  Vector<colorref_t> color_table() { return Vector<colorref_t>(raw()->ColorTable, 16); }
 
 private:
-  console_screen_buffer_infoex_t info_;
+  console_screen_buffer_infoex_t raw_;
 };
 
+// Convenience wrapper around a CONSOLE_READCONSOLE_CONTROL.
 class ReadConsoleControl {
 public:
   ReadConsoleControl();
-  ReadConsoleControl(console_readconsole_control_t *prototype) : control_(*prototype) { }
-  console_readconsole_control_t *as_winapi() { return &control_; }
-  void set_control_key_state(ulong_t value) { as_winapi()->dwControlKeyState = value; }
-  void set_ctrl_wakeup_mask(ulong_t value) { as_winapi()->dwCtrlWakeupMask = value; }
-  void set_initial_chars(ulong_t value) { as_winapi()->nInitialChars = value; }
+  // Creates a read control with the same contents as the given prototype but
+  // unconnected, to changes to either won't affect the other.
+  ReadConsoleControl(console_readconsole_control_t *prototype) : raw_(*prototype) { }
+
+  // Returns the raw struct underlying this wrapper.
+  console_readconsole_control_t *raw() { return &raw_; }
+
+  ulong_t control_key_state() { return raw()->dwControlKeyState; }
+  void set_control_key_state(ulong_t value) { raw()->dwControlKeyState = value; }
+  ulong_t ctrl_wakeup_mask() { return raw()->dwCtrlWakeupMask; }
+  void set_ctrl_wakeup_mask(ulong_t value) { raw()->dwCtrlWakeupMask = value; }
+  ulong_t initial_chars() { return raw()->nInitialChars; }
+  void set_initial_chars(ulong_t value) { raw()->nInitialChars = value; }
 
 private:
-  console_readconsole_control_t control_;
+  console_readconsole_control_t raw_;
 };
 
 // Stuff relating to the console protocol types that doesn't fit anywhere else.

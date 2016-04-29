@@ -315,11 +315,11 @@ AGENT_TEST(set_std_modes) {
 class InfoBackend : public BasicConsoleBackend {
 public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
-      ConsoleScreenBufferInfo *info_out);
+      ScreenBufferInfo *info_out);
 };
 
 response_t<bool_t> InfoBackend::get_console_screen_buffer_info(Handle buffer,
-    ConsoleScreenBufferInfo *info_out) {
+    ScreenBufferInfo *info_out) {
   info_out->set_size(coord_new(0x0FEE, 0x0BAA));
   info_out->set_cursor_position(coord_new(0x0EFF, 0x0ABB));
   info_out->set_attributes(0x0CAB);
@@ -631,9 +631,9 @@ AGENT_TEST(read_console_aw) {
   wide_char_t not_long_wide[] = {'S', 'H', 'O', 'R', 'T', 0};
   ASSERT_BLOBEQ(StringUtils::as_blob(not_long_wide, false), as_blob(*rcw0));
 
-  ASSERT_EQ(0, backend.last_control.as_winapi()->dwControlKeyState);
-  ASSERT_EQ(0, backend.last_control.as_winapi()->dwCtrlWakeupMask);
-  ASSERT_EQ(0, backend.last_control.as_winapi()->nInitialChars);
+  ASSERT_EQ(0, backend.last_control.control_key_state());
+  ASSERT_EQ(0, backend.last_control.ctrl_wakeup_mask());
+  ASSERT_EQ(0, backend.last_control.initial_chars());
 
   ReadConsoleControl control;
   control.set_ctrl_wakeup_mask(0xBCCB);
@@ -645,10 +645,9 @@ AGENT_TEST(read_console_aw) {
   ASSERT_EQ(200, backend.last_request_size);
   ASSERT_EQ(true, backend.last_is_unicode);
   ASSERT_BLOBEQ(StringUtils::as_blob(not_long_wide, false), as_blob(*rcw1));
-  ASSERT_EQ(0xABBA, control.as_winapi()->dwControlKeyState);
-  ASSERT_EQ(0xBCCB, backend.last_control.as_winapi()->dwCtrlWakeupMask);
-  ASSERT_EQ(10, backend.last_control.as_winapi()->nInitialChars);
-
+  ASSERT_EQ(0xABBA, control.control_key_state());
+  ASSERT_EQ(0xBCCB, backend.last_control.ctrl_wakeup_mask());
+  ASSERT_EQ(10, backend.last_control.initial_chars());
 }
 
 // A backend that fails on *everything*. Don't forget to add a test when you
@@ -664,7 +663,7 @@ public:
   response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode, size_t *bytes_written_out) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_title(tclib::Blob title, bool is_unicode) { return fail<bool_t>(); }
   response_t<bool_t> set_console_mode(Handle handle, uint32_t mode) { return fail<bool_t>(); }
-  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, ConsoleScreenBufferInfo *info_out) { return fail<bool_t>(); }
+  response_t<bool_t> get_console_screen_buffer_info(Handle buffer, ScreenBufferInfo *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read, ReadConsoleControl *input_control) { return fail<uint32_t>(); }
 

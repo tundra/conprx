@@ -151,19 +151,18 @@ NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
       : req->xform().remote_to_local(payload->buffer);
   bool_t is_unicode = payload->is_unicode;
   size_t char_size = StringUtils::char_size(is_unicode);
-  size_t real_bufsize = payload->buffer_size / StringUtils::char_size(!is_unicode);
+  // The bufsize field gets scaled by the wide char size, always, so we have
+  // to scale it back if it's not intended to actually hold a unicode string.
+  size_t real_bufsize = payload->buffer_size / (is_unicode ? 1 : sizeof(wide_char_t));
   tclib::Blob scratch(start, real_bufsize);
-  console_readconsole_control_t input_control;
-  struct_zero_fill(input_control);
-  input_control.nLength = sizeof(input_control);
-  input_control.nInitialChars = static_cast<ulong_t>(payload->initial_size / char_size);
-  input_control.dwCtrlWakeupMask = payload->ctrl_wakeup_mask;
-  input_control.dwControlKeyState = payload->control_key_state;
+  ReadConsoleControl input_control;
+  input_control.set_initial_chars(static_cast<ulong_t>(payload->initial_size / char_size));
+  input_control.set_ctrl_wakeup_mask(payload->ctrl_wakeup_mask);
   response_t<uint32_t> resp = connector()->read_console(payload->input, scratch,
-      payload->is_unicode, &input_control);
+      payload->is_unicode, input_control.raw());
   req->set_return_value(NtStatus::from_response(resp));
   payload->size_in_bytes = resp.value();
-  payload->control_key_state = input_control.dwControlKeyState;
+  payload->control_key_state = input_control.control_key_state();
   return NtStatus::success();
 }
 

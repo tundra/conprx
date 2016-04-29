@@ -15,14 +15,14 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
-ConsoleScreenBufferInfo::ConsoleScreenBufferInfo() {
-  struct_zero_fill(info_);
-  info_.cbSize = sizeof(info_);
+ScreenBufferInfo::ScreenBufferInfo() {
+  struct_zero_fill(raw_);
+  raw_.cbSize = sizeof(raw_);
 }
 
 ReadConsoleControl::ReadConsoleControl() {
-  struct_zero_fill(control_);
-  control_.nLength = sizeof(control_);
+  struct_zero_fill(raw_);
+  raw_.nLength = sizeof(raw_);
 }
 
 TypeRegistry *ConsoleTypes::registry() {
@@ -195,13 +195,11 @@ ConcreteSeedType<small_rect_t> *default_seed_type<small_rect_t>::get() {
 }
 
 static console_readconsole_control_t *new_readcontrol(Variant header, Factory *factory) {
-  console_readconsole_control_t *result = new (factory) console_readconsole_control_t;
-  struct_zero_fill(*result);
-  return result;
+  ReadConsoleControl *result = new (factory) ReadConsoleControl();
+  return result->raw();
 }
 
 static void init_readcontrol(console_readconsole_control_t *control, Seed payload, Factory *factory) {
-  control->nLength = static_cast<ulong_t>(payload.get_field("nLength").integer_value());
   control->nInitialChars = static_cast<ulong_t>(payload.get_field("nInitialChars").integer_value());
   control->dwCtrlWakeupMask = static_cast<ulong_t>(payload.get_field("dwCtrlWakeupMask").integer_value());
   control->dwControlKeyState = static_cast<ulong_t>(payload.get_field("dwControlKeyState").integer_value());
@@ -209,7 +207,6 @@ static void init_readcontrol(console_readconsole_control_t *control, Seed payloa
 
 static Variant readcontrol_to_seed(console_readconsole_control_t *control, Factory *factory) {
   Seed seed = factory->new_seed(default_seed_type<console_readconsole_control_t>::get());
-  seed.set_field("nLength", control->nLength);
   seed.set_field("nInitialChars", control->nInitialChars);
   seed.set_field("dwCtrlWakeupMask", control->dwCtrlWakeupMask);
   seed.set_field("dwControlKeyState", control->dwControlKeyState);

@@ -24,7 +24,7 @@ public:
 
   // Write information about this wty into the given screen buffer info.
   virtual response_t<bool_t> get_screen_buffer_info(bool is_error,
-      ConsoleScreenBufferInfo *info_out) = 0;
+      ScreenBufferInfo *info_out) = 0;
 
   // Read up to to the buffer's capacity from the wty's input.
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,

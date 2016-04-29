@@ -85,11 +85,11 @@ Variant DriverRequest::read_console_a(Handle input, uint32_t bufsize) {
 Variant DriverRequest::read_console_w(Handle input, uint32_t bufsize,
     ReadConsoleControl *control) {
   NativeVariant input_var(&input);
-  NativeVariant control_var(control == NULL ? NULL : control->as_winapi());
+  NativeVariant control_var(control == NULL ? NULL : control->raw());
   Array pair = send("read_console_w", input_var, bufsize, control_var);
   if (control != NULL) {
     console_readconsole_control_t *control_out = pair[1].native_as<console_readconsole_control_t>();
-    *control->as_winapi() = *control_out;
+    *control = ReadConsoleControl(control_out);
   }
   return pair[0];
 }
