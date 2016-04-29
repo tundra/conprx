@@ -12,9 +12,14 @@ END_C_INCLUDES
 using namespace tclib;
 using namespace conprx;
 
-static bool should_trace() {
-  const char *envval = getenv("TRACE_CONPRX_HOST");
-  return (envval != NULL) && (strcmp(envval, "1") == 0);
+static OutStream *open_trace_stream() {
+  const char *trace_flag = getenv("TRACE_CONPRX_HOST");
+  if ((trace_flag == NULL) || (strcmp(trace_flag, "1") != 0))
+    return NULL;
+  const char *trace_file = getenv("TRACE_CONPRX_DEST");
+  if ((trace_file == NULL) || (strcmp(trace_file, "-") == 0))
+    return FileSystem::native()->std_out();
+  return FileSystem::native()->open(new_c_string(trace_file), OPEN_FILE_MODE_WRITE).out();
 }
 
 fat_bool_t fat_main(int argc, char *argv[], int *exit_code_out) {
@@ -43,12 +48,18 @@ fat_bool_t fat_main(int argc, char *argv[], int *exit_code_out) {
   F_TRY(launcher.initialize());
   F_TRY(launcher.start(command, new_argc, new_argv));
 
-  plankton::rpc::TracingMessageSocketObserver observer;
-  if (should_trace())
+  plankton::rpc::TracingMessageSocketObserver observer("HOST");
+  OutStream *trace_stream = open_trace_stream();
+  if (trace_stream != NULL) {
+    observer.set_out(trace_stream);
     observer.install(launcher.socket());
+  }
 
   F_TRY(launcher.process_messages());
   F_TRY(launcher.join(exit_code_out));
+
+  if (trace_stream != NULL)
+    trace_stream->close();
 
   return F_TRUE;
 }

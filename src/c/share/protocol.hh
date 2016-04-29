@@ -45,6 +45,7 @@
   F(SetConsoleTextAttribute,    ,                               0x0001A,                ) \
   F(GetFileType,                ,                               0x00023,                ) \
   F(BaseDllInitHelper,          ,                               0x0004C,                ) \
+  F(CreateProcess,              ,                               0x10000,                ) \
   F(NlsGetUserInfo,             ,                               0x1001B,                )
 
 // LPC minor flag extractors.
