@@ -105,6 +105,15 @@ NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
   return req->call_native_backend();
 }
 
+NtStatus ConsoleAdaptor::set_console_cursor_position(lpc::Message *req,
+    lpc::set_console_cursor_position_m *payload) {
+  VALIDATE_MESSAGE_OR_BAIL(req, payload);
+  response_t<bool_t> resp = connector()->set_console_cursor_position(payload->output,
+      payload->position);
+  req->set_return_value(NtStatus::from_response(resp));
+  return NtStatus::success();
+}
+
 NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
     lpc::get_console_screen_buffer_info_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
@@ -296,6 +305,16 @@ response_t<bool_t> PrpcConsoleConnector::set_console_mode(Handle handle,
   NativeVariant handle_var(&handle);
   Variant args[2] = {handle_var, mode};
   rpc::OutgoingRequest req(Variant::null(), "set_console_mode", 2, args);
+  rpc::IncomingResponse resp;
+  return send_request_default<bool_t>(&req, &resp);
+}
+
+response_t<bool_t> PrpcConsoleConnector::set_console_cursor_position(Handle output,
+    coord_t position) {
+  NativeVariant output_var(&output);
+  NativeVariant position_var(&position);
+  Variant args[2] = {output_var, position_var};
+  rpc::OutgoingRequest req(Variant::null(), "set_console_cursor_position", 2, args);
   rpc::IncomingResponse resp;
   return send_request_default<bool_t>(&req, &resp);
 }

@@ -120,6 +120,12 @@ Variant DriverRequest::set_console_cp(uint32_t value) {
   return send("set_console_cp", value);
 }
 
+Variant DriverRequest::set_console_cursor_position(Handle output, coord_t position) {
+  NativeVariant output_var(&output);
+  NativeVariant position_var(&position);
+  return send("set_console_cursor_position", output_var, position_var);
+}
+
 Variant DriverRequest::get_console_output_cp() {
   return send("get_console_output_cp");
 }

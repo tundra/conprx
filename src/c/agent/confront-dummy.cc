@@ -106,6 +106,10 @@ bool_t DummyConsoleFrontend::set_console_output_cp(uint32_t value) {
   return false;
 }
 
+bool_t DummyConsoleFrontend::set_console_cursor_position(handle_t output, coord_t position) {
+  return false;
+}
+
 bool_t DummyConsoleFrontend::get_console_mode(handle_t handle, dword_t *mode_out) {
   return false;
 }

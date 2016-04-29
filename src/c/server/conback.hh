@@ -42,6 +42,10 @@ public:
   // Set either the input or output code page.
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output) = 0;
 
+  // Sets the given output buffer's cursor position.
+  virtual response_t<bool_t> set_console_cursor_position(Handle output,
+      coord_t position) = 0;
+
   // Fill the given buffer with the title.
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode,
       size_t *bytes_written_out) = 0;
@@ -76,6 +80,8 @@ public:
   virtual response_t<int64_t> poke(int64_t value);
   virtual response_t<uint32_t> get_console_cp(bool is_output);
   virtual response_t<bool_t> set_console_cp(uint32_t value, bool is_output);
+  virtual response_t<bool_t> set_console_cursor_position(Handle output,
+      coord_t position);
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer,
       bool is_unicode, size_t *bytes_written_out);
   virtual response_t<bool_t> set_console_title(tclib::Blob title,

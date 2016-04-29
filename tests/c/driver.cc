@@ -220,6 +220,19 @@ void ConsoleFrontendService::set_console_cp(rpc::RequestData *data, ResponseCall
       : rpc::OutgoingResponse::failure(new_console_error(data->factory())));
 }
 
+void ConsoleFrontendService::set_console_cursor_position(rpc::RequestData *data,
+    ResponseCallback callback) {
+  Handle *handle = data->argument(0).native_as<Handle>();
+  if (handle != NULL) {
+    coord_t *position = data->argument(1).native_as<coord_t>();
+    if (position != NULL) {
+      if (frontend()->set_console_cursor_position(handle->ptr(), *position))
+        return callback(rpc::OutgoingResponse::success(Variant::yes()));
+    }
+  }
+  return callback(rpc::OutgoingResponse::failure(new_console_error(data->factory())));
+}
+
 void ConsoleFrontendService::get_console_output_cp(rpc::RequestData *data, ResponseCallback callback) {
   uint32_t cp = frontend()->get_console_output_cp();
   // GetConsoleCP doesn't specify how it indicates errors but it seems to be

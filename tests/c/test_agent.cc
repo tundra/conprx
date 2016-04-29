@@ -650,6 +650,34 @@ AGENT_TEST(read_console_aw) {
   ASSERT_EQ(10, backend.last_control.initial_chars());
 }
 
+class SetPositionBackend : public BasicConsoleBackend {
+public:
+  SetPositionBackend() : last_position(coord_new(0, 0)) { }
+  response_t<bool_t> set_console_cursor_position(Handle output, coord_t position);
+  coord_t last_position;
+};
+
+response_t<bool_t> SetPositionBackend::set_console_cursor_position(Handle output, coord_t position) {
+  last_position = position;
+  return response_t<bool_t>::yes();
+}
+
+AGENT_TEST(set_position) {
+  SetPositionBackend backend;
+  AGENT_TEST_PREAMBLE(&backend, use_real);
+
+  DriverRequest gsh0 = driver.get_std_handle(conprx::kStdOutputHandle);
+  Handle output = *gsh0->native_as<Handle>();
+
+  ASSERT_EQ(0, backend.last_position.X);
+  ASSERT_EQ(0, backend.last_position.Y);
+
+  DriverRequest sccp0 = driver.set_console_cursor_position(output, coord_new(13, 14));
+  ASSERT_TRUE(sccp0->bool_value());
+  ASSERT_EQ(13, backend.last_position.X);
+  ASSERT_EQ(14, backend.last_position.Y);
+}
+
 // A backend that fails on *everything*. Don't forget to add a test when you
 // add a new method.
 class FailingConsoleBackend : public ConsoleBackend {
@@ -666,6 +694,7 @@ public:
   response_t<bool_t> get_console_screen_buffer_info(Handle buffer, ScreenBufferInfo *info_out) { return fail<bool_t>(); }
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read, ReadConsoleControl *input_control) { return fail<uint32_t>(); }
+  response_t<bool_t> set_console_cursor_position(Handle output, coord_t position) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();
@@ -732,4 +761,6 @@ AGENT_TEST(failures) {
   ASSERT_EQ(90, get_last_error(driver.write_console_w(dummy_handle, StringUtils::as_blob(wide_foo))));
   ASSERT_EQ(115, get_last_error(driver.read_console_a(dummy_handle, 10)));
   ASSERT_EQ(147, get_last_error(driver.read_console_w(dummy_handle, 10)));
+
+  ASSERT_EQ(188, get_last_error(driver.set_console_cursor_position(dummy_handle, coord_new(10, 11))));
 }

@@ -45,6 +45,7 @@ public:
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
       ReadConsoleControl *input_control);
+  virtual response_t<bool_t> set_cursor_position(coord_t position, bool is_error);
   static NoWinTty *get();
 
 private:
@@ -66,6 +67,11 @@ response_t<uint32_t> NoWinTty::read(tclib::Blob buffer, bool is_unicode,
     ReadConsoleControl *input_control) {
   return response_t<uint32_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
 }
+
+response_t<bool_t> NoWinTty::set_cursor_position(coord_t position, bool is_error) {
+  return response_t<bool_t>::error(CONPRX_ERROR_NOT_IMPLEMENTED);
+}
+
 
 NoWinTty NoWinTty::instance;
 
@@ -113,6 +119,12 @@ response_t<uint32_t> BasicConsoleBackend::get_console_title(tclib::Blob buffer,
   return is_unicode
       ? get_console_title_wide(buffer, bytes_written_out)
       : get_console_title_ansi(buffer, bytes_written_out);
+}
+
+response_t<bool_t> BasicConsoleBackend::set_console_cursor_position(Handle output,
+    coord_t position) {
+  HandleShadow shadow = get_handle_shadow(output);
+  return wty()->set_cursor_position(position, shadow.is_error());
 }
 
 response_t<uint32_t> BasicConsoleBackend::get_console_title_wide(tclib::Blob buffer,
@@ -291,6 +303,16 @@ void ConsoleBackendService::on_set_console_cp(rpc::RequestData *data, ResponseCa
   uint32_t value = static_cast<uint32_t>(data->argument(0).integer_value());
   bool is_output = data->argument(1).bool_value();
   forward_response(backend()->set_console_cp(value, is_output), resp);
+}
+
+void ConsoleBackendService::on_set_console_cursor_position(rpc::RequestData *data, ResponseCallback resp) {
+  Handle *output = data->argument(0).native_as<Handle>();
+  if (output == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_EXPECTED_HANDLE));
+  coord_t *position = data->argument(1).native_as<coord_t>();
+  if (position == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_INVALID_ARGUMENT));
+  forward_response(backend()->set_console_cursor_position(*output, *position), resp);
 }
 
 void ConsoleBackendService::on_get_console_title(rpc::RequestData *data, ResponseCallback resp) {

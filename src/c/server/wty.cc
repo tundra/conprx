@@ -22,6 +22,7 @@ public:
   virtual response_t<uint32_t> read(tclib::Blob buffer, bool is_unicode,
       ReadConsoleControl *input_control);
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error);
+  virtual response_t<bool_t> set_cursor_position(coord_t position, bool is_error);
 
 private:
   ConsoleFrontend *frontend() { return frontend_; }
@@ -75,6 +76,13 @@ response_t<uint32_t> AdaptedWinTty::write(tclib::Blob blob, bool is_unicode,
   return write_succeeded
       ? response_t<uint32_t>::of(chars_written * StringUtils::char_size(is_unicode))
       : response_t<uint32_t>::error(frontend()->get_last_error().to_nt());
+}
+
+response_t<bool_t> AdaptedWinTty::set_cursor_position(coord_t position, bool is_error) {
+  handle_t handle = platform()->get_std_handle(is_error ? kStdErrorHandle : kStdOutputHandle);
+  return frontend()->set_console_cursor_position(handle, position)
+      ? response_t<bool_t>::yes()
+      : response_t<bool_t>::error(frontend()->get_last_error().to_nt());
 }
 
 pass_def_ref_t<WinTty> WinTty::new_adapted(ConsoleFrontend *frontend,

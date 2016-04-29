@@ -34,6 +34,10 @@ public:
   // error.
   virtual response_t<uint32_t> write(tclib::Blob blob, bool is_unicode, bool is_error) = 0;
 
+  // Sets the cursor position of an output buffer.
+  virtual response_t<bool_t> set_cursor_position(coord_t position,
+      bool is_error) = 0;
+
   // Returns a new wty backed by the given frontend and platform. Since
   // frontends can be backed by wtys be sure not to back a wty by a frontend
   // it itself backs.

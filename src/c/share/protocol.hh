@@ -26,6 +26,7 @@
   F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X, _)) \
   F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _, _)) \
   F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X, _)) \
+  F(SetConsoleCursorPosition,   set_console_cursor_position,    0x00016, (_, _, _, _, _)) \
   F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _, _)) \
   F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _, _)) \
   F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _, _)) \

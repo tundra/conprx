@@ -225,6 +225,16 @@ bool_t SimulatingConsoleFrontend::set_console_output_cp(uint32_t value) {
   return set_console_cp(value, true);
 }
 
+bool_t SimulatingConsoleFrontend::set_console_cursor_position(handle_t output,
+    coord_t position) {
+  SimulatedMessage<ConsoleAgent::lmSetConsoleCursorPosition> message(this);
+  lpc::set_console_cursor_position_m *payload = message.payload();
+  payload->output = output;
+  payload->position = position;
+  agent()->on_message(message.message());
+  return update_last_error(&message);
+}
+
 bool_t SimulatingConsoleFrontend::set_console_title_a(ansi_cstr_t str) {
   SimulatedMessage<ConsoleAgent::lmSetConsoleTitle> message(this);
   lpc::set_console_title_m *payload = message.payload();

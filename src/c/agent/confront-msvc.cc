@@ -75,6 +75,11 @@ bool_t WindowsConsoleFrontend::set_console_cp(uint32_t value) {
   return SetConsoleCP(value);
 }
 
+bool_t WindowsConsoleFrontend::set_console_cursor_position(handle_t output,
+    coord_t position) {
+  return SetConsoleCursorPosition(output, position);
+}
+
 uint32_t WindowsConsoleFrontend::get_console_output_cp() {
   return GetConsoleOutputCP();
 }

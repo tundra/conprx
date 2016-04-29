@@ -43,6 +43,9 @@ public:
 
   virtual response_t<uint32_t> get_console_mode(Handle handle) = 0;
 
+  virtual response_t<bool_t> set_console_cursor_position(Handle output,
+      coord_t position) = 0;
+
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       console_screen_buffer_infoex_t *info_out) = 0;
 
@@ -87,6 +90,8 @@ public:
   virtual response_t<uint32_t> get_console_title(tclib::Blob buffer, bool is_unicode);
   virtual response_t<bool_t> set_console_mode(Handle handle, uint32_t mode);
   virtual response_t<uint32_t> get_console_mode(Handle handle);
+  virtual response_t<bool_t> set_console_cursor_position(Handle output,
+      coord_t position);
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       console_screen_buffer_infoex_t *info_out);
   virtual response_t<uint32_t> write_console(Handle output, tclib::Blob data,

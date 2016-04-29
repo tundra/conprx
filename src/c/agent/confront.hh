@@ -103,6 +103,7 @@ class ConsoleAdaptor;
 #define psigHandleBlob(F) F(_, (Handle output, tclib::Blob data), (output, data))
 #define psigHandleUInt32(F) F(_, (Handle output, uint32_t size), (output, size))
 #define psigHandleUInt32ReadControl(F) F(_, (Handle output, uint32_t size, ReadConsoleControl *control=NULL), (output, size, control))
+#define psigHandleCoord(F) F(_, (Handle output, coord_t coord), (output, coord))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
@@ -122,6 +123,7 @@ class ConsoleAdaptor;
   F(SetConsoleTitleW,             set_console_title_w,               (_), sigWideCStrToBool,               psigWideCStr)          \
   F(GetConsoleCP,                 get_console_cp,                    (_), sigVoidToUInt,                   psigVoid)              \
   F(SetConsoleCP,                 set_console_cp,                    (_), sigUIntToBool,                   psigUInt32)            \
+  F(SetConsoleCursorPosition,     set_console_cursor_position,       (_), sigSetConsoleCursorPosition,     psigHandleCoord)       \
   F(GetConsoleOutputCP,           get_console_output_cp,             (_), sigVoidToUInt,                   psigVoid)              \
   F(SetConsoleOutputCP,           set_console_output_cp,             (_), sigUIntToBool,                   psigUInt32)            \
   F(GetConsoleMode,               get_console_mode,                  (_), sigGetConsoleMode,               psigHandle)            \
@@ -141,7 +143,6 @@ class ConsoleAdaptor;
   F(ReadConsoleOutputA,         read_console_output_a,          (_), sigReadConsoleOutputA,         _)                     \
   F(ReadConsoleOutputW,         read_console_output_w,          (_), sigReadConsoleOutputW,         _)                     \
   F(SetConsoleCursorInfo,       set_console_cursor_info,        (_), sigSetConsoleCursorInfo,       _)                     \
-  F(SetConsoleCursorPosition,   set_console_cursor_position,    (_), sigSetConsoleCursorPosition,   _)                     \
   F(WriteConsoleW,              write_console_w,                (_), sigWriteConsoleW,              _)                     \
   F(WriteConsoleOutputA,        write_console_output_a,         (_), sigWriteConsoleOutputA,        _)                     \
   F(WriteConsoleOutputW,        write_console_output_w,         (_), sigWriteConsoleOutputW,        _)
