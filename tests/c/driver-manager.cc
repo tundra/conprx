@@ -154,6 +154,10 @@ Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
   return send("get_console_screen_buffer_info_ex", handle_var);
 }
 
+Variant DriverRequest::create_process(Variant args) {
+  return send("create_process", args);
+}
+
 const Variant &DriverRequest::operator*() {
   ASSERT_TRUE(response_->is_settled());
   if (response_->is_rejected()) {

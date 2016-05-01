@@ -678,6 +678,13 @@ AGENT_TEST(set_position) {
   ASSERT_EQ(14, backend.last_position.Y);
 }
 
+AGENT_TEST(create_process) {
+  BasicConsoleBackend backend;
+  AGENT_TEST_PREAMBLE(&backend, use_real);
+
+  driver.create_process("foo");
+}
+
 // A backend that fails on *everything*. Don't forget to add a test when you
 // add a new method.
 class FailingConsoleBackend : public ConsoleBackend {

@@ -190,6 +190,11 @@ NtStatus ConsoleAdaptor::console_connect(lpc::Message *req,
       : NtStatus::from(CONPRX_ERROR_CALIBRATION_FAILED);
 }
 
+NtStatus ConsoleAdaptor::create_process(lpc::Message *req,
+    lpc::create_process_m *payload) {
+  return req->call_native_backend();
+}
+
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
   return connector()->poke(value);
 }

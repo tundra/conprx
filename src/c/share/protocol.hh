@@ -33,7 +33,8 @@
   F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _, _)) \
   F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _, _)) \
   F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _, _)) \
-  F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _))
+  F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _)) \
+  F(CreateProcess,              create_process,                 0x10000, (_, _, X, _, _))
 
 // Messages that we know about and so don't want to dump/suspend on when
 // doing that on unknown messages, but that we also don't have an implementation
@@ -45,7 +46,6 @@
   F(SetConsoleTextAttribute,    ,                               0x0001A,                ) \
   F(GetFileType,                ,                               0x00023,                ) \
   F(BaseDllInitHelper,          ,                               0x0004C,                ) \
-  F(CreateProcess,              ,                               0x10000,                ) \
   F(NlsGetUserInfo,             ,                               0x1001B,                )
 
 // LPC minor flag extractors.

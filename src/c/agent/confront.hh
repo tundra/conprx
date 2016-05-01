@@ -130,8 +130,7 @@ class ConsoleAdaptor;
   F(SetConsoleMode,               set_console_mode,                  (_), sigSetConsoleMode,               psigSetConsoleMode)    \
   F(GetConsoleScreenBufferInfo,   get_console_screen_buffer_info,    (_), sigGetConsoleScreenBufferInfo,   psigHandle)            \
   F(GetConsoleScreenBufferInfoEx, get_console_screen_buffer_info_ex, (_), sigGetConsoleScreenBufferInfoEx, psigHandle)            \
-  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigInt64)             \
-
+  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigInt64)
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
   FOR_EACH_CONAPI_FUNCTION(F)                                                                                              \
