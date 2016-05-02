@@ -170,8 +170,8 @@ private:
   utf8_t agent_dll_;
   tclib::NativePipe up_;
   tclib::NativePipe down_;
-  tclib::NativeProcess::InjectRequest injection_;
-  tclib::NativeProcess::InjectRequest *injection() { return &injection_; }
+  tclib::NativeProcessHandle::InjectRequest injection_;
+  tclib::NativeProcessHandle::InjectRequest *injection() { return &injection_; }
 };
 
 } // namespace conprx

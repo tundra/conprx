@@ -60,7 +60,7 @@ fat_bool_t InjectingLauncher::complete_connect_to_agent() {
   tclib::NativeThread connector(new_callback(
       &InjectingLauncher::ensure_agent_ready_background, this));
   F_TRY(connector.start());
-  fat_bool_t injected = process()->complete_inject_library(injection());
+  fat_bool_t injected = process()->handle()->complete_inject_library(injection());
   if (!injected)
     F_TRY(abort_agent_service());
   opaque_t ready = o0();
