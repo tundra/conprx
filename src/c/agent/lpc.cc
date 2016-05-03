@@ -163,18 +163,22 @@ fat_bool_t PatchingInterceptor::infer_address_from_caller(tclib::Blob function,
   return F_FALSE;
 }
 
-Message::Message(handle_t port, message_data_t *request, message_data_t *reply,
-    Interceptor *interceptor, AddressXform xform, Destination destination)
+Message::Message(handle_t port, Interceptor *interceptor, AddressXform xform,
+    Destination destination, relevant_message_t *request, relevant_message_t *reply)
   : port_(port)
-  , request_(request)
-  , reply_(reply)
   , interceptor_(interceptor)
   , xform_(xform)
-  , destination_(destination) {
-}
+  , destination_(destination)
+  , request_(request)
+  , reply_(reply) { }
+
+template <typename T>
+ConcreteMessage<T>::ConcreteMessage(handle_t port, T *request, T *reply,
+    Interceptor *interceptor, AddressXform xform, Destination destination)
+  : Message(port, interceptor, xform, destination, &request->relevant, &reply->relevant) { }
 
 void Message::set_return_value(NtStatus status) {
-  reply_->header.return_value = status.to_nt();
+  reply()->return_value = status.to_nt();
 }
 
 void Message::dump(OutStream *out, Blob::DumpStyle style) {
@@ -182,7 +186,7 @@ void Message::dump(OutStream *out, Blob::DumpStyle style) {
   size_t data_size = this->data_length();
   size_t header_size = total_size - data_size;
   out->printf("--- message %x [size: %i, data: %i]\n", api_number(), total_size, data_size);
-  address_t start = reinterpret_cast<address_t>(request_);
+  address_t start = reinterpret_cast<address_t>(request());
   tclib::Blob header(start, header_size);
   header.dump(out, style);
   out->printf("\n--- data ---\n");
@@ -193,7 +197,11 @@ void Message::dump(OutStream *out, Blob::DumpStyle style) {
 }
 
 NtStatus Message::call_native_backend() {
-  return interceptor()->call_native_backend(port_, request_, reply_);
+  return interceptor()->call_native_backend(port(), request(), reply());
+}
+
+namespace lpc {
+template class ConcreteMessage<console_message_t>;
 }
 
 #ifdef IS_MSVC

@@ -23,14 +23,15 @@
 // tell its calling convention by how the name is mangled.
 #define FOR_EACH_LPC_FUNCTION(F)                                               \
   F(NtRequestWaitReplyPort, nt_request_wait_reply_port, ntstatus_t,            \
-     (handle_t port_handle, lpc::message_data_t *request, lpc::message_data_t *incoming_reply), \
+     (handle_t port_handle, lpc::relevant_message_t *request,                  \
+         lpc::relevant_message_t *incoming_reply),                             \
      (port_handle, request, incoming_reply))
 
 namespace lpc {
 
-struct message_data_t;
-struct capture_buffer_data_t;
 class Message;
+struct capture_buffer_data_t;
+struct relevant_message_t;
 
 // A tranformation that turns local addresses into remote ones (or back) based
 // on a fixed delta.
@@ -99,7 +100,7 @@ public:
   };
 
   virtual conprx::NtStatus call_native_backend(handle_t port,
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply) = 0;
+      relevant_message_t *request, relevant_message_t *incoming_reply) = 0;
 
   // Attempt to infer the console port calibration.
   virtual fat_bool_t calibrate_console_port() = 0;
@@ -126,7 +127,7 @@ public:
   fat_bool_t infer_calibration(PatchingInterceptor *inter);
 
   // Called through the lpc handling system during inference.
-  fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);
+  fat_bool_t process_calibration_message(handle_t port_handle, relevant_message_t *message);
 
   // The handle of the console port.
   handle_t handle() { return handle_; }
@@ -187,12 +188,12 @@ public:
   // Passes a call through this interceptor to the native backend it was
   // originally intended for.
   virtual conprx::NtStatus call_native_backend(handle_t port,
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
+      lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply);
 
   virtual fat_bool_t calibrate_console_port();
 
 private:
-  friend class Message;
+  template <typename T> friend class ConcreteMessage;
   friend class PortView;
 
   // The type of ConsoleClientCallServer. Should really be called
@@ -217,10 +218,7 @@ private:
   // grows up.
   int32_t infer_stack_direction();
 
-  // Process the calibration message sent after we've located CCCS.
-  fat_bool_t process_calibration_message(handle_t port_handle, message_data_t *message);
-
-  fat_bool_t process_base_request_message(handle_t port_handle, message_data_t *message);
+  fat_bool_t process_base_request_message(handle_t port_handle, relevant_message_t *message);
 
   // Initialize the given patch.
   fat_bool_t initialize_patch(conprx::PatchRequest *request, const char *name,
@@ -296,7 +294,7 @@ private:
 typedef uint8_t client_id_t[IF_32_BIT(8, 16)];
 
 // The generic part of an LPC message.
-struct port_message_data_t {
+struct generic_message_t {
   union {
     struct {
       uint16_t data_length;
@@ -322,6 +320,9 @@ struct port_message_data_t {
   };
 };
 
+// Size of the generic portion of a message.
+static const size_t kGenericMessageDataSize = sizeof(generic_message_t);
+
 // The header of a capture buffer.
 struct capture_buffer_data_t {
   ulong_t length;
@@ -334,6 +335,21 @@ struct capture_buffer_data_t {
 // A platform integer.
 typedef IF_32_BIT(int32_t, int64_t) intn_t;
 typedef IF_32_BIT(uint32_t, uint64_t) uintn_t;
+
+// Not just any kind of message but the type we're interested in. There may be
+// others that conform to the generic type but the ones we're interested in look
+// like this.
+struct relevant_message_t {
+  generic_message_t generic;
+  capture_buffer_data_t *capture_buffer;
+  uint32_t api_number;
+  int32_t return_value;
+  intn_t reserved;
+};
+
+// The size of just the relevant message part of a message, ignoring the generic
+// bit.
+static const size_t kRelevantMessageDataSize = sizeof(relevant_message_t) - kGenericMessageDataSize;
 
 struct get_console_mode_m {
   void *handle;
@@ -401,13 +417,6 @@ struct read_console_m {
   bool is_unicode;
 };
 
-struct message_data_header_t {
-  capture_buffer_data_t *capture_buffer;
-  uint32_t api_number;
-  int32_t return_value;
-  intn_t reserved;
-};
-
 struct get_console_screen_buffer_info_m {
   handle_t output;
   coord_t size;
@@ -442,11 +451,19 @@ struct create_process_m { };
 #endif
 
 // A console api message, a superset of a port message.
-struct message_data_t {
-  port_message_data_t port_message;
-  message_data_header_t header;
+struct console_message_t {
+  relevant_message_t relevant;
   union {
-#define __EMIT_ENTRY__(Name, name, NUM, FLAGS) name##_m name;
+#define __EMIT_ENTRY__(Name, name, NUM, FLAGS) lfBa FLAGS (,name##_m name);
+  FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
+#undef __EMIT_ENTRY__
+  } payload;
+};
+
+struct base_message_t {
+  relevant_message_t relevant;
+  union {
+#define __EMIT_ENTRY__(Name, name, NUM, FLAGS) lfBa FLAGS (name##_m name,);
   FOR_EACH_LPC_TO_INTERCEPT(__EMIT_ENTRY__)
 #undef __EMIT_ENTRY__
   } payload;
@@ -456,6 +473,12 @@ struct message_data_t {
 #  pragma pack(pop)
 #endif
 
+// Given the size of just the message payload returns the generic message data
+// size.
+static size_t message_data_length_from_payload_length(size_t payload_length) {
+  return kRelevantMessageDataSize + payload_length;
+}
+
 // Given the data size for a message returns the total length.
 static size_t total_message_length_from_data_length(size_t data_length) {
   // I have no idea where that extra 4 bytes comes from on 32 bit. It suggests
@@ -464,7 +487,7 @@ static size_t total_message_length_from_data_length(size_t data_length) {
   // no room for it to be larger. Also it doesn't seem to be alignment because
   // all sizes are 4-aligned and those extra 4 bytes sometimes knocks it out
   // of 8-alignment. Go figure.
-  return sizeof(lpc::port_message_data_t) + data_length + IF_32_BIT(4, 0);
+  return kGenericMessageDataSize + data_length + IF_32_BIT(4, 0);
 }
 
 // Computes the joint api number given a dll and an api index.
@@ -480,26 +503,8 @@ public:
     mdBase
   };
 
-  Message(handle_t port, message_data_t *request, message_data_t *reply,
-      Interceptor *interceptor, AddressXform xform, Destination destination);
-
-  // The total size of the message data, including header and full payload.
-  uint16_t total_length() { return data()->port_message.u1.s1.total_length; }
-
-  // Just the size of the payload, excluding the header size.
-  uint16_t data_length() { return data()->port_message.u1.s1.data_length; }
-
-  // Misc accessors.
-  uint32_t api_number() { return data()->header.api_number; }
-
-  // The raw underlying data.
-  message_data_t *data() { return request_; }
-
-  // Sets the return status to the given value.
-  void set_return_value(conprx::NtStatus status);
-
-  // Dump this message textually to the given out stream.
-  void dump(tclib::OutStream *out, tclib::Blob::DumpStyle style = tclib::Blob::DumpStyle());
+  Message(handle_t port, Interceptor *interceptor, AddressXform xform,
+      Destination destination, relevant_message_t *request, relevant_message_t *reply);
 
   AddressXform xform() { return xform_; }
 
@@ -516,14 +521,48 @@ public:
   // Handle of the port this message was sent to.
   handle_t port() { return port_; }
 
+  relevant_message_t *request() { return request_; }
+
+  relevant_message_t *reply() { return reply_; }
+
+  // The total size of the message data, including header and full payload.
+  uint16_t total_length() { return request()->generic.u1.s1.total_length; }
+
+  // Just the size of the payload, excluding the header size.
+  uint16_t data_length() { return request()->generic.u1.s1.data_length; }
+
+  // Misc accessors.
+  uint32_t api_number() { return request()->api_number; }
+
+  // Sets the return status to the given value.
+  void set_return_value(conprx::NtStatus status);
+
+  // Dump this message textually to the given out stream.
+  void dump(tclib::OutStream *out, tclib::Blob::DumpStyle style = tclib::Blob::DumpStyle());
+
 private:
   handle_t port_;
-  message_data_t *request_;
-  message_data_t *reply_;
   Interceptor *interceptor_;
   AddressXform xform_;
   Destination destination_;
+  relevant_message_t *request_;
+  relevant_message_t *reply_;
 };
+
+template <typename M>
+class ConcreteMessage : public Message {
+public:
+  ConcreteMessage(handle_t port, M *request, M *reply, Interceptor *interceptor,
+      AddressXform xform, Destination destination);
+
+  // The raw underlying data.
+  M *data() { return reinterpret_cast<M*>(request()); }
+};
+
+struct base_message_t;
+struct console_message_t;
+typedef ConcreteMessage<console_message_t> ConsoleMessage;
+typedef ConcreteMessage<base_message_t> BaseMessage;
 
 } // namespace lpc
 

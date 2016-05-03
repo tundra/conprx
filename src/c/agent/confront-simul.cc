@@ -29,12 +29,12 @@ public:
 
   virtual fat_bool_t calibrate_console_port() { return F_TRUE; }
 
-  virtual NtStatus call_native_backend(handle_t port,
-      lpc::message_data_t *request, lpc::message_data_t *incoming_reply);
+  virtual NtStatus call_native_backend(handle_t port, lpc::relevant_message_t *request,
+      lpc::relevant_message_t *incoming_reply);
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
-    lfSw FLAGS (NtStatus on_##name(lpc::name##_m *data, lpc::message_data_t *incoming_reply),);
+    lfSw FLAGS (NtStatus on_##name(lpc::name##_m *data, lpc::console_message_t *incoming_reply),);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 
@@ -46,12 +46,14 @@ private:
 };
 
 NtStatus SimulatingInterceptor::call_native_backend(handle_t port,
-    lpc::message_data_t *request, lpc::message_data_t *incoming_reply) {
-  uint32_t apinum = request->header.api_number;
+    lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply) {
+  uint32_t apinum = request->api_number;
   switch (apinum) {
-#define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lfSw FLAGS (__GEN_DISPATCH__(Name, name),)
-#define __GEN_DISPATCH__(Name, name) case ConsoleAgent::lm##Name:              \
-    return on_##name(&request->payload.name, incoming_reply);
+#define __MAYBE_GEN_DISPATCH__(Name, name, NUM, FLAGS) lfSw FLAGS (__GEN_DISPATCH__(Name, name, FLAGS),)
+#define __GEN_DISPATCH__(Name, name, FLAGS) case ConsoleAgent::lm##Name: {     \
+    typedef lfBa FLAGS (lpc::base_message_t, lpc::console_message_t) message_t;\
+    return on_##name(&reinterpret_cast<message_t*>(request)->payload.name, reinterpret_cast<message_t*>(incoming_reply)); \
+  }
   FOR_EACH_LPC_TO_INTERCEPT(__MAYBE_GEN_DISPATCH__)
 #undef __GEN_DISPATCH__
 #undef __MAYBE_GEN_DISPATCH__
@@ -139,7 +141,7 @@ template <ConsoleAgent::lpc_method_key_t K> struct MessageInfo { };
 #define __DECLARE_MESSAGE_INFO__(Name, name, APINUM, FLAGS)                    \
   template <> struct MessageInfo<ConsoleAgent::lm##Name> {                     \
     typedef lpc::name##_m data_m;                                              \
-    static data_m *get_payload(lpc::message_data_t *data) { return &data->payload.name; } \
+    static data_m *get_payload(lfBa FLAGS (lpc::base_message_t, lpc::console_message_t) *data) { return &data->payload.name; } \
   };
 FOR_EACH_LPC_TO_INTERCEPT(__DECLARE_MESSAGE_INFO__)
 #undef __DECLARE_MESSAGE_INFO__
@@ -148,17 +150,17 @@ FOR_EACH_LPC_TO_INTERCEPT(__DECLARE_MESSAGE_INFO__)
 class AbstractSimulatedMessage {
 public:
   AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend);
-  lpc::Message *message() { return &message_; }
-  lpc::message_data_t *operator->() { return data(); }
+  lpc::ConsoleMessage *message() { return &message_; }
+  lpc::console_message_t *operator->() { return data(); }
 
-  int32_t return_value() { return data()->header.return_value; }
+  int32_t return_value() { return data()->relevant.return_value; }
 
 protected:
-  lpc::message_data_t *data() { return &data_; }
+  lpc::console_message_t *data() { return &data_; }
 
 private:
-  lpc::message_data_t data_;
-  lpc::Message message_;
+  lpc::console_message_t data_;
+  lpc::ConsoleMessage message_;
 };
 
 template <ConsoleAgent::lpc_method_key_t K>
@@ -172,11 +174,11 @@ private:
 template <ConsoleAgent::lpc_method_key_t K>
 SimulatedMessage<K>::SimulatedMessage(SimulatingConsoleFrontend *frontend)
   : AbstractSimulatedMessage(frontend) {
-  data()->header.api_number = K;
-  size_t data_length = sizeof(lpc::message_data_header_t) + sizeof(typename MessageInfo<K>::data_m);
-  data()->port_message.u1.s1.data_length = static_cast<uint16_t>(data_length);
+  data()->relevant.api_number = K;
+  size_t data_length = lpc::message_data_length_from_payload_length(sizeof(typename MessageInfo<K>::data_m));
+  data()->relevant.generic.u1.s1.data_length = static_cast<uint16_t>(data_length);
   size_t total_length = lpc::total_message_length_from_data_length(data_length);
-  data()->port_message.u1.s1.total_length = static_cast<uint16_t>(total_length);
+  data()->relevant.generic.u1.s1.total_length = static_cast<uint16_t>(total_length);
 }
 
 bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *message) {
@@ -186,7 +188,7 @@ bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *mess
 }
 
 AbstractSimulatedMessage::AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend)
-  : message_(NULL, data(), data(), frontend->interceptor(), frontend->xform(), lpc::Message::mdConsole) {
+  : message_(NULL, data(), data(), frontend->interceptor(), frontend->xform(), lpc::ConsoleMessage::mdConsole) {
   struct_zero_fill(data_);
 }
 
@@ -467,15 +469,15 @@ pass_def_ref_t<InMemoryConsolePlatform> InMemoryConsolePlatform::new_simulating(
 }
 
 NtStatus SimulatingInterceptor::on_get_console_mode(lpc::get_console_mode_m *data,
-    lpc::message_data_t *incoming_reply) {
+    lpc::console_message_t *incoming_reply) {
   data->mode = platform()->get_console_mode(data->handle);
-  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  incoming_reply->relevant.return_value = NtStatus::success().to_nt();
   return NtStatus::success();
 }
 
 NtStatus SimulatingInterceptor::on_set_console_mode(lpc::set_console_mode_m *data,
-    lpc::message_data_t *incoming_reply) {
+    lpc::console_message_t *incoming_reply) {
   platform()->set_console_mode(data->handle, data->mode);
-  incoming_reply->header.return_value = NtStatus::success().to_nt();
+  incoming_reply->relevant.return_value = NtStatus::success().to_nt();
   return NtStatus::success();
 }

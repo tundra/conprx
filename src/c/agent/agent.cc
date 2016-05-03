@@ -85,11 +85,13 @@ NtStatus ConsoleAgent::on_message(lpc::Message *request) {
     // The messages we want to handle.
 #define __EMIT_CASE__(Name, name, NUM, FLAGS)                                  \
     case lm##Name: {                                                           \
+      typedef lfBa FLAGS (lpc::BaseMessage, lpc::ConsoleMessage) MessageType;  \
+      MessageType *conc_request = static_cast<MessageType*>(request);          \
       lfSp FLAGS (NativeThread::sleep(Duration::seconds(30)),);                \
       lfTr FLAGS (trace_before(#name, request),);                              \
       NtStatus result = lfDa FLAGS (                                           \
           request->call_native_backend(),                                      \
-          adaptor()->name(request, &request->data()->payload.name));           \
+          adaptor()->name(conc_request, &conc_request->data()->payload.name)); \
       lfTr FLAGS (trace_after(#name, request, result),);                       \
       return result;                                                           \
     }

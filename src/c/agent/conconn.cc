@@ -24,7 +24,7 @@ using namespace tclib;
 // payload is of the given type.
 template <typename P>
 static NtStatus validate_message(lpc::Message *req, P *payload) {
-  size_t data_length = sizeof(lpc::message_data_header_t) + sizeof(P);
+  size_t data_length = lpc::message_data_length_from_payload_length(sizeof(P));
   if (data_length != req->data_length()) {
     WARN("Unexpected data length [%x]: expected %i, found %i", req->api_number(),
         data_length, req->data_length());
@@ -46,7 +46,7 @@ static NtStatus validate_message(lpc::Message *req, P *payload) {
     return __status__;                                                         \
 } while (false)
 
-NtStatus ConsoleAdaptor::get_console_cp(lpc::Message *req,
+NtStatus ConsoleAdaptor::get_console_cp(lpc::ConsoleMessage *req,
     lpc::get_console_cp_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   response_t<uint32_t> resp = connector()->get_console_cp(payload->is_output);
@@ -55,7 +55,7 @@ NtStatus ConsoleAdaptor::get_console_cp(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::set_console_cp(lpc::Message *req,
+NtStatus ConsoleAdaptor::set_console_cp(lpc::ConsoleMessage *req,
     lpc::set_console_cp_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   response_t<bool_t> resp = connector()->set_console_cp(
@@ -64,7 +64,7 @@ NtStatus ConsoleAdaptor::set_console_cp(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::set_console_title(lpc::Message *req,
+NtStatus ConsoleAdaptor::set_console_title(lpc::ConsoleMessage *req,
     lpc::set_console_title_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   void *start = req->xform().remote_to_local(payload->title);
@@ -74,7 +74,7 @@ NtStatus ConsoleAdaptor::set_console_title(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
+NtStatus ConsoleAdaptor::get_console_title(lpc::ConsoleMessage *req,
     lpc::get_console_title_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   void *start = req->xform().remote_to_local(payload->title);
@@ -86,7 +86,7 @@ NtStatus ConsoleAdaptor::get_console_title(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
+NtStatus ConsoleAdaptor::set_console_mode(lpc::ConsoleMessage *req,
     lpc::set_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   NtStatus backend_status = req->call_native_backend();
@@ -99,13 +99,13 @@ NtStatus ConsoleAdaptor::set_console_mode(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::get_console_mode(lpc::Message *req,
+NtStatus ConsoleAdaptor::get_console_mode(lpc::ConsoleMessage *req,
     lpc::get_console_mode_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   return req->call_native_backend();
 }
 
-NtStatus ConsoleAdaptor::set_console_cursor_position(lpc::Message *req,
+NtStatus ConsoleAdaptor::set_console_cursor_position(lpc::ConsoleMessage *req,
     lpc::set_console_cursor_position_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   response_t<bool_t> resp = connector()->set_console_cursor_position(payload->output,
@@ -114,7 +114,7 @@ NtStatus ConsoleAdaptor::set_console_cursor_position(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
+NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::ConsoleMessage *req,
     lpc::get_console_screen_buffer_info_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   console_screen_buffer_infoex_t info;
@@ -136,7 +136,7 @@ NtStatus ConsoleAdaptor::get_console_screen_buffer_info(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
+NtStatus ConsoleAdaptor::write_console(lpc::ConsoleMessage *req,
     lpc::write_console_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   // It seems like it would be simpler to always transform the contents field
@@ -151,7 +151,7 @@ NtStatus ConsoleAdaptor::write_console(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
+NtStatus ConsoleAdaptor::read_console(lpc::ConsoleMessage *req,
     lpc::read_console_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   bool is_inline = payload->buffer_size <= lpc::kMaxInlineBytes;
@@ -175,7 +175,7 @@ NtStatus ConsoleAdaptor::read_console(lpc::Message *req,
   return NtStatus::success();
 }
 
-NtStatus ConsoleAdaptor::console_connect(lpc::Message *req,
+NtStatus ConsoleAdaptor::console_connect(lpc::ConsoleMessage *req,
     lpc::console_connect_m *payload) {
   VALIDATE_MESSAGE_OR_BAIL(req, payload);
   NtStatus result = req->call_native_backend();
@@ -190,7 +190,7 @@ NtStatus ConsoleAdaptor::console_connect(lpc::Message *req,
       : NtStatus::from(CONPRX_ERROR_CALIBRATION_FAILED);
 }
 
-NtStatus ConsoleAdaptor::create_process(lpc::Message *req,
+NtStatus ConsoleAdaptor::create_process(lpc::BaseMessage *req,
     lpc::create_process_m *payload) {
   return req->call_native_backend();
 }

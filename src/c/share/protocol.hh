@@ -21,20 +21,20 @@
 //   - Sw: this message should be implemented in the platform simulator
 //   - Sp: suspend on calls to this message
 //
-//  Name                        name                            apinum   (Tr Da Pa Sw Sp)
-#define FOR_EACH_LPC_TO_INTERCEPT(F)                                                      \
-  F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X, _)) \
-  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _, _)) \
-  F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X, _)) \
-  F(SetConsoleCursorPosition,   set_console_cursor_position,    0x00016, (_, _, _, _, _)) \
-  F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _, _)) \
-  F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _, _)) \
-  F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _, _)) \
-  F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _, _)) \
-  F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _, _)) \
-  F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _, _)) \
-  F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _)) \
-  F(CreateProcess,              create_process,                 0x10000, (_, _, X, _, _))
+//  Name                        name                            apinum   (Tr Da Pa Sw Sp Ba)
+#define FOR_EACH_LPC_TO_INTERCEPT(F)                                                         \
+  F(GetConsoleMode,             get_console_mode,               0x00008, (_, _, X, X, _, _)) \
+  F(GetConsoleScreenBufferInfo, get_console_screen_buffer_info, 0x0000B, (_, _, _, _, _, _)) \
+  F(SetConsoleMode,             set_console_mode,               0x00011, (_, _, _, X, _, _)) \
+  F(SetConsoleCursorPosition,   set_console_cursor_position,    0x00016, (_, _, _, _, _, _)) \
+  F(ReadConsole,                read_console,                   0x0001D, (_, _, _, _, _, _)) \
+  F(WriteConsole,               write_console,                  0x0001E, (_, _, _, _, _, _)) \
+  F(GetConsoleTitle,            get_console_title,              0x00024, (_, _, _, _, _, _)) \
+  F(SetConsoleTitle,            set_console_title,              0x00025, (_, _, _, _, _, _)) \
+  F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _, _, _)) \
+  F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _, _, _)) \
+  F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _, _)) \
+  F(CreateProcess,              create_process,                 0x10000, (_, _, X, _, _, X))
 
 // Messages that we know about and so don't want to dump/suspend on when
 // doing that on unknown messages, but that we also don't have an implementation
@@ -49,11 +49,12 @@
   F(NlsGetUserInfo,             ,                               0x1001B,                )
 
 // LPC minor flag extractors.
-#define lfTr(TR, DA, PA, SW, SP) TR
-#define lfDa(TR, DA, PA, SW, SP) DA
-#define lfPa(TR, DA, PA, SW, SP) PA
-#define lfSw(TR, DA, PA, SW, SP) SW
-#define lfSp(TR, DA, PA, SW, SP) SP
+#define lfTr(TR, DA, PA, SW, SP, BA) TR
+#define lfDa(TR, DA, PA, SW, SP, BA) DA
+#define lfPa(TR, DA, PA, SW, SP, BA) PA
+#define lfSw(TR, DA, PA, SW, SP, BA) SW
+#define lfSp(TR, DA, PA, SW, SP, BA) SP
+#define lfBa(TR, DA, PA, SW, SP, BA) BA
 
 namespace conprx {
 

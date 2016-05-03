@@ -66,7 +66,7 @@ public:
 
   // Generate the handler declarations.
 #define __GEN_HANDLER__(Name, name, NUM, FLAGS)                                \
-  NtStatus name(lpc::Message *req, lpc::name##_m *data);
+  NtStatus name(lfBa FLAGS (lpc::BaseMessage, lpc::ConsoleMessage) *req, lpc::name##_m *data);
   FOR_EACH_LPC_TO_INTERCEPT(__GEN_HANDLER__)
 #undef __GEN_HANDLER__
 

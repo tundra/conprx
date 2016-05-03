@@ -46,7 +46,7 @@ TEST(lpc, infer_unguided_successful) {
     ASSERT_PTREQ(CODE_UPCAST(fun_two), guided_out);
 }
 
-#define FOFF(FIELD) offsetof(lpc::message_data_t, payload.FIELD)
+#define FOFF(FIELD) offsetof(lpc::console_message_t, payload.FIELD)
 
 TEST(lpc, offsets) {
   if (!kIsMsvc)
