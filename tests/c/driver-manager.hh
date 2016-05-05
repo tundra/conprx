@@ -30,7 +30,7 @@ using plankton::rpc::OutgoingRequest;
 using plankton::rpc::IncomingResponse;
 using plankton::rpc::StreamServiceConnector;
 
-class DriverManager;
+class DriverConnection;
 
 // An individual request to the driver.
 class DriverRequest {
@@ -65,8 +65,8 @@ public:
   bool is_rejected() { return response_->is_rejected(); }
 
 private:
-  friend class DriverManager;
-  DriverRequest(DriverManager *connection)
+  friend class DriverConnection;
+  DriverRequest(DriverConnection *connection)
     : is_used_(false)
     , manager_(connection) { }
 
@@ -80,7 +80,7 @@ private:
   Variant send_request(OutgoingRequest *req);
 
   bool is_used_;
-  DriverManager *manager_;
+  DriverConnection *manager_;
   IncomingResponse response_;
   Variant result_;
   Arena arena_;
@@ -126,63 +126,29 @@ protected:
   // This is only present such that we can report an error if anyone tries to
   // call it.
   virtual fat_bool_t start_connect_to_agent();
-
 };
 
-// A manager that manages the lifetime of the driver, including starting it up,
-// and allows communication with it.
-class DriverManager {
+class DriverConnection {
 public:
-  // Which kind of agent to use.
-  enum AgentType {
-    atNone,
-    atFake,
-    atReal
-  };
+  DriverConnection();
 
-  DriverManager();
-
-  // Start up the driver executable.
-  fat_bool_t start();
-
-  // Connect to the running driver.
-  fat_bool_t connect();
-
-  // Wait for the driver to terminate.
-  fat_bool_t join(int *exit_code_out);
-
-  // When devutils are enabled, allows you to trace all the requests that go
-  // through this manager.
-  ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
-
-  // Sets the type of agent to use for this manager. Note that not all agents
-  // are supported on all platforms.
-  void set_agent_type(AgentType type);
-
-  // Sets the frontend type the driver should use. This setter is sanity checked
-  // against the agent type so you need to set the agent type first.
-  void set_frontend_type(DriverFrontendType type);
-
-  // Overrides the default agent path (set via an env variable) with the given
-  // value.
-  void set_agent_path(utf8_t path) { agent_path_ = path; }
-
-  // Instruct the driver to not print log messages. Useful for when the driver
-  // is made to do stuff that we know will fail, for testing.
-  void set_silence_log(bool value) { silence_log_ = value; }
+  fat_bool_t initialize();
 
   // Returns a new request object that can be used to perform a single call to
   // the driver. The value returned by the call is only valid as long as the
   // request is.
   DriverRequest new_request() { return DriverRequest(this); }
 
-  Launcher *operator->() { return launcher(); }
+  IncomingResponse send(OutgoingRequest *req);
 
-  // Sets the backend to eventually pass to the launcher once it's been created.
-  void set_backend(ConsoleBackend *backend) { backend_ = backend; }
+  // When devutils are enabled, allows you to trace all the requests that go
+  // through this manager.
+  ONLY_ALLOW_DEVUTILS(void set_trace(bool value) { trace_ = value; })
 
-  // Constant that's true when the real agent can work.
-  static const bool kSupportsRealAgent = kIsMsvc;
+  bool trace() { return trace_; }
+
+  // Connect to the running driver.
+  fat_bool_t connect();
 
   // Shorthands for requests that don't need the request object before sending
   // the message.
@@ -204,25 +170,69 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECL_PROXY_METHOD__)
 #undef __DECL_PROXY_METHOD__
 
-  IncomingResponse send(OutgoingRequest *req);
+  tclib::ServerChannel *channel() { return *channel_;}
+
+private:
+  bool trace_;
+  plankton::TypeRegistry registry_;
+
+  // The channel through which we control the driver.
+  tclib::def_ref_t<tclib::ServerChannel> channel_;
+  tclib::def_ref_t<StreamServiceConnector> connector_;
+  StreamServiceConnector *connector() { return *connector_; }
+};
+
+// A manager that manages the lifetime of the driver, including starting it up,
+// and allows communication with it.
+class DriverManager : public DriverConnection {
+public:
+  // Which kind of agent to use.
+  enum AgentType {
+    atNone,
+    atFake,
+    atReal
+  };
+
+  DriverManager();
+
+  // Start up the driver executable.
+  fat_bool_t start();
+
+  // Wait for the driver to terminate.
+  fat_bool_t join(int *exit_code_out);
+
+  // Sets the type of agent to use for this manager. Note that not all agents
+  // are supported on all platforms.
+  void set_agent_type(AgentType type);
+
+  // Sets the frontend type the driver should use. This setter is sanity checked
+  // against the agent type so you need to set the agent type first.
+  void set_frontend_type(DriverFrontendType type);
+
+  // Overrides the default agent path (set via an env variable) with the given
+  // value.
+  void set_agent_path(utf8_t path) { agent_path_ = path; }
+
+  // Instruct the driver to not print log messages. Useful for when the driver
+  // is made to do stuff that we know will fail, for testing.
+  void set_silence_log(bool value) { silence_log_ = value; }
+
+  Launcher *operator->() { return launcher(); }
+
+  // Sets the backend to eventually pass to the launcher once it's been created.
+  void set_backend(ConsoleBackend *backend) { backend_ = backend; }
+
+  // Constant that's true when the real agent can work.
+  static const bool kSupportsRealAgent = kIsMsvc;
 
 private:
   tclib::def_ref_t<Launcher> launcher_;
   Launcher *launcher() { return *launcher_; }
 
-  plankton::TypeRegistry registry_;
-
-  // The channel through which we control the driver.
-  tclib::def_ref_t<tclib::ServerChannel> channel_;
-  tclib::ServerChannel *channel() { return *channel_;}
-  tclib::def_ref_t<StreamServiceConnector> connector_;
-  StreamServiceConnector *connector() { return *connector_; }
-
   tclib::NativeThread agent_monitor_;
   bool has_started_agent_monitor_;
 
   bool silence_log_;
-  bool trace_;
   plankton::rpc::TracingMessageSocketObserver tracer_;
   utf8_t agent_path_;
   utf8_t agent_path();

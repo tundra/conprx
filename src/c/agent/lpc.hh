@@ -441,7 +441,9 @@ struct set_console_cursor_position_m {
   coord_t position;
 };
 
-struct create_process_m { };
+struct create_process_m {
+  uint32_t padding[68];
+};
 
 // How these are actually declared in the windows implementation I have no idea
 // but using 4-packing seems to produce a struct packing that matches the data

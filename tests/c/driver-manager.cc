@@ -17,16 +17,18 @@ using namespace conprx;
 using namespace plankton;
 using namespace tclib;
 
+DriverConnection::DriverConnection()
+  : trace_(false) {
+  channel_ = ServerChannel::create();
+}
+
 DriverManager::DriverManager()
   : has_started_agent_monitor_(false)
   , silence_log_(false)
-  , trace_(false)
   , agent_path_(string_empty())
   , agent_type_(atNone)
   , frontend_type_(dfDummy)
-  , backend_(NULL) {
-  channel_ = ServerChannel::create();
-}
+  , backend_(NULL) { }
 
 void DriverManager::set_agent_type(AgentType type) {
   if (!kSupportsRealAgent)
@@ -231,9 +233,14 @@ void CommandLineBuilder::add_option(Variant key, Variant value) {
   map_.set(key, value);
 }
 
+fat_bool_t DriverConnection::initialize() {
+  F_TRY(channel()->allocate());
+  return F_TRUE;
+}
+
 fat_bool_t DriverManager::start() {
   CommandLineBuilder builder;
-  F_TRY(channel()->allocate());
+  F_TRY(initialize());
   builder.add_option("channel", channel()->name().chars);
   switch (agent_type()) {
     case atNone:
@@ -276,7 +283,7 @@ fat_bool_t DriverManager::start() {
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
   F_TRY(launcher()->start(exec, 1, &args));
-  if (trace_)
+  if (trace())
     tracer_.install(launcher()->socket());
   if (!use_agent())
     return F_TRUE;
@@ -285,7 +292,7 @@ fat_bool_t DriverManager::start() {
   return F_BOOL(agent_monitor_.start());
 }
 
-fat_bool_t DriverManager::connect() {
+fat_bool_t DriverConnection::connect() {
   F_TRY(channel()->open());
   connector_ = new (kDefaultAlloc) StreamServiceConnector(channel()->in(),
       channel()->out());
@@ -295,7 +302,7 @@ fat_bool_t DriverManager::connect() {
   return connector()->init(empty_callback());
 }
 
-IncomingResponse DriverManager::send(rpc::OutgoingRequest *req) {
+IncomingResponse DriverConnection::send(rpc::OutgoingRequest *req) {
   if (trace_) {
     TextWriter selw, argsw;
     selw.write(req->selector());
