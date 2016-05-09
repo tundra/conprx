@@ -22,7 +22,7 @@ namespace conprx {
   F(is_handle,          (Variant value),        (value))                       \
   F(raise_error,        (NtStatus last_error),  (last_error))                  \
   F(poke_backend,       (Variant value),        (value))                       \
-  F(create_process,     (Variant args),         (args))
+  F(create_child,       (Variant args),         (args))
 
 enum DriverFrontendType {
   // The native frontend on this platform; only works on windows obviously.

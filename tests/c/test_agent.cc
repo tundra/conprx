@@ -682,7 +682,8 @@ AGENT_TEST(create_process) {
   BasicConsoleBackend backend;
   AGENT_TEST_PREAMBLE(&backend, use_real);
 
-  driver.create_process("foo");
+  DriverRequest create = driver.create_child("foo");
+  ASSERT_EQ(0, create->integer_value());
 }
 
 // A backend that fails on *everything*. Don't forget to add a test when you

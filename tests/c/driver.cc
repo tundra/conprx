@@ -10,6 +10,7 @@
 #include "rpc.hh"
 #include "socket.hh"
 #include "sync/pipe.hh"
+#include "sync/thread.hh"
 
 BEGIN_C_INCLUDES
 #include "utils/lifetime.h"
@@ -46,6 +47,10 @@ TempBuffer<T>::~TempBuffer() {
 class ConsoleFrontendService : public rpc::Service {
 public:
   ConsoleFrontendService(ConsoleFrontend *frontend, ConsolePlatform *platform);
+  ~ConsoleFrontendService();
+
+  // Initializes this service; must be done before running it.
+  fat_bool_t initialize();
 
 #define __DECL_DRIVER_BY_NAME__(name, SIG, ARGS)                               \
   void name(rpc::RequestData *data, ResponseCallback callback);
@@ -60,6 +65,18 @@ public:
 
   ConsolePlatform *platform() { return platform_; }
 
+  // Notifies this service that a new child has become active.
+  void mark_child_active();
+
+  // Notifies this service that an active child is now done.
+  void mark_child_done();
+
+  // Adds a value to be deleted when this service is.
+  void add_garbage(tclib::DefaultDestructable *elm) { garbage_.push_back(elm); }
+
+  // Wait for any children to complete.
+  fat_bool_t join();
+
 private:
   // Captures the last error and wraps it in a console error.
   Native new_console_error(Factory *factory);
@@ -73,6 +90,9 @@ private:
 
   ConsoleFrontend *frontend_;
   ConsolePlatform *platform_;
+  Intex active_children_;
+  Intex *active_children() { return &active_children_; }
+  std::vector<tclib::DefaultDestructable*> garbage_;
 };
 
 ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *frontend,
@@ -87,6 +107,19 @@ ConsoleFrontendService::ConsoleFrontendService(ConsoleFrontend *frontend,
   FOR_EACH_CONAPI_FUNCTION(__REG_DRIVER_FUNCTION__)
 #undef __REG_DRIVER_FUNCTION__
 #undef __REG_DRIVER_BY_NAME
+}
+
+ConsoleFrontendService::~ConsoleFrontendService() {
+  for (size_t i = 0; i < garbage_.size(); i++) {
+    DefaultDestructable *elm = garbage_[i];
+    elm->default_destroy();
+  }
+  garbage_.clear();
+}
+
+fat_bool_t ConsoleFrontendService::initialize() {
+  F_TRY(active_children()->initialize());
+  return F_TRUE;
 }
 
 void ConsoleFrontendService::echo(rpc::RequestData *data, ResponseCallback callback) {
@@ -112,6 +145,49 @@ void ConsoleFrontendService::poke_backend(rpc::RequestData *data, ResponseCallba
   if (result == 0)
     return fail_request(data, callback);
   callback(rpc::OutgoingResponse::success(result));
+}
+
+// A wrapper that manages a child of this driver.
+class ChildManager : public DefaultDestructable {
+public:
+  ChildManager(ConsoleFrontendService *service);
+  virtual ~ChildManager();
+  virtual void default_destroy() { default_delete_concrete(this); }
+  void start(rpc::Service::ResponseCallback callback);
+
+private:
+  opaque_t run();
+
+  ConsoleFrontendService *service_;
+  ConsoleFrontendService *service() { return service_; }
+  NativeThread runner_;
+  NativeThread *runner() { return &runner_; }
+};
+
+ChildManager::ChildManager(ConsoleFrontendService *service)
+  : service_(service)
+  , runner_(new_callback(&ChildManager::run, this)) {
+  service->add_garbage(this);
+}
+
+ChildManager::~ChildManager() {
+  runner()->join(NULL);
+}
+
+void ChildManager::start(rpc::Service::ResponseCallback callback) {
+  service()->mark_child_active();
+  runner()->start();
+  callback(rpc::OutgoingResponse::success(Variant::yes()));
+}
+
+opaque_t ChildManager::run() {
+  service()->mark_child_done();
+  return o0();
+}
+
+void ConsoleFrontendService::create_child(rpc::RequestData *data,
+    ResponseCallback callback) {
+  (new (kDefaultAlloc) ChildManager(this))->start(callback);
 }
 
 void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCallback callback) {
@@ -298,9 +374,22 @@ void ConsoleFrontendService::get_console_screen_buffer_info_ex(rpc::RequestData 
   return callback(rpc::OutgoingResponse::success(info_var));
 }
 
-void ConsoleFrontendService::create_process(rpc::RequestData *data,
-    ResponseCallback callback) {
-  return fail_request(data, callback);
+void ConsoleFrontendService::mark_child_active() {
+  active_children()->lock();
+    active_children()->add(1);
+  active_children()->unlock();
+}
+
+void ConsoleFrontendService::mark_child_done() {
+  active_children()->lock();
+    active_children()->add(-1);
+  active_children()->unlock();
+}
+
+fat_bool_t ConsoleFrontendService::join() {
+  F_TRY(active_children()->lock_when() == 0);
+  F_TRY(active_children()->unlock());
+  return F_TRUE;
 }
 
 Native ConsoleFrontendService::wrap_handle(handle_t raw_handle, Factory *factory) {
@@ -498,9 +587,11 @@ fat_bool_t ConsoleDriverMain::run() {
       break;
   }
   ConsoleFrontendService driver(*frontend, *platform_);
+  F_TRY(driver.initialize());
   if (!connector.init(driver.handler()))
     return F_FALSE;
   fat_bool_t result = connector.process_all_messages();
+  F_TRY(driver.join());
   channel()->out()->close();
   if (use_fake_agent())
     F_TRY(fake_agent()->uninstall_agent());

@@ -156,8 +156,8 @@ Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
   return send("get_console_screen_buffer_info_ex", handle_var);
 }
 
-Variant DriverRequest::create_process(Variant args) {
-  return send("create_process", args);
+Variant DriverRequest::create_child(Variant args) {
+  return send("create_child", args);
 }
 
 const Variant &DriverRequest::operator*() {
