@@ -128,6 +128,8 @@ protected:
   virtual fat_bool_t start_connect_to_agent();
 };
 
+// A connection to a driver that lets you interact with it but not necessarily
+// control its lifetime.
 class DriverConnection {
 public:
   DriverConnection();
