@@ -224,7 +224,7 @@ void ConsoleFrontendService::create_process(rpc::RequestData *data,
   utf8_t exe = new_string(exe_var.chars(), exe_var.length());
   Array args_var = data->argument(1);
   uint32_t argc = args_var.length();
-  CHECK_REL("too many args", argc, <, kMaxArgvSize);
+  CHECK_REL("too many args", argc, <=, kMaxArgvSize);
   utf8_t argv[kMaxArgvSize];
   for (uint32_t i = 0; i < argc; i++) {
     Variant arg = args_var[i];

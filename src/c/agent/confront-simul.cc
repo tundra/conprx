@@ -477,19 +477,19 @@ handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
 }
 
 // An interceptor that does nothing on backend calls.
-class MuteInterceptor : public lpc::Interceptor {
+class NoopInterceptor : public lpc::Interceptor {
 public:
   virtual conprx::NtStatus call_native_backend(handle_t port,
       lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply);
   virtual fat_bool_t calibrate_console_port();
 };
 
-conprx::NtStatus MuteInterceptor::call_native_backend(handle_t port,
+conprx::NtStatus NoopInterceptor::call_native_backend(handle_t port,
       lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply) {
   return NtStatus::success();
 }
 
-fat_bool_t MuteInterceptor::calibrate_console_port() {
+fat_bool_t NoopInterceptor::calibrate_console_port() {
   return F_FALSE;
 }
 
@@ -505,8 +505,8 @@ pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
   // to pass it to the backend. Here the creation has already happened so we
   // don't need the call to go through, instead we do everything else but let
   // the mute interceptor drop the backend call.
-  MuteInterceptor mute;
-  message.message()->set_interceptor(&mute);
+  NoopInterceptor interceptor;
+  message.message()->set_interceptor(&interceptor);
   agent()->on_message(message.message());
   return result;
 }

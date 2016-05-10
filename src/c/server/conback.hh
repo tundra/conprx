@@ -69,6 +69,7 @@ public:
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       ScreenBufferInfo *info_out) = 0;
 
+  // Notifies this backend that a process with the given uid has been created.
   virtual response_t<bool_t> create_process(uint64_t id) = 0;
 };
 
