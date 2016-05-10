@@ -202,6 +202,7 @@ NtStatus Message::call_native_backend() {
 
 namespace lpc {
 template class ConcreteMessage<console_message_t>;
+template class ConcreteMessage<base_message_t>;
 }
 
 #ifdef IS_MSVC

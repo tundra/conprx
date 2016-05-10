@@ -14,7 +14,7 @@ TEST(conapi, datatypes) {
 }
 
 TEST(conapi, platform) {
-  def_ref_t<ConsolePlatform> platform = InMemoryConsolePlatform::new_simulating();
+  def_ref_t<ConsolePlatform> platform = InMemoryConsolePlatform::new_simulating(NULL);
   Handle stdin_handle = platform->get_std_handle(kStdInputHandle);
   ASSERT_TRUE(stdin_handle.is_console());
   Handle stdout_handle = platform->get_std_handle(kStdOutputHandle);
@@ -32,8 +32,10 @@ TEST(conapi, functypes) {
 #  define __EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG)                        \
    ConsoleFrontend::name##_t name = Name;                                      \
    use(name);
-   FOR_EACH_CONAPI_FUNCTION(__EMIT_ASSIGN__)
+#  define __MAYBE_EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG) mfSt FLAGS (, __EMIT_ASSIGN__(Name, name, FLAGS, SIG, PSIG))
+   FOR_EACH_CONAPI_FUNCTION(__MAYBE_EMIT_ASSIGN__)
 #  undef __EMIT_ASSIGN__
+#  undef __MAYBE_EMIT_ASSIGN__
 #else
   SKIP_TEST("msvc only");
 #endif

@@ -28,6 +28,7 @@ def compile_test_file(source):
   # Include the C sources.
   source.add_include(get_root().get_child("src", "c"))
   source.add_include(get_dep("tclib").get_child("src", "c"))
+  source.add_include(get_dep("tclib").get_child("tests", "c"))
   source.add_include(get_dep("plankton").get_child("src", "c"))
   source.add_include(get_dep("plankton").get_child("tests", "c"))
   object = source.get_object()
@@ -63,9 +64,12 @@ test_objects.add_member(get_dep_external("tclib", "src", "c", "test", "log-fail"
 test_objects.add_member(get_dep_external("tclib", "src", "c", "io", "library"))
 test_objects.add_member(get_dep_external("tclib", "src", "c", "async", "library"))
 test_objects.add_member(get_dep_external("plankton", "tests", "c", "library"))
+test_objects.add_member(get_dep_external("tclib", "tests", "c", "helpers"))
 test_objects.add_member(get_external("src", "objects"))
 test_objects.add_member(get_external("src", "c", "server", "server"))
 test_objects.add_member(driver_common)
+
+durian_main = get_dep_external("tclib", "tests", "c", "durian")
 
 # Compile the test main executable.
 test_main = c.get_executable("main")
@@ -73,11 +77,11 @@ test_main.add_object(test_library)
 test_main.add_object(test_objects)
 test_main.add_dependency(driver_main)
 test_main.add_dependency(agent)
+test_main.add_dependency(durian_main)
 
 manual = c.get_executable("manual")
 manual.add_object(test_objects)
 manual.add_object(compile_test_file(c.get_source_file("manual_conback.cc")))
-
 
 run_tests = get_group("run-tests")
 
@@ -91,6 +95,7 @@ for filename in filenames:
   test_case.set_arguments(stripped_test_case_name)
   test_case.add_env("AGENT", agent.get_output_path())
   test_case.add_env("DRIVER", driver_main.get_output_path())
+  test_case.add_env("DURIAN_MAIN", durian_main.get_output_path())
   run_tests.add_member(test_case)
 
 all = get_group("all")

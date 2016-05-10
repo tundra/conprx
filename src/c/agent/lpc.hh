@@ -442,7 +442,10 @@ struct set_console_cursor_position_m {
 };
 
 struct create_process_m {
-  uint32_t padding[68];
+  void *handle;
+  uint32_t padding_1;
+  uintn_t process_id;
+  uint32_t padding_2[63];
 };
 
 // How these are actually declared in the windows implementation I have no idea
@@ -512,6 +515,8 @@ public:
 
   // Returns the interceptor that intercepted this message.
   Interceptor *interceptor() { return interceptor_; }
+
+  void set_interceptor(Interceptor *value) { interceptor_ = value; }
 
   // Sends this message on to the native backend where it was originally
   // intended to go.

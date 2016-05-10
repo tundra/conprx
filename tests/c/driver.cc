@@ -6,6 +6,7 @@
 #include "agent/agent.hh"
 #include "agent/conconn.hh"
 #include "agent/confront.hh"
+#include "async/promise-inl.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
 #include "socket.hh"
@@ -150,44 +151,92 @@ void ConsoleFrontendService::poke_backend(rpc::RequestData *data, ResponseCallba
 // A wrapper that manages a child of this driver.
 class ChildManager : public DefaultDestructable {
 public:
-  ChildManager(ConsoleFrontendService *service);
+  ChildManager(ConsoleFrontendService *service, utf8_t executable, size_t argc,
+      utf8_t *argv);
   virtual ~ChildManager();
   virtual void default_destroy() { default_delete_concrete(this); }
-  void start(rpc::Service::ResponseCallback callback);
+  fat_bool_t start(rpc::Service::ResponseCallback callback);
 
 private:
-  opaque_t run();
+  opaque_t run_opaque();
+  fat_bool_t run();
+
+#define kMaxArgvSize 8
 
   ConsoleFrontendService *service_;
   ConsoleFrontendService *service() { return service_; }
   NativeThread runner_;
   NativeThread *runner() { return &runner_; }
+  def_ref_t<NativeProcess> process_;
+  NativeProcess *process() { return *process_; }
+  utf8_t executable_;
+  size_t argc_;
+  utf8_t argv_[kMaxArgvSize];
 };
 
-ChildManager::ChildManager(ConsoleFrontendService *service)
+ChildManager::ChildManager(ConsoleFrontendService *service, utf8_t executable,
+    size_t argc, utf8_t *argv)
   : service_(service)
-  , runner_(new_callback(&ChildManager::run, this)) {
-  service->add_garbage(this);
+  , runner_(new_callback(&ChildManager::run_opaque, this))
+  , executable_(string_default_dup(executable))
+  , argc_(argc) {
+  struct_zero_fill(argv_);
+  for (size_t i = 0; i < argc_; i++)
+    argv_[i] = string_default_dup(argv[i]);
 }
 
 ChildManager::~ChildManager() {
-  runner()->join(NULL);
+  opaque_t opaque_result = o0();
+  F_LOG_FALSE(runner()->join(&opaque_result));
+  F_LOG_FALSE(o2f(opaque_result));
+  string_default_delete(executable_);
+  for (size_t i = 0; i < argc_; i++)
+    string_default_delete(argv_[i]);
 }
 
-void ChildManager::start(rpc::Service::ResponseCallback callback) {
+fat_bool_t ChildManager::start(rpc::Service::ResponseCallback callback) {
+  process_ = service()->platform()->create_process(executable_, argc_, argv_);
   service()->mark_child_active();
-  runner()->start();
-  callback(rpc::OutgoingResponse::success(Variant::yes()));
+  F_TRY(runner()->start());
+  callback(rpc::OutgoingResponse::success(process_->guid()));
+  return F_TRUE;
 }
 
-opaque_t ChildManager::run() {
+opaque_t ChildManager::run_opaque() {
+  fat_bool_t result = run();
   service()->mark_child_done();
-  return o0();
+  return f2o(result);
 }
 
-void ConsoleFrontendService::create_child(rpc::RequestData *data,
+fat_bool_t ChildManager::run() {
+  F_TRY(process()->wait_sync());
+  int exit_code = process()->exit_code().peek_value(0);
+  if (exit_code != 0) {
+    WARN("Child driver failed: %i", exit_code);
+    return F_FALSE;
+  }
+  return F_TRUE;
+}
+
+void ConsoleFrontendService::create_process(rpc::RequestData *data,
     ResponseCallback callback) {
-  (new (kDefaultAlloc) ChildManager(this))->start(callback);
+  String exe_var = data->argument(0);
+  utf8_t exe = new_string(exe_var.chars(), exe_var.length());
+  Array args_var = data->argument(1);
+  uint32_t argc = args_var.length();
+  CHECK_REL("too many args", argc, <, kMaxArgvSize);
+  utf8_t argv[kMaxArgvSize];
+  for (uint32_t i = 0; i < argc; i++) {
+    Variant arg = args_var[i];
+    argv[i] = new_string(arg.string_chars(), arg.string_length());
+  }
+  ChildManager *manager = new (kDefaultAlloc) ChildManager(this, exe, argc, argv);
+  add_garbage(manager);
+  fat_bool_t started = manager->start(callback);
+  if (!started) {
+    F_LOG_FALSE(started);
+    callback(rpc::OutgoingResponse::failure(Variant::no()));
+  }
 }
 
 void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCallback callback) {
@@ -533,17 +582,17 @@ fat_bool_t ConsoleDriverMain::open_connection() {
   if (silence_log_)
     silent_log_.ensure_installed();
   if (use_fake_agent()) {
-    pass_def_ref_t<InMemoryConsolePlatform> platform = InMemoryConsolePlatform::new_simulating();
+    fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
+    pass_def_ref_t<InMemoryConsolePlatform> platform = InMemoryConsolePlatform::new_simulating(fake_agent());
     platform_ = platform;
     fake_platform_ = platform.peek();
     fake_agent_channel_ = ClientChannel::create();
     if (!fake_agent_channel()->open(fake_agent_channel_name_))
       return F_FALSE;
-    fake_agent_ = new (kDefaultAlloc) FakeConsoleAgent();
     if (!install_fake_agent())
       return F_FALSE;
   } else {
-    platform_ = IF_MSVC(ConsolePlatform::new_native(), InMemoryConsolePlatform::new_simulating());
+    platform_ = IF_MSVC(ConsolePlatform::new_native(), InMemoryConsolePlatform::new_simulating(NULL));
   }
   channel_ = ClientChannel::create();
   if (!channel()->open(channel_name_))
@@ -606,6 +655,8 @@ fat_bool_t ConsoleDriverMain::inner_main(int argc, const char **argv) {
 }
 
 int ConsoleDriverMain::outer_main(int argc, const char **argv) {
+  lifetime_t lifetime;
+  lifetime_begin_default(&lifetime);
   limited_allocator_t limiter;
   limited_allocator_install(&limiter, 100 * 1024 * 1024);
   fingerprinting_allocator_t fingerprinter;
@@ -623,6 +674,8 @@ int ConsoleDriverMain::outer_main(int argc, const char **argv) {
         fat_bool_line(result));
     return 1;
   }
+
+  lifetime_end_default(&lifetime);
 
   if (fingerprinting_allocator_uninstall(&fingerprinter)
       && limited_allocator_uninstall(&limiter)) {

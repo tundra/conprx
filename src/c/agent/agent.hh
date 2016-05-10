@@ -87,25 +87,6 @@ using plankton::rpc::StreamServiceConnector;
 
 class Options;
 
-class LogEntry {
-public:
-  LogEntry();
-  LogEntry(log_entry_t *entry) : entry_(*entry) { }
-  void init(utf8_t file, uint32_t line, utf8_t message);
-
-  // The seed type for handles.
-  static plankton::SeedType<LogEntry> *seed_type() { return &kSeedType; }
-
-private:
-  log_entry_t entry_;
-
-  template <typename T> friend class plankton::DefaultSeedType;
-  static LogEntry *new_instance(plankton::Variant header, plankton::Factory *factory);
-  plankton::Variant to_seed(plankton::Factory *factory);
-  void init(plankton::Seed payload, plankton::Factory *factory);
-  static plankton::DefaultSeedType<LogEntry> kSeedType;
-};
-
 // Log that streams messages onto an output stream before passing log handling
 // on to the enclosing log.
 class StreamingLog : public tclib::Log {

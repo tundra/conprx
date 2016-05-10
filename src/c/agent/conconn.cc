@@ -192,7 +192,10 @@ NtStatus ConsoleAdaptor::console_connect(lpc::ConsoleMessage *req,
 
 NtStatus ConsoleAdaptor::create_process(lpc::BaseMessage *req,
     lpc::create_process_m *payload) {
-  return req->call_native_backend();
+  NtStatus result = req->call_native_backend();
+  if (!result.is_success())
+    return result;
+  return NtStatus::from_response(connector()->create_process(payload->process_id));
 }
 
 response_t<int64_t> ConsoleAdaptor::poke(int64_t value) {
@@ -372,6 +375,13 @@ response_t<uint32_t> PrpcConsoleConnector::read_console(Handle input,
   console_readconsole_control_t *input_control_out = response["input_control"].native_as<console_readconsole_control_t>();
   *input_control = *input_control_out;
   return response_t<uint32_t>::of(return_value);
+}
+
+response_t<bool_t> PrpcConsoleConnector::create_process(uint64_t id) {
+  Variant id_var = id;
+  rpc::OutgoingRequest req(Variant::null(), "create_process", 1, &id_var);
+  rpc::IncomingResponse resp;
+  return send_request_default<bool_t>(&req, &resp);
 }
 
 pass_def_ref_t<ConsoleConnector> PrpcConsoleConnector::create(

@@ -90,6 +90,8 @@ class ConsoleAdaptor;
     (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,  \
      coord_t buffer_coord, small_rect_t *write_region),                        \
     (console_output, buffer, buffer_size, buffer_coord, write_region))
+#define sigCreateProcess(F) F(tclib::pass_def_ref_t<tclib::NativeProcess>,     \
+    (utf8_t executable, size_t argc, utf8_t *argv), (executable, argc, argv))
 
 #define psigInt64(F) F(_, (int64_t n), (n))
 #define psigAnsiCStr(F) F(_, (ansi_cstr_t str), (str))
@@ -104,49 +106,51 @@ class ConsoleAdaptor;
 #define psigHandleUInt32(F) F(_, (Handle output, uint32_t size), (output, size))
 #define psigHandleUInt32ReadControl(F) F(_, (Handle output, uint32_t size, ReadConsoleControl *control=NULL), (output, size, control))
 #define psigHandleCoord(F) F(_, (Handle output, coord_t coord), (output, coord))
+#define psigVariantVariant(F) F(_, (Variant a, Variant b), (a, b))
 
 // Table of console api functions that need some form of treatment. To make it
 // easier to read the function signatures are defined in separate macros above.
 // The flags are,
 //
 //   - _Pf_, is this a platform function, otherwise it's a frontend one.
+//   - _St_, is this a synthetic function that doesn't correspond to an api?
 //
-//  CamelName                   underscore_name                      (Pf) sigSignature                     psigProxySignature
+//  CamelName                   underscore_name                      (Pf St) sigSignature                     psigProxySignature
 #define FOR_EACH_CONAPI_FUNCTION(F)                                                                                               \
-  F(WriteConsoleA,                write_console_a,                   (_), sigWriteConsoleA,                psigHandleBlob)        \
-  F(WriteConsoleW,                write_console_w,                   (_), sigWriteConsoleW,                psigHandleBlob)        \
-  F(ReadConsoleA,                 read_console_a,                    (_), sigReadConsoleA,                 psigHandleUInt32)      \
-  F(ReadConsoleW,                 read_console_w,                    (_), sigReadConsoleW,                 psigHandleUInt32ReadControl) \
-  F(GetConsoleTitleA,             get_console_title_a,               (_), sigAnsiStrDwordToDWord,          psigInt64)             \
-  F(SetConsoleTitleA,             set_console_title_a,               (_), sigAnsiCStrToBool,               psigAnsiCStr)          \
-  F(GetConsoleTitleW,             get_console_title_w,               (_), sigWideStrDWordToDWord,          psigInt64)             \
-  F(SetConsoleTitleW,             set_console_title_w,               (_), sigWideCStrToBool,               psigWideCStr)          \
-  F(GetConsoleCP,                 get_console_cp,                    (_), sigVoidToUInt,                   psigVoid)              \
-  F(SetConsoleCP,                 set_console_cp,                    (_), sigUIntToBool,                   psigUInt32)            \
-  F(SetConsoleCursorPosition,     set_console_cursor_position,       (_), sigSetConsoleCursorPosition,     psigHandleCoord)       \
-  F(GetConsoleOutputCP,           get_console_output_cp,             (_), sigVoidToUInt,                   psigVoid)              \
-  F(SetConsoleOutputCP,           set_console_output_cp,             (_), sigUIntToBool,                   psigUInt32)            \
-  F(GetConsoleMode,               get_console_mode,                  (_), sigGetConsoleMode,               psigHandle)            \
-  F(SetConsoleMode,               set_console_mode,                  (_), sigSetConsoleMode,               psigSetConsoleMode)    \
-  F(GetConsoleScreenBufferInfo,   get_console_screen_buffer_info,    (_), sigGetConsoleScreenBufferInfo,   psigHandle)            \
-  F(GetConsoleScreenBufferInfoEx, get_console_screen_buffer_info_ex, (_), sigGetConsoleScreenBufferInfoEx, psigHandle)            \
-  F(GetStdHandle,                 get_std_handle,                    (X), sigDWordToHandle,                psigInt64)
+  F(WriteConsoleA,                write_console_a,                   (_, _), sigWriteConsoleA,                psigHandleBlob)        \
+  F(WriteConsoleW,                write_console_w,                   (_, _), sigWriteConsoleW,                psigHandleBlob)        \
+  F(ReadConsoleA,                 read_console_a,                    (_, _), sigReadConsoleA,                 psigHandleUInt32)      \
+  F(ReadConsoleW,                 read_console_w,                    (_, _), sigReadConsoleW,                 psigHandleUInt32ReadControl) \
+  F(GetConsoleTitleA,             get_console_title_a,               (_, _), sigAnsiStrDwordToDWord,          psigInt64)             \
+  F(SetConsoleTitleA,             set_console_title_a,               (_, _), sigAnsiCStrToBool,               psigAnsiCStr)          \
+  F(GetConsoleTitleW,             get_console_title_w,               (_, _), sigWideStrDWordToDWord,          psigInt64)             \
+  F(SetConsoleTitleW,             set_console_title_w,               (_, _), sigWideCStrToBool,               psigWideCStr)          \
+  F(GetConsoleCP,                 get_console_cp,                    (_, _), sigVoidToUInt,                   psigVoid)              \
+  F(SetConsoleCP,                 set_console_cp,                    (_, _), sigUIntToBool,                   psigUInt32)            \
+  F(SetConsoleCursorPosition,     set_console_cursor_position,       (_, _), sigSetConsoleCursorPosition,     psigHandleCoord)       \
+  F(GetConsoleOutputCP,           get_console_output_cp,             (_, _), sigVoidToUInt,                   psigVoid)              \
+  F(SetConsoleOutputCP,           set_console_output_cp,             (_, _), sigUIntToBool,                   psigUInt32)            \
+  F(GetConsoleMode,               get_console_mode,                  (_, _), sigGetConsoleMode,               psigHandle)            \
+  F(SetConsoleMode,               set_console_mode,                  (_, _), sigSetConsoleMode,               psigSetConsoleMode)    \
+  F(GetConsoleScreenBufferInfo,   get_console_screen_buffer_info,    (_, _), sigGetConsoleScreenBufferInfo,   psigHandle)            \
+  F(GetConsoleScreenBufferInfoEx, get_console_screen_buffer_info_ex, (_, _), sigGetConsoleScreenBufferInfoEx, psigHandle)            \
+  F(GetStdHandle,                 get_std_handle,                    (X, _), sigDWordToHandle,                psigInt64)             \
+  F(CreateProcess,                create_process,                    (X, X), sigCreateProcess,                psigVariantVariant)
 
 #define FOR_EACH_FULL_CONAPI_FUNCTION(F)                                                                                   \
   FOR_EACH_CONAPI_FUNCTION(F)                                                                                              \
-  F(AllocConsole,               alloc_console,                  (_), sigVoidToBool,                 _)                     \
-  F(FreeConsole,                free_console,                   (_), sigVoidToBool,                 _)                     \
-  F(GetConsoleCursorInfo,       get_console_cursor_info,        (_), sigGetConsoleCursorInfo,       _)                     \
-  F(GetConsoleOutputCP,         get_console_output_cp,          (_), sigVoidToUInt,                 _)                     \
-  F(GetConsoleWindow,           get_console_window,             (_), sigVoidToHWnd,                 _)                     \
-  F(ReadConsoleOutputA,         read_console_output_a,          (_), sigReadConsoleOutputA,         _)                     \
-  F(ReadConsoleOutputW,         read_console_output_w,          (_), sigReadConsoleOutputW,         _)                     \
-  F(SetConsoleCursorInfo,       set_console_cursor_info,        (_), sigSetConsoleCursorInfo,       _)                     \
-  F(WriteConsoleW,              write_console_w,                (_), sigWriteConsoleW,              _)                     \
-  F(WriteConsoleOutputA,        write_console_output_a,         (_), sigWriteConsoleOutputA,        _)                     \
-  F(WriteConsoleOutputW,        write_console_output_w,         (_), sigWriteConsoleOutputW,        _)
+  F(AllocConsole,                 alloc_console,                     (_, _), sigVoidToBool,                 _)                     \
+  F(FreeConsole,                  free_console,                      (_, _), sigVoidToBool,                 _)                     \
+  F(GetConsoleCursorInfo,         get_console_cursor_info,           (_, _), sigGetConsoleCursorInfo,       _)                     \
+  F(GetConsoleWindow,             get_console_window,                (_, _), sigVoidToHWnd,                 _)                     \
+  F(ReadConsoleOutputA,           read_console_output_a,             (_, _), sigReadConsoleOutputA,         _)                     \
+  F(ReadConsoleOutputW,           read_console_output_w,             (_, _), sigReadConsoleOutputW,         _)                     \
+  F(SetConsoleCursorInfo,         set_console_cursor_info,           (_, _), sigSetConsoleCursorInfo,       _)                     \
+  F(WriteConsoleOutputA,          write_console_output_a,            (_, _), sigWriteConsoleOutputA,        _)                     \
+  F(WriteConsoleOutputW,          write_console_output_w,            (_, _), sigWriteConsoleOutputW,        _)
 
-#define mfPf(PF) PF
+#define mfPf(PF, ST) PF
+#define mfSt(PF, ST) ST
 #define mfOnlyPf(FLAGS, E) mfPf FLAGS (E, )
 #define mfUnlessPf(FLAGS, E) mfPf FLAGS (, E)
 
@@ -198,6 +202,11 @@ public:
   FOR_EACH_CONAPI_FUNCTION(__DECLARE_PLATFORM_METHOD__)
 #undef __DECLARE_PLATFORM_METHOD__
 
+  // Creates and starts a process in whatever way is appropriate for this
+  // platform.
+  static tclib::pass_def_ref_t<tclib::NativeProcess> create_native_process(
+      utf8_t executable, size_t argc, utf8_t *argv);
+
   // Creates and returns a new native platform. Only available on windows.
   static tclib::pass_def_ref_t<ConsolePlatform> new_native();
 };
@@ -208,7 +217,7 @@ public:
   virtual void set_console_mode(Handle handle, uint32_t mode) = 0;
 
   // Creates and returns a new platform simulator.
-  static tclib::pass_def_ref_t<InMemoryConsolePlatform> new_simulating();
+  static tclib::pass_def_ref_t<InMemoryConsolePlatform> new_simulating(ConsoleAgent *agent);
 };
 
 } // conprx

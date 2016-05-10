@@ -16,7 +16,7 @@ SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
   , trace_(false)
   , tracer_("SB") {
   streams_.set_default_type_registry(ConsoleTypes::registry());
-  platform_ = InMemoryConsolePlatform::new_simulating();
+  platform_ = InMemoryConsolePlatform::new_simulating(&agent_);
   frontend_ = ConsoleFrontend::new_simulating(&agent_, *platform_);
   service_.set_backend(backend_);
 }

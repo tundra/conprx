@@ -68,7 +68,7 @@ private:
   friend class DriverConnection;
   DriverRequest(DriverConnection *connection)
     : is_used_(false)
-    , manager_(connection) { }
+    , connection_(connection) { }
 
   // Returns a blob variant corresponding to the given blob.
   Variant from_blob(tclib::Blob blob);
@@ -80,7 +80,8 @@ private:
   Variant send_request(OutgoingRequest *req);
 
   bool is_used_;
-  DriverConnection *manager_;
+  DriverConnection *connection_;
+  DriverConnection *connection() { return connection_; }
   IncomingResponse response_;
   Variant result_;
   Arena arena_;
@@ -227,6 +228,8 @@ public:
   // Constant that's true when the real agent can work.
   static const bool kSupportsRealAgent = kIsMsvc;
 
+  static utf8_t executable_path();
+
 private:
   tclib::def_ref_t<Launcher> launcher_;
   Launcher *launcher() { return *launcher_; }
@@ -245,7 +248,6 @@ private:
   DriverFrontendType frontend_type() { return frontend_type_; }
   ConsoleBackend *backend_;
 
-  static utf8_t executable_path();
   static utf8_t default_agent_path();
 };
 

@@ -134,48 +134,56 @@ int64_t SimulatingConsoleFrontend::poke_backend(int64_t value) {
   }
 }
 
+// Convenience class for constructing simulated messages.
+class AbstractSimulatedMessage {
+public:
+  AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend);
+  virtual ~AbstractSimulatedMessage() { }
+  lpc::ConsoleMessage *console_message() { return &console_message_; }
+  lpc::BaseMessage *base_message() { return &base_message_; }
+  virtual lpc::Message *raw_message() = 0;
+  int32_t return_value() { return raw_message()->request()->return_value; }
+
+  union {
+    lpc::console_message_t as_console;
+    lpc::base_message_t as_base;
+  } data_;
+  lpc::ConsoleMessage console_message_;
+  lpc::BaseMessage base_message_;
+};
+
 // Static mapping from message keys to some types and functions it's convenient
 // to have bundled together.
 template <ConsoleAgent::lpc_method_key_t K> struct MessageInfo { };
 
 #define __DECLARE_MESSAGE_INFO__(Name, name, APINUM, FLAGS)                    \
   template <> struct MessageInfo<ConsoleAgent::lm##Name> {                     \
-    typedef lpc::name##_m data_m;                                              \
-    static data_m *get_payload(lfBa FLAGS (lpc::base_message_t, lpc::console_message_t) *data) { return &data->payload.name; } \
+    typedef lpc::name##_m payload_m;                                           \
+    typedef lfBa FLAGS (lpc::base_message_t, lpc::console_message_t) data_t;   \
+    typedef lfBa FLAGS (lpc::BaseMessage, lpc::ConsoleMessage) message_t;      \
+    static payload_m *get_payload(data_t *data) { return &data->payload.name; }\
+    static data_t *get_data(AbstractSimulatedMessage *message) { return &message->data_. lfBa FLAGS (as_base, as_console); } \
+    static message_t *get_message(AbstractSimulatedMessage *message) { return message->lfBa FLAGS (base_message, console_message)(); } \
   };
 FOR_EACH_LPC_TO_INTERCEPT(__DECLARE_MESSAGE_INFO__)
 #undef __DECLARE_MESSAGE_INFO__
 
-// Convenience class for constructing simulated messages.
-class AbstractSimulatedMessage {
-public:
-  AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend);
-  lpc::ConsoleMessage *message() { return &message_; }
-  lpc::console_message_t *operator->() { return data(); }
-
-  int32_t return_value() { return data()->relevant.return_value; }
-
-protected:
-  lpc::console_message_t *data() { return &data_; }
-
-private:
-  lpc::console_message_t data_;
-  lpc::ConsoleMessage message_;
-};
-
 template <ConsoleAgent::lpc_method_key_t K>
 class SimulatedMessage : public AbstractSimulatedMessage {
 public:
+  SimulatedMessage();
   SimulatedMessage(SimulatingConsoleFrontend *frontend);
-  typename MessageInfo<K>::data_m *payload() { return MessageInfo<K>::get_payload(data()); }
-private:
+  typename MessageInfo<K>::payload_m *payload() { return MessageInfo<K>::get_payload(data()); }
+  typename MessageInfo<K>::data_t *data() { return MessageInfo<K>::get_data(this); }
+  typename MessageInfo<K>::message_t *message() { return MessageInfo<K>::get_message(this); }
+  lpc::Message *raw_message() { return message(); }
 };
 
 template <ConsoleAgent::lpc_method_key_t K>
 SimulatedMessage<K>::SimulatedMessage(SimulatingConsoleFrontend *frontend)
   : AbstractSimulatedMessage(frontend) {
   data()->relevant.api_number = K;
-  size_t data_length = lpc::message_data_length_from_payload_length(sizeof(typename MessageInfo<K>::data_m));
+  size_t data_length = lpc::message_data_length_from_payload_length(sizeof(typename MessageInfo<K>::payload_m));
   data()->relevant.generic.u1.s1.data_length = static_cast<uint16_t>(data_length);
   size_t total_length = lpc::total_message_length_from_data_length(data_length);
   data()->relevant.generic.u1.s1.total_length = static_cast<uint16_t>(total_length);
@@ -187,8 +195,19 @@ bool SimulatingConsoleFrontend::update_last_error(AbstractSimulatedMessage *mess
   return status.is_success();
 }
 
+static lpc::Interceptor *get_interceptor(SimulatingConsoleFrontend *frontend) {
+  return (frontend == NULL) ? NULL : frontend->interceptor();
+}
+
+static lpc::AddressXform get_xform(SimulatingConsoleFrontend *frontend) {
+  return (frontend == NULL) ? lpc::AddressXform() : frontend->xform();
+}
+
 AbstractSimulatedMessage::AbstractSimulatedMessage(SimulatingConsoleFrontend *frontend)
-  : message_(NULL, data(), data(), frontend->interceptor(), frontend->xform(), lpc::ConsoleMessage::mdConsole) {
+  : console_message_(NULL, &data_.as_console, &data_.as_console,
+      get_interceptor(frontend), get_xform(frontend), lpc::ConsoleMessage::mdConsole)
+  , base_message_(NULL, &data_.as_base, &data_.as_base,
+      get_interceptor(frontend), get_xform(frontend), lpc::ConsoleMessage::mdBase) {
   struct_zero_fill(data_);
 }
 
@@ -429,6 +448,7 @@ namespace conprx {
 
 class SimulatingConsolePlatform : public InMemoryConsolePlatform {
 public:
+  SimulatingConsolePlatform(ConsoleAgent *agent) : agent_(agent) { }
   virtual void default_destroy() { default_delete_concrete(this); }
 
 #define __DECLARE_PLATFORM_METHOD__(Name, name, FLAGS, SIG, PSIG)              \
@@ -441,6 +461,8 @@ public:
 
 private:
   platform_hash_map<address_arith_t, uint32_t> modes_;
+  ConsoleAgent *agent_;
+  ConsoleAgent *agent() { return agent_; }
 };
 
 } // namespace conprx
@@ -454,6 +476,41 @@ handle_t SimulatingConsolePlatform::get_std_handle(dword_t id) {
   }
 }
 
+// An interceptor that does nothing on backend calls.
+class MuteInterceptor : public lpc::Interceptor {
+public:
+  virtual conprx::NtStatus call_native_backend(handle_t port,
+      lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply);
+  virtual fat_bool_t calibrate_console_port();
+};
+
+conprx::NtStatus MuteInterceptor::call_native_backend(handle_t port,
+      lpc::relevant_message_t *request, lpc::relevant_message_t *incoming_reply) {
+  return NtStatus::success();
+}
+
+fat_bool_t MuteInterceptor::calibrate_console_port() {
+  return F_FALSE;
+}
+
+pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
+    utf8_t executable, size_t argc, utf8_t *argv) {
+  pass_def_ref_t<NativeProcess> result = create_native_process(executable, argc, argv);
+  if (result.is_null())
+    return result;
+  SimulatedMessage<ConsoleAgent::lmCreateProcess> message(NULL);
+  message.payload()->process_id = result.peek()->guid();
+  // There's a bit of cheating going on here. Under normal circumstances the
+  // createprocess message would be sent during creation where it's appropriate
+  // to pass it to the backend. Here the creation has already happened so we
+  // don't need the call to go through, instead we do everything else but let
+  // the mute interceptor drop the backend call.
+  MuteInterceptor mute;
+  message.message()->set_interceptor(&mute);
+  agent()->on_message(message.message());
+  return result;
+}
+
 uint32_t SimulatingConsolePlatform::get_console_mode(Handle handle) {
   address_arith_t key = reinterpret_cast<address_arith_t>(handle.ptr());
   return modes_[key];
@@ -464,8 +521,8 @@ void SimulatingConsolePlatform::set_console_mode(Handle handle, uint32_t mode) {
   modes_[key] = mode;
 }
 
-pass_def_ref_t<InMemoryConsolePlatform> InMemoryConsolePlatform::new_simulating() {
-  return new (kDefaultAlloc) SimulatingConsolePlatform();
+pass_def_ref_t<InMemoryConsolePlatform> InMemoryConsolePlatform::new_simulating(ConsoleAgent *agent) {
+  return new (kDefaultAlloc) SimulatingConsolePlatform(agent);
 }
 
 NtStatus SimulatingInterceptor::on_get_console_mode(lpc::get_console_mode_m *data,

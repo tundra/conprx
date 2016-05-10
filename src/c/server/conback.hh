@@ -68,6 +68,8 @@ public:
   // the given handle.
   virtual response_t<bool_t> get_console_screen_buffer_info(Handle buffer,
       ScreenBufferInfo *info_out) = 0;
+
+  virtual response_t<bool_t> create_process(uint64_t id) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -93,6 +95,7 @@ public:
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
       bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control);
+  virtual response_t<bool_t> create_process(uint64_t id);
 
   // Returns info about the given handle, if the handle isn't known the default
   // info is returned.

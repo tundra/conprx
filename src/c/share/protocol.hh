@@ -3,8 +3,9 @@
 
 // Type declarations used by both sides of the console api.
 
-#include "rpc.hh"
 #include "agent/conapi-types.hh"
+#include "rpc.hh"
+#include "utils/log.hh"
 #include "utils/vector.hh"
 
 #ifndef _CONPRX_SHARE_PROTOCOL_HH
@@ -20,6 +21,7 @@
 //   - Pa: pure-agent function that doesn't involve calling the backend
 //   - Sw: this message should be implemented in the platform simulator
 //   - Sp: suspend on calls to this message
+//   - Ba: this is a base, not a console, message
 //
 //  Name                        name                            apinum   (Tr Da Pa Sw Sp Ba)
 #define FOR_EACH_LPC_TO_INTERCEPT(F)                                                         \
@@ -34,7 +36,7 @@
   F(GetConsoleCP,               get_console_cp,                 0x0003C, (_, _, _, _, _, _)) \
   F(SetConsoleCP,               set_console_cp,                 0x0003D, (_, _, _, _, _, _)) \
   F(ConsoleConnect,             console_connect,                0x00053, (_, _, X, _, _, _)) \
-  F(CreateProcess,              create_process,                 0x10000, (_, _, X, _, _, X))
+  F(CreateProcess,              create_process,                 0x10000, (_, _, _, _, _, X))
 
 // Messages that we know about and so don't want to dump/suspend on when
 // doing that on unknown messages, but that we also don't have an implementation
@@ -346,6 +348,26 @@ public:
 
 private:
   console_readconsole_control_t raw_;
+};
+
+class LogEntry {
+public:
+  LogEntry();
+  LogEntry(log_entry_t *entry) : entry_(*entry) { }
+  void init(utf8_t file, uint32_t line, utf8_t message);
+  log_entry_t *as_struct() { return &entry_; }
+
+  // The seed type for handles.
+  static plankton::SeedType<LogEntry> *seed_type() { return &kSeedType; }
+
+private:
+  log_entry_t entry_;
+
+  template <typename T> friend class plankton::DefaultSeedType;
+  static LogEntry *new_instance(plankton::Variant header, plankton::Factory *factory);
+  plankton::Variant to_seed(plankton::Factory *factory);
+  void init(plankton::Seed payload, plankton::Factory *factory);
+  static plankton::DefaultSeedType<LogEntry> kSeedType;
 };
 
 // Stuff relating to the console protocol types that doesn't fit anywhere else.

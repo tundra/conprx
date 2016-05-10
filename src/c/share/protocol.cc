@@ -35,6 +35,7 @@ TypeRegistry *ConsoleTypes::registry() {
     instance->register_type<console_screen_buffer_info_t>();
     instance->register_type<console_screen_buffer_infoex_t>();
     instance->register_type<console_readconsole_control_t>();
+    instance->register_type<LogEntry>();
   }
   return instance;
 }

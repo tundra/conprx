@@ -240,11 +240,24 @@ response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
   return resp;
 }
 
+response_t<bool_t> BasicConsoleBackend::create_process(uint64_t id) {
+  return response_t<bool_t>::yes();
+}
+
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
-  TextWriter writer;
-  writer.write(data->argument(0));
-  INFO("AGENT LOG: %s", *writer);
-  resp(rpc::OutgoingResponse::success(Variant::null()));
+  Variant remote_value = data->argument(0);
+  LogEntry *remote_entry = remote_value.native_as<LogEntry>();
+  if (remote_entry == NULL) {
+    TextWriter writer;
+    writer.write(remote_value);
+    INFO("Unknown log: %s", *writer);
+  } else {
+    log_entry_t local_entry = *remote_entry->as_struct();
+    if (local_entry.level == llFatal)
+      local_entry.level = llError;
+    log_entry(&local_entry);
+  }
+  resp(rpc::OutgoingResponse::success(Variant::yes()));
 }
 
 void ConsoleBackendService::on_is_ready(rpc::RequestData *data, ResponseCallback resp) {
@@ -406,6 +419,11 @@ void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *
     NativeVariant info_var(info->raw());
     return resp(rpc::OutgoingResponse::success(info_var));
   }
+}
+
+void ConsoleBackendService::on_create_process(rpc::RequestData *data, ResponseCallback resp) {
+  uint64_t id = data->argument(0).integer_value();
+  forward_response(backend()->create_process(id), resp);
 }
 
 void ConsoleBackendService::message_not_understood(rpc::RequestData *data,

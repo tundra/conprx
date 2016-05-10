@@ -156,8 +156,8 @@ Variant DriverRequest::get_console_screen_buffer_info_ex(Handle handle) {
   return send("get_console_screen_buffer_info_ex", handle_var);
 }
 
-Variant DriverRequest::create_child(Variant args) {
-  return send("create_child", args);
+Variant DriverRequest::create_process(Variant executable, Variant args) {
+  return send("create_process", executable, args);
 }
 
 const Variant &DriverRequest::operator*() {
@@ -202,7 +202,7 @@ Variant DriverRequest::send(Variant selector, Variant arg0, Variant arg1,
 Variant DriverRequest::send_request(OutgoingRequest *req) {
   ASSERT_FALSE(is_used_);
   is_used_ = true;
-  response_ = manager_->send(req);
+  response_ = connection()->send(req);
   return response_->peek_value(Variant::null());
 }
 
