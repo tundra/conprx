@@ -499,7 +499,7 @@ pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
   if (result.is_null())
     return result;
   SimulatedMessage<ConsoleAgent::lmCreateProcess> message(NULL);
-  message.payload()->process_id = result.peek()->guid();
+  message.payload()->process_id = result.peek()->handle()->guid();
   // There's a bit of cheating going on here. Under normal circumstances the
   // createprocess message would be sent during creation where it's appropriate
   // to pass it to the backend. Here the creation has already happened so we

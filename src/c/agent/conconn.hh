@@ -55,7 +55,7 @@ public:
   virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
       bool is_unicode, console_readconsole_control_t *input_control) = 0;
 
-  virtual response_t<bool_t> create_process(uint64_t id) = 0;
+  virtual response_t<bool_t> create_process(NativeProcessInfo *info) = 0;
 };
 
 // A console adaptor converts raw lpc messages into plankton messages to send
@@ -100,7 +100,7 @@ public:
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle input, tclib::Blob buffer,
       bool is_unicode, console_readconsole_control_t *input_control);
-  virtual response_t<bool_t> create_process(uint64_t id);
+  virtual response_t<bool_t> create_process(NativeProcessInfo *info);
 
   static tclib::pass_def_ref_t<ConsoleConnector> create(
       plankton::rpc::MessageSocket *socket, plankton::InputSocket *in);

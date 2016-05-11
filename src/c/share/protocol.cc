@@ -36,6 +36,7 @@ TypeRegistry *ConsoleTypes::registry() {
     instance->register_type<console_screen_buffer_infoex_t>();
     instance->register_type<console_readconsole_control_t>();
     instance->register_type<LogEntry>();
+    instance->register_type<NativeProcessInfo>();
   }
   return instance;
 }
@@ -53,10 +54,24 @@ Variant Handle::to_seed(Factory *factory) {
 }
 
 void Handle::init(Seed payload, Factory *factory) {
-  Variant id = payload.get_field("id");
-  id_ = id.is_integer() ? id.integer_value() : kInvalidHandleValue;
+  id_ = payload.get_field("id").integer_value(kInvalidHandleValue);
 }
 
+DefaultSeedType<NativeProcessInfo> NativeProcessInfo::kSeedType("conprx.NativeProcessInfo");
+
+NativeProcessInfo *NativeProcessInfo::new_instance(Variant header, Factory *factory) {
+  return new (factory) NativeProcessInfo(0);
+}
+
+Variant NativeProcessInfo::to_seed(plankton::Factory *factory) {
+  Seed result = factory->new_seed(seed_type());
+  result.set_field("id", raw_id());
+  return result;
+}
+
+void NativeProcessInfo::init(plankton::Seed payload, plankton::Factory *factory) {
+  raw_id_ = payload.get_field("id").integer_value(0);
+}
 
 NtStatus NtStatus::from(Severity severity, Provider provider, Facility facility,
     uint32_t code) {

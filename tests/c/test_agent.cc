@@ -682,16 +682,16 @@ AGENT_TEST(set_position) {
 class CreateProcessBackend : public BasicConsoleBackend {
 public:
   CreateProcessBackend() : last_id(0), create_count(0) { }
-  virtual response_t<bool_t> create_process(uint64_t id);
+  virtual response_t<bool_t> create_process(NativeProcessHandle *handle);
 
 public:
   uint64_t last_id;
   uint32_t create_count;
 };
 
-response_t<bool_t> CreateProcessBackend::create_process(uint64_t id) {
+response_t<bool_t> CreateProcessBackend::create_process(NativeProcessHandle *handle) {
   create_count++;
-  last_id = id;
+  last_id = handle->guid();
   return response_t<bool_t>::yes();
 }
 
@@ -724,7 +724,7 @@ public:
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read, ReadConsoleControl *input_control) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_cursor_position(Handle output, coord_t position) { return fail<bool_t>(); }
-  response_t<bool_t> create_process(uint64_t id) { return fail<bool_t>(); }
+  response_t<bool_t> create_process(NativeProcessHandle *process) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();

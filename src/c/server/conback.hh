@@ -70,7 +70,7 @@ public:
       ScreenBufferInfo *info_out) = 0;
 
   // Notifies this backend that a process with the given uid has been created.
-  virtual response_t<bool_t> create_process(uint64_t id) = 0;
+  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -96,7 +96,7 @@ public:
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
       bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control);
-  virtual response_t<bool_t> create_process(uint64_t id);
+  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process);
 
   // Returns info about the given handle, if the handle isn't known the default
   // info is returned.

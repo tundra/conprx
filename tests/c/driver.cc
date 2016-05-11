@@ -198,7 +198,7 @@ fat_bool_t ChildManager::start(rpc::Service::ResponseCallback callback) {
   process_ = service()->platform()->create_process(executable_, argc_, argv_);
   service()->mark_child_active();
   F_TRY(runner()->start());
-  callback(rpc::OutgoingResponse::success(process_->guid()));
+  callback(rpc::OutgoingResponse::success(process_->handle()->guid()));
   return F_TRUE;
 }
 
@@ -233,10 +233,8 @@ void ConsoleFrontendService::create_process(rpc::RequestData *data,
   ChildManager *manager = new (kDefaultAlloc) ChildManager(this, exe, argc, argv);
   add_garbage(manager);
   fat_bool_t started = manager->start(callback);
-  if (!started) {
-    F_LOG_FALSE(started);
-    callback(rpc::OutgoingResponse::failure(Variant::no()));
-  }
+  F_LOG_FALSE(started);
+  return callback(rpc::OutgoingResponse::failure(Variant::boolean(started)));
 }
 
 void ConsoleFrontendService::get_std_handle(rpc::RequestData *data, ResponseCallback callback) {

@@ -98,7 +98,8 @@ enum conprx_error_t {
   CONPRX_ERROR_CALIBRATION_FAILED = 0x0007,
   CONPRX_ERROR_WRITE_FAILED = 0x0008,
   CONPRX_ERROR_READ_FAILED = 0x0009,
-  CONPRX_ERROR_INVALID_ARGUMENT = 0x0010
+  CONPRX_ERROR_INVALID_ARGUMENT = 0x0010,
+  CONPRX_ERROR_SYSTEM = 0x0011
 };
 
 // A wrapper around an nt status code that makes it easier to dissect the value
@@ -368,6 +369,24 @@ private:
   plankton::Variant to_seed(plankton::Factory *factory);
   void init(plankton::Seed payload, plankton::Factory *factory);
   static plankton::DefaultSeedType<LogEntry> kSeedType;
+};
+
+class NativeProcessInfo {
+public:
+  NativeProcessInfo(uint64_t raw_id) : raw_id_(raw_id) { }
+
+  uint64_t raw_id() { return raw_id_; }
+
+  // The seed type for handles.
+  static plankton::SeedType<NativeProcessInfo> *seed_type() { return &kSeedType; }
+
+private:
+  uint64_t raw_id_;
+  template <typename T> friend class plankton::DefaultSeedType;
+  static NativeProcessInfo *new_instance(plankton::Variant header, plankton::Factory *factory);
+  plankton::Variant to_seed(plankton::Factory *factory);
+  void init(plankton::Seed payload, plankton::Factory *factory);
+  static plankton::DefaultSeedType<NativeProcessInfo> kSeedType;
 };
 
 // Stuff relating to the console protocol types that doesn't fit anywhere else.

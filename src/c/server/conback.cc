@@ -240,7 +240,7 @@ response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
   return resp;
 }
 
-response_t<bool_t> BasicConsoleBackend::create_process(uint64_t id) {
+response_t<bool_t> BasicConsoleBackend::create_process(tclib::NativeProcessHandle *process) {
   return response_t<bool_t>::yes();
 }
 
@@ -422,8 +422,16 @@ void ConsoleBackendService::on_get_console_screen_buffer_info(rpc::RequestData *
 }
 
 void ConsoleBackendService::on_create_process(rpc::RequestData *data, ResponseCallback resp) {
-  uint64_t id = data->argument(0).integer_value();
-  forward_response(backend()->create_process(id), resp);
+  NativeProcessInfo *info = data->argument(0).native_as<NativeProcessInfo>();
+  if (info == NULL)
+    return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_INVALID_ARGUMENT));
+  native_process_id_t id = static_cast<native_process_id_t>(info->raw_id());
+  NativeProcessHandle handle;
+  fat_bool_t opened = handle.open(id);
+  if (!opened)
+    resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_SYSTEM));
+  forward_response(backend()->create_process(&handle), resp);
+  handle.close();
 }
 
 void ConsoleBackendService::message_not_understood(rpc::RequestData *data,
