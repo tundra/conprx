@@ -195,7 +195,7 @@ NtStatus ConsoleAdaptor::create_process(lpc::BaseMessage *req,
   NtStatus result = req->call_native_backend();
   if (!result.is_success())
     return result;
-  NativeProcessInfo info(payload->process_id);
+  NativeProcessInfo info(static_cast<native_process_id_t>(payload->process_id));
   return NtStatus::from_response(connector()->create_process(&info));
 }
 

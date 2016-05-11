@@ -371,11 +371,12 @@ private:
   static plankton::DefaultSeedType<LogEntry> kSeedType;
 };
 
+// Serializable info about a native process appropriate to pass as plankton.
 class NativeProcessInfo {
 public:
-  NativeProcessInfo(uint64_t raw_id) : raw_id_(raw_id) { }
+  NativeProcessInfo(native_process_id_t id) : raw_id_(id) { }
 
-  uint64_t raw_id() { return raw_id_; }
+  native_process_id_t id() { return static_cast<native_process_id_t>(raw_id_); }
 
   // The seed type for handles.
   static plankton::SeedType<NativeProcessInfo> *seed_type() { return &kSeedType; }

@@ -425,7 +425,7 @@ void ConsoleBackendService::on_create_process(rpc::RequestData *data, ResponseCa
   NativeProcessInfo *info = data->argument(0).native_as<NativeProcessInfo>();
   if (info == NULL)
     return resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_INVALID_ARGUMENT));
-  native_process_id_t id = static_cast<native_process_id_t>(info->raw_id());
+  native_process_id_t id = info->id();
   NativeProcessHandle handle;
   fat_bool_t opened = handle.open(id);
   if (!opened)

@@ -65,7 +65,7 @@ NativeProcessInfo *NativeProcessInfo::new_instance(Variant header, Factory *fact
 
 Variant NativeProcessInfo::to_seed(plankton::Factory *factory) {
   Seed result = factory->new_seed(seed_type());
-  result.set_field("id", raw_id());
+  result.set_field("id", raw_id_);
   return result;
 }
 
