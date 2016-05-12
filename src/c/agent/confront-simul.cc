@@ -493,13 +493,12 @@ fat_bool_t NoopInterceptor::calibrate_console_port() {
   return F_FALSE;
 }
 
-pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
-    utf8_t executable, size_t argc, utf8_t *argv) {
-  pass_def_ref_t<NativeProcess> result = create_native_process(executable, argc, argv);
-  if (result.is_null())
-    return result;
+fat_bool_t SimulatingConsolePlatform::create_process(
+    utf8_t executable, size_t argc, utf8_t *argv, pass_def_ref_t<NativeProcess> *process_out) {
+  pass_def_ref_t<NativeProcess> process;
+  F_TRY(create_native_process(executable, argc, argv, &process));
   SimulatedMessage<ConsoleAgent::lmCreateProcess> message(NULL);
-  message.payload()->process_id = result.peek()->handle()->guid();
+  message.payload()->process_id = process.peek()->handle()->guid();
   // There's a bit of cheating going on here. Under normal circumstances the
   // createprocess message would be sent during creation where it's appropriate
   // to pass it to the backend. Here the creation has already happened so we
@@ -508,10 +507,11 @@ pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
   NoopInterceptor interceptor;
   message.message()->set_interceptor(&interceptor);
   if (!agent()->on_message(message.message()).is_success()) {
-    def_ref_t<NativeProcess> arrival = result;
-    return pass_def_ref_t<NativeProcess>::null();
+    def_ref_t<NativeProcess> arrival = process;
+    return F_FALSE;
   }
-  return result;
+  *process_out = process;
+  return F_TRUE;
 }
 
 uint32_t SimulatingConsolePlatform::get_console_mode(Handle handle) {

@@ -20,11 +20,16 @@ using namespace tclib;
 
 #include "confront-simul.cc"
 
-pass_def_ref_t<NativeProcess> ConsolePlatform::create_native_process(utf8_t executable,
-    size_t argc, utf8_t *argv) {
-  NativeProcess *result = new (kDefaultAlloc) NativeProcess();
-  F_LOG_FALSE(result->start(executable, argc, argv));
-  return result;
+fat_bool_t ConsolePlatform::create_native_process(utf8_t executable, size_t argc,
+    utf8_t *argv, pass_def_ref_t<NativeProcess> *process_out) {
+  pass_def_ref_t<NativeProcess> process = new (kDefaultAlloc) NativeProcess();
+  fat_bool_t started = process.peek()->start(executable, argc, argv);
+  if (!started) {
+    def_ref_t<NativeProcess> arrival = process;
+    return F_FALSE;
+  }
+  *process_out = process;
+  return F_TRUE;
 }
 
 #ifdef IS_MSVC

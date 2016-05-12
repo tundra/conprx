@@ -29,6 +29,8 @@ class Launcher;
 class ConsoleBackendContext {
 public:
   virtual ~ConsoleBackendContext() { }
+
+  // Inject the agent code into the given process.
   virtual fat_bool_t inject_agent(tclib::NativeProcessHandle *process) = 0;
 };
 

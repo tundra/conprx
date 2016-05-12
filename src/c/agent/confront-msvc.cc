@@ -128,9 +128,9 @@ handle_t WindowsConsolePlatform::get_std_handle(dword_t id) {
   return GetStdHandle(id);
 }
 
-pass_def_ref_t<NativeProcess> WindowsConsolePlatform::create_process(utf8_t executable,
-    size_t argc, utf8_t *argv) {
-  return create_native_process(executable, argc, argv);
+fat_bool_t WindowsConsolePlatform::create_process(utf8_t executable, size_t argc,
+    utf8_t *argv, pass_def_ref_t<NativeProcess> *process_out) {
+  return create_native_process(executable, argc, argv, process_out);
 }
 
 pass_def_ref_t<ConsolePlatform> ConsolePlatform::new_native() {

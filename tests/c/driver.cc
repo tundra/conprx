@@ -195,9 +195,9 @@ ChildManager::~ChildManager() {
 }
 
 fat_bool_t ChildManager::start(rpc::Service::ResponseCallback callback) {
-  process_ = service()->platform()->create_process(executable_, argc_, argv_);
-  if (process_.is_null())
-    return F_FALSE;
+  pass_def_ref_t<NativeProcess> passref;
+  F_TRY(service()->platform()->create_process(executable_, argc_, argv_, &passref));
+  process_ = passref;
   service()->mark_child_active();
   F_TRY(runner()->start());
   callback(rpc::OutgoingResponse::success(process_->handle()->guid()));

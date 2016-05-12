@@ -90,8 +90,10 @@ class ConsoleAdaptor;
     (handle_t console_output, const char_info_t *buffer, coord_t buffer_size,  \
      coord_t buffer_coord, small_rect_t *write_region),                        \
     (console_output, buffer, buffer_size, buffer_coord, write_region))
-#define sigCreateProcess(F) F(tclib::pass_def_ref_t<tclib::NativeProcess>,     \
-    (utf8_t executable, size_t argc, utf8_t *argv), (executable, argc, argv))
+#define sigCreateProcess(F) F(fat_bool_t,                                      \
+    (utf8_t executable, size_t argc, utf8_t *argv,                             \
+     tclib::pass_def_ref_t<tclib::NativeProcess> *process_out),                \
+    (executable, argc, argv, process_out))
 
 #define psigInt64(F) F(_, (int64_t n), (n))
 #define psigAnsiCStr(F) F(_, (ansi_cstr_t str), (str))
@@ -204,8 +206,8 @@ public:
 
   // Creates and starts a process in whatever way is appropriate for this
   // platform.
-  static tclib::pass_def_ref_t<tclib::NativeProcess> create_native_process(
-      utf8_t executable, size_t argc, utf8_t *argv);
+  static fat_bool_t create_native_process(utf8_t executable, size_t argc,
+      utf8_t *argv, tclib::pass_def_ref_t<tclib::NativeProcess> *process_out);
 
   // Creates and returns a new native platform. Only available on windows.
   static tclib::pass_def_ref_t<ConsolePlatform> new_native();
