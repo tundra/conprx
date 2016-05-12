@@ -13,6 +13,7 @@ SimulatedFrontendAdaptor::SimulatedFrontendAdaptor(ConsoleBackend *backend)
   , streams_(&buffer_, &buffer_)
   , connector_(streams_.socket(), streams_.input())
   , agent_(&connector_)
+  , service_(NULL)
   , trace_(false)
   , tracer_("SB") {
   streams_.set_default_type_registry(ConsoleTypes::registry());

@@ -15,6 +15,7 @@ using namespace plankton;
 
 Launcher::Launcher()
   : state_(lsConstructed)
+  , service_(this)
   , agent_monitor_done_(Drawbridge::dsLowered)
   , backend_(NULL) {
   process_.set_flags(pfStartSuspendedOnWindows | pfNewHiddenConsoleOnWindows);
@@ -136,6 +137,10 @@ fat_bool_t Launcher::abort_agent_service() {
 fat_bool_t Launcher::ensure_agent_service_ready() {
   while (!service()->agent_is_ready())
     F_TRY(agent()->input()->process_next_instruction(NULL));
+  return F_TRUE;
+}
+
+fat_bool_t Launcher::inject_agent(tclib::NativeProcessHandle *process) {
   return F_TRUE;
 }
 

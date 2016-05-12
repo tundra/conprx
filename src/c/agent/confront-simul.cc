@@ -507,7 +507,10 @@ pass_def_ref_t<NativeProcess> SimulatingConsolePlatform::create_process(
   // the mute interceptor drop the backend call.
   NoopInterceptor interceptor;
   message.message()->set_interceptor(&interceptor);
-  agent()->on_message(message.message());
+  if (!agent()->on_message(message.message()).is_success()) {
+    def_ref_t<NativeProcess> arrival = result;
+    return pass_def_ref_t<NativeProcess>::null();
+  }
   return result;
 }
 

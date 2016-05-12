@@ -23,6 +23,15 @@ using plankton::Arena;
 
 class Launcher;
 
+// A backend context contains information and functions that can't reasonably
+// be expected to be implemented by the backend itself and so is provided for
+// its use in calls where it's relevant.
+class ConsoleBackendContext {
+public:
+  virtual ~ConsoleBackendContext() { }
+  virtual fat_bool_t inject_agent(tclib::NativeProcessHandle *process) = 0;
+};
+
 // Virtual type, implementations of which can be used as the implementation of
 // a console.
 class ConsoleBackend {
@@ -70,7 +79,8 @@ public:
       ScreenBufferInfo *info_out) = 0;
 
   // Notifies this backend that a process with the given uid has been created.
-  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process) = 0;
+  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process,
+      ConsoleBackendContext *context) = 0;
 };
 
 // A complete implementation of a console backend.
@@ -96,7 +106,8 @@ public:
       bool is_unicode);
   virtual response_t<uint32_t> read_console(Handle output, tclib::Blob buffer,
       bool is_unicode, size_t *bytes_read_out, ReadConsoleControl *input_control);
-  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process);
+  virtual response_t<bool_t> create_process(tclib::NativeProcessHandle *process,
+      ConsoleBackendContext *context);
 
   // Returns info about the given handle, if the handle isn't known the default
   // info is returned.
@@ -142,9 +153,6 @@ private:
   uint32_t input_codepage_;
   uint32_t output_codepage_;
   ucs16_t title_;
-  // TODO: for now all handles have the same mode value. There needs to be a
-  //   more nuanced way to set those.
-  uint32_t mode_;
   WinTty *wty_;
   HandleManager *handles() { return &handles_; }
   HandleManager handles_;
@@ -153,7 +161,7 @@ private:
 // The service the driver will call back to when it wants to access the manager.
 class ConsoleBackendService : public plankton::rpc::Service {
 public:
-  ConsoleBackendService();
+  ConsoleBackendService(ConsoleBackendContext *context);
   virtual ~ConsoleBackendService() { }
 
   // Returns true once the agent has reported that it's ready.
@@ -193,6 +201,8 @@ private:
 
   ConsoleBackend *backend_;
   ConsoleBackend *backend() { return backend_; }
+  ConsoleBackendContext *context_;
+  ConsoleBackendContext *context() { return context_; }
 
   plankton::TypeRegistry registry_;
 

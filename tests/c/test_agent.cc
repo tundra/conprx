@@ -682,20 +682,21 @@ AGENT_TEST(set_position) {
 class CreateProcessBackend : public BasicConsoleBackend {
 public:
   CreateProcessBackend() : last_id(0), create_count(0) { }
-  virtual response_t<bool_t> create_process(NativeProcessHandle *handle);
+  virtual response_t<bool_t> create_process(NativeProcessHandle *handle, ConsoleBackendContext *context);
 
 public:
   uint64_t last_id;
   uint32_t create_count;
 };
 
-response_t<bool_t> CreateProcessBackend::create_process(NativeProcessHandle *handle) {
+response_t<bool_t> CreateProcessBackend::create_process(NativeProcessHandle *handle,
+    ConsoleBackendContext *context) {
   create_count++;
   last_id = handle->guid();
   return response_t<bool_t>::yes();
 }
 
-AGENT_TEST(create_process) {
+AGENT_TEST(create_process_durian) {
   CreateProcessBackend backend;
   AGENT_TEST_PREAMBLE(&backend, use_real);
 
@@ -705,6 +706,17 @@ AGENT_TEST(create_process) {
   Variant value = c0.create_process(get_durian_main().chars, args);
   ASSERT_EQ(1, backend.create_count);
   ASSERT_EQ(backend.last_id, value.integer_value());
+}
+
+AGENT_TEST(create_project_inject) {
+  BasicConsoleBackend backend;
+  AGENT_TEST_PREAMBLE(&backend, use_real);
+
+  DriverRequest c0 = driver.new_request();
+  Array args = c0.factory()->new_array(1);
+  args.add("--quiet");
+  Variant value = c0.create_process(get_durian_main().chars, args);
+  ASSERT_TRUE(value.is_integer());
 }
 
 // A backend that fails on *everything*. Don't forget to add a test when you
@@ -724,7 +736,7 @@ public:
   response_t<uint32_t> write_console(Handle output, tclib::Blob data, bool is_unicode) { return fail<uint32_t>(); }
   response_t<uint32_t> read_console(Handle output, tclib::Blob buffer, bool is_unicode, size_t *bytes_read, ReadConsoleControl *input_control) { return fail<uint32_t>(); }
   response_t<bool_t> set_console_cursor_position(Handle output, coord_t position) { return fail<bool_t>(); }
-  response_t<bool_t> create_process(NativeProcessHandle *process) { return fail<bool_t>(); }
+  response_t<bool_t> create_process(NativeProcessHandle *process, ConsoleBackendContext *context) { return fail<bool_t>(); }
 
   // Returns the next error code in the sequence.
   uint32_t gen_error();

@@ -16,8 +16,9 @@ using namespace tclib;
 using namespace conprx;
 using namespace plankton;
 
-ConsoleBackendService::ConsoleBackendService()
+ConsoleBackendService::ConsoleBackendService(ConsoleBackendContext *context)
   : backend_(NULL)
+  , context_(context)
   , agent_is_ready_(false)
   , agent_is_done_(false) {
 
@@ -84,7 +85,6 @@ BasicConsoleBackend::BasicConsoleBackend()
   , input_codepage_(cpUtf8)
   , output_codepage_(cpUtf8)
   , title_(ucs16_empty())
-  , mode_(0)
   , wty_(NoWinTty::get()) { }
 
 BasicConsoleBackend::~BasicConsoleBackend() {
@@ -240,8 +240,13 @@ response_t<uint32_t> BasicConsoleBackend::read_console(Handle input,
   return resp;
 }
 
-response_t<bool_t> BasicConsoleBackend::create_process(tclib::NativeProcessHandle *process) {
-  return response_t<bool_t>::yes();
+response_t<bool_t> BasicConsoleBackend::create_process(NativeProcessHandle *process,
+    ConsoleBackendContext *context) {
+  fat_bool_t injected = context->inject_agent(process);
+  F_LOG_FALSE(injected);
+  return injected
+      ? response_t<bool_t>::yes()
+      : response_t<bool_t>::error(CONPRX_ERROR_AGENT_INJECTION_FAILED);
 }
 
 void ConsoleBackendService::on_log(rpc::RequestData *data, ResponseCallback resp) {
@@ -430,7 +435,7 @@ void ConsoleBackendService::on_create_process(rpc::RequestData *data, ResponseCa
   fat_bool_t opened = handle.open(id);
   if (!opened)
     resp(rpc::OutgoingResponse::failure(CONPRX_ERROR_SYSTEM));
-  forward_response(backend()->create_process(&handle), resp);
+  forward_response(backend()->create_process(&handle, context()), resp);
   handle.close();
 }
 

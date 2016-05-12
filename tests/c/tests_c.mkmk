@@ -95,7 +95,7 @@ for filename in filenames:
   test_case.set_arguments(stripped_test_case_name)
   test_case.add_env("AGENT", agent.get_output_path())
   test_case.add_env("DRIVER", driver_main.get_output_path())
-  test_case.add_env("DURIAN_MAIN", durian_main.get_output_path())
+  test_case.add_env("DURIAN", durian_main.get_output_path())
   run_tests.add_member(test_case)
 
 all = get_group("all")

@@ -99,7 +99,9 @@ enum conprx_error_t {
   CONPRX_ERROR_WRITE_FAILED = 0x0008,
   CONPRX_ERROR_READ_FAILED = 0x0009,
   CONPRX_ERROR_INVALID_ARGUMENT = 0x0010,
-  CONPRX_ERROR_SYSTEM = 0x0011
+  CONPRX_ERROR_SYSTEM = 0x0011,
+  CONPRX_ERROR_INVALID_STATE = 0x0012,
+  CONPRX_ERROR_AGENT_INJECTION_FAILED = 0x0013
 };
 
 // A wrapper around an nt status code that makes it easier to dissect the value

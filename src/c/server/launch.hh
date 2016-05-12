@@ -23,7 +23,7 @@ using plankton::rpc::IncomingResponse;
 using plankton::rpc::StreamServiceConnector;
 
 // Encapsulates launching a child process and injecting the agent dll.
-class Launcher : public tclib::DefaultDestructable {
+class Launcher : public tclib::DefaultDestructable, public ConsoleBackendContext {
 public:
   Launcher();
   virtual ~Launcher() { }
@@ -100,6 +100,9 @@ protected:
   // Loop around waiting for the agent to report to the owner service that
   // it's ready. Does nothing if the agent is already ready.
   fat_bool_t ensure_agent_service_ready();
+
+  // Inject an agent into the given process.
+  virtual fat_bool_t inject_agent(tclib::NativeProcessHandle *process);
 
   // There are four streams in play here: the owner pair and the agent pair.
   // The owner in stream allows the owner to read what is written to the agent
