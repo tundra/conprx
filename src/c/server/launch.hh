@@ -22,59 +22,18 @@ using plankton::rpc::OutgoingRequest;
 using plankton::rpc::IncomingResponse;
 using plankton::rpc::StreamServiceConnector;
 
-// Encapsulates launching a child process and injecting the agent dll.
-class Launcher : public tclib::DefaultDestructable, public ConsoleBackendContext {
+class Launcher;
+
+class ProcessAttachment : public tclib::DefaultDestructable {
 public:
-  Launcher();
-  virtual ~Launcher() { }
+  ProcessAttachment(tclib::NativeProcessHandle *process, Launcher *launcher);
+  virtual ~ProcessAttachment() { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   // Initialize this launcher's resources but don't actually launch anything.
   // Won't block.
   virtual fat_bool_t initialize();
 
-  // Start the process running and wait for it to be brought up, but don't
-  // connect the agent owner service.
-  fat_bool_t start(utf8_t command, size_t argc, utf8_t *argv);
-
-  // Connect the agent owner service and wait for the agent to report back that
-  // it's ready. Subtypes can override this to perform additional work before
-  // and/or after.
-  virtual fat_bool_t connect_service();
-
-  // Run the agent owner service.
-  fat_bool_t process_messages();
-
-  // Wait for the process to exit, storing the exit code in the out param.
-  virtual fat_bool_t join(int *exit_code_out);
-
-  fat_bool_t close_agent();
-
-  // Must be called by the concrete implementation at the time appropriate to
-  // them to resume the child process if it has been started suspended.
-  fat_bool_t ensure_process_resumed();
-
-  // Sets the backend the owner agent will delegate calls to when it receives
-  // them from the agent.
-  void set_backend(ConsoleBackend *backend);
-
-  // Returns the custom backend backing this launcher.
-  ConsoleBackend *backend() { return backend_; }
-
-  // Runs the loop that monitors the agent service and handles requests. While
-  // the launch is running there needs to be a thread doing this, which they
-  // do by calling this.
-  opaque_t monitor_agent();
-
-  // Returns a drawbridge that gets lowered when the the agent monitor is done.
-  // This is useful when running the agent in a separate thread: you close the
-  // connection which causes the agent to wind down and then wait for this
-  // to be lowered.
-  tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
-
-  // Returns the raw message socket used to communicate with the agent.
-  plankton::rpc::MessageSocket *socket() { return agent()->socket(); }
-
-protected:
   // Override this to do any work that needs to be performed before the process
   // can be launched.
   virtual fat_bool_t prepare_start() { return F_TRUE; }
@@ -87,11 +46,6 @@ protected:
   // service has been started.
   virtual fat_bool_t complete_connect_to_agent() { return F_TRUE; }
 
-  // Return true if this launcher intends to launch the agent. If it does it
-  // must implement start_connect_to_agent and complete_connect_to_agent such
-  // that one of them resumes the process using ensure_process_resumed.
-  virtual bool use_agent() = 0;
-
   // Create the agent service and open the connection to the agent.
   fat_bool_t attach_agent_service();
 
@@ -101,8 +55,23 @@ protected:
   // it's ready. Does nothing if the agent is already ready.
   fat_bool_t ensure_agent_service_ready();
 
-  // Inject an agent into the given process.
-  virtual fat_bool_t inject_agent(tclib::NativeProcessHandle *process);
+  tclib::NativeProcessHandle *process() { return process_; }
+
+  // Sets the backend the owner agent will delegate calls to when it receives
+  // them from the agent.
+  void set_backend(ConsoleBackend *backend);
+
+  // Returns the custom backend backing this launcher.
+  ConsoleBackend *backend() { return backend_; }
+
+  // Returns a drawbridge that gets lowered when the the agent monitor is done.
+  // This is useful when running the agent in a separate thread: you close the
+  // connection which causes the agent to wind down and then wait for this
+  // to be lowered.
+  tclib::Drawbridge *agent_monitor_done() { return &agent_monitor_done_; }
+
+  // Returns the raw message socket used to communicate with the agent.
+  plankton::rpc::MessageSocket *socket() { return agent()->socket(); }
 
   // There are four streams in play here: the owner pair and the agent pair.
   // The owner in stream allows the owner to read what is written to the agent
@@ -112,22 +81,18 @@ protected:
   virtual tclib::InStream *owner_in() { return NULL; }
   virtual tclib::OutStream *owner_out() { return NULL; }
 
-  tclib::NativeProcess *process() { return &process_; }
+  // Runs the loop that monitors the agent service and handles requests. While
+  // the launch is running there needs to be a thread doing this, which they
+  // do by calling this.
+  opaque_t monitor_agent();
+
+  // Run the agent owner service.
+  fat_bool_t process_messages();
+
+  fat_bool_t close_agent(bool use_agent);
 
 private:
-  enum State {
-    lsConstructed = 0,
-    lsInitialized = 1,
-    lsStarted = 2,
-    lsConnected = 3
-  };
-
-  // Does the work of connecting the agent.
-  fat_bool_t connect_agent();
-
-  tclib::NativeProcess process_;
-
-  State state_;
+  tclib::NativeProcessHandle *process_;
 
   tclib::def_ref_t<StreamServiceConnector> agent_;
   StreamServiceConnector *agent() { return *agent_; }
@@ -138,15 +103,88 @@ private:
   ConsoleBackend *backend_;
 };
 
-// A launcher that works by injecting the agent as a dll into the process.
-class InjectingLauncher : public Launcher {
+// Encapsulates launching a child process and injecting the agent dll.
+class Launcher : public tclib::DefaultDestructable, public ConsoleBackendContext {
 public:
-  InjectingLauncher(utf8_t agent_dll)
-    : agent_dll_(agent_dll)
-    , injection_(agent_dll) { }
-  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  Launcher();
+  virtual ~Launcher() { }
+
+  // Initialize this launcher's resources but don't actually launch anything.
+  // Won't block.
+  fat_bool_t initialize();
+
+  // Start the process running and wait for it to be brought up, but don't
+  // connect the agent owner service.
+  fat_bool_t start(utf8_t command, size_t argc, utf8_t *argv);
+
+  // Connect the agent owner service and wait for the agent to report back that
+  // it's ready. Subtypes can override this to perform additional work before
+  // and/or after.
+  virtual fat_bool_t connect_service();
+
+  // Wait for the process to exit, storing the exit code in the out param.
+  virtual fat_bool_t join(int *exit_code_out);
+
+  // Sets the backend the owner agent will delegate calls to when it receives
+  // them from the agent.
+  void set_backend(ConsoleBackend *backend);
+
+  // Returns the custom backend backing this launcher.
+  ConsoleBackend *backend() { return attachment()->backend(); }
+
+  virtual tclib::pass_def_ref_t<ProcessAttachment> create_attachment(
+      tclib::NativeProcessHandle *process) = 0;
+
+  ProcessAttachment *attachment();
+
+  // Must be called by the concrete implementation at the time appropriate to
+  // them to resume the child process if it has been started suspended.
+  fat_bool_t ensure_process_resumed();
 
 protected:
+  // Override this to do any work that needs to be performed before the process
+  // can be launched.
+  fat_bool_t prepare_start();
+
+  // Return true if this launcher intends to launch the agent. If it does it
+  // must implement start_connect_to_agent and complete_connect_to_agent such
+  // that one of them resumes the process using ensure_process_resumed.
+  virtual bool use_agent() = 0;
+
+  // Inject an agent into the given process.
+  virtual fat_bool_t inject_agent(tclib::NativeProcessHandle *process);
+
+  tclib::NativeProcessHandle *process() { return process_.handle(); }
+
+  // Does the work of connecting the agent.
+  virtual fat_bool_t connect_agent();
+
+private:
+  enum State {
+    lsConstructed = 0,
+    lsInitialized = 1,
+    lsStarted = 2,
+    lsConnected = 3
+  };
+
+  tclib::NativeProcess process_;
+
+  State state_;
+  ConsoleBackend *backend_;
+  tclib::def_ref_t<ProcessAttachment> attachment_;
+};
+
+class InjectingProcessAttachment : public ProcessAttachment {
+public:
+  InjectingProcessAttachment(tclib::NativeProcessHandle *process,
+      Launcher *launcher, utf8_t agent_dll)
+    : ProcessAttachment(process, launcher)
+    , agent_dll_(agent_dll)
+    , injection_(agent_dll) { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  virtual tclib::InStream *owner_in() { return up_.in(); }
+  virtual tclib::OutStream *owner_out() { return down_.out(); }
+
   // Before we can start we need to open up the pipes over which we'll be
   // communicating. These can be created without blocking so we do that early
   // on.
@@ -163,18 +201,31 @@ protected:
   // process so the main program can start running.
   virtual fat_bool_t complete_connect_to_agent();
 
-  opaque_t ensure_agent_ready_background();
-
-  virtual bool use_agent() { return true; }
-  virtual tclib::InStream *owner_in() { return up_.in(); }
-  virtual tclib::OutStream *owner_out() { return down_.out(); }
-
 private:
   utf8_t agent_dll_;
   tclib::NativePipe up_;
   tclib::NativePipe down_;
   tclib::NativeProcessHandle::InjectRequest injection_;
   tclib::NativeProcessHandle::InjectRequest *injection() { return &injection_; }
+
+  opaque_t ensure_agent_ready_background();
+};
+
+// A launcher that works by injecting the agent as a dll into the process.
+class InjectingLauncher : public Launcher {
+public:
+  InjectingLauncher(utf8_t agent_dll)
+    : agent_dll_(agent_dll) { }
+
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
+  virtual tclib::pass_def_ref_t<ProcessAttachment> create_attachment(
+      tclib::NativeProcessHandle *process);
+
+  virtual bool use_agent() { return true; }
+
+private:
+  utf8_t agent_dll_;
 };
 
 } // namespace conprx

@@ -87,6 +87,30 @@ private:
   Arena arena_;
 };
 
+class FakeAgentProcessAttachment : public ProcessAttachment {
+public:
+  FakeAgentProcessAttachment(tclib::NativeProcessHandle *process, Launcher *launcher,
+      tclib::ServerChannel *agent_channel);
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
+  virtual tclib::InStream *owner_in() { return agent_channel()->in(); }
+  virtual tclib::OutStream *owner_out() { return agent_channel()->out(); }
+
+  // The fake agent launcher needs the process to be running before it can start
+  // talking to the remote agent so this does almost all of the work, it
+  // releases the process from being suspended and opens up the connection.
+  virtual fat_bool_t start_connect_to_agent();
+
+  // Allocate the underlying channel.
+  fat_bool_t allocate();
+
+  tclib::ServerChannel *agent_channel() { return agent_channel_; }
+
+private:
+  tclib::ServerChannel *agent_channel_;
+  tclib::def_ref_t<tclib::ServerChannel> own_agent_channel_;
+};
+
 // A launcher that knows how to start the driver and communicate with the fake
 // launcher that the driver supports. It can't be used for anything other than
 // testing.
@@ -98,22 +122,27 @@ public:
   // Allocate the underlying channel.
   fat_bool_t allocate();
 
+  virtual tclib::pass_def_ref_t<ProcessAttachment> create_attachment(
+      tclib::NativeProcessHandle *process);
+
   tclib::ServerChannel *agent_channel() { return *agent_channel_; }
 
-protected:
-  virtual tclib::InStream *owner_in() { return agent_channel()->in(); }
-  virtual tclib::OutStream *owner_out() { return agent_channel()->out(); }
-
-  // The fake agent launcher needs the process to be running before it can start
-  // talking to the remote agent so this does almost all of the work, it
-  // releases the process from being suspended and opens up the connection.
-  virtual fat_bool_t start_connect_to_agent();
+  FakeAgentProcessAttachment *attachment() { return static_cast<FakeAgentProcessAttachment*>(Launcher::attachment()); }
 
   virtual bool use_agent() { return true; }
 
-private:
+protected:
+  virtual fat_bool_t connect_agent();
 
+private:
   tclib::def_ref_t<tclib::ServerChannel> agent_channel_;
+};
+
+class NoAgentProcessAttachment : public ProcessAttachment {
+public:
+  NoAgentProcessAttachment(tclib::NativeProcessHandle *process, Launcher *launcher);
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
 };
 
 // Launcher that knows how to launch the driver with no agent. Useful for
@@ -122,6 +151,8 @@ class NoAgentLauncher : public Launcher {
 public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
   virtual bool use_agent() { return false; }
+  virtual tclib::pass_def_ref_t<ProcessAttachment> create_attachment(
+      tclib::NativeProcessHandle *process);
 
 protected:
   // This is only present such that we can report an error if anyone tries to

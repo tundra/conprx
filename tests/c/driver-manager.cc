@@ -10,7 +10,6 @@
 BEGIN_C_INCLUDES
 #include "utils/strbuf.h"
 #include "utils/string-inl.h"
-#include "utils/trybool.h"
 END_C_INCLUDES
 
 using namespace conprx;
@@ -262,7 +261,9 @@ fat_bool_t DriverManager::start() {
   }
   if (backend_ != NULL)
     launcher()->set_backend(backend_);
-  agent_monitor_.set_callback(new_callback(&Launcher::monitor_agent, launcher()));
+  F_TRY(launcher()->initialize());
+  agent_monitor_.set_callback(new_callback(&ProcessAttachment::monitor_agent,
+      launcher()->attachment()));
   const char *frontend_type_name = NULL;
   switch (frontend_type()) {
     case dfNative:
@@ -279,15 +280,14 @@ fat_bool_t DriverManager::start() {
   if (silence_log_)
     builder.add_option("silence-log", Variant::yes());
   builder.add_option("port-delta", 90000);
-  F_TRY(launcher()->initialize());
   utf8_t args = builder.flush();
   utf8_t exec = executable_path();
   F_TRY(launcher()->start(exec, 1, &args));
   if (trace())
-    tracer_.install(launcher()->socket());
+    tracer_.install(launcher()->attachment()->socket());
   if (!use_agent())
     return F_TRUE;
-  launcher()->agent_monitor_done()->raise();
+  launcher()->attachment()->agent_monitor_done()->raise();
   has_started_agent_monitor_ = true;
   return F_BOOL(agent_monitor_.start());
 }
@@ -330,7 +330,7 @@ IncomingResponse DriverConnection::send(rpc::OutgoingRequest *req) {
 fat_bool_t DriverManager::join(int *exit_code_out) {
   F_TRY(channel()->close());
   if (use_agent()) {
-    F_TRY(launcher()->close_agent());
+    F_TRY(launcher()->attachment()->close_agent(use_agent()));
     if (has_started_agent_monitor_) {
       opaque_t monitor_result = o0();
       F_TRY(agent_monitor_.join(&monitor_result));
@@ -363,6 +363,16 @@ utf8_t DriverManager::default_agent_path() {
   return new_c_string(result);
 }
 
+FakeAgentProcessAttachment::FakeAgentProcessAttachment(NativeProcessHandle *process,
+    Launcher *launcher, ServerChannel *agent_channel)
+  : ProcessAttachment(process, launcher)
+  , agent_channel_(agent_channel) {
+  if (agent_channel_ == NULL) {
+    own_agent_channel_ = ServerChannel::create();
+    agent_channel_ = *own_agent_channel_;
+  }
+}
+
 FakeAgentLauncher::FakeAgentLauncher() {
   agent_channel_ = ServerChannel::create();
 }
@@ -372,14 +382,33 @@ fat_bool_t FakeAgentLauncher::allocate() {
   return F_TRUE;
 }
 
-fat_bool_t FakeAgentLauncher::start_connect_to_agent() {
-  F_TRY(ensure_process_resumed());
+tclib::pass_def_ref_t<ProcessAttachment> FakeAgentLauncher::create_attachment(
+    tclib::NativeProcessHandle *process) {
+  return new (kDefaultAlloc) FakeAgentProcessAttachment(process, this,
+      *agent_channel_);
+}
+
+fat_bool_t FakeAgentProcessAttachment::start_connect_to_agent() {
   F_TRY(agent_channel()->open());
   F_TRY(attach_agent_service());
   return F_TRUE;
 }
 
+fat_bool_t FakeAgentLauncher::connect_agent() {
+  F_TRY(ensure_process_resumed());
+  return Launcher::connect_agent();
+}
+
 fat_bool_t NoAgentLauncher::start_connect_to_agent() {
   UNREACHABLE("NoAgentLauncher::start_connect_to_agent");
   return F_FALSE;
+}
+
+NoAgentProcessAttachment::NoAgentProcessAttachment(NativeProcessHandle *process,
+    Launcher *launcher)
+  : ProcessAttachment(process, launcher) { }
+
+tclib::pass_def_ref_t<ProcessAttachment> NoAgentLauncher::create_attachment(
+    NativeProcessHandle *process) {
+  return new (kDefaultAlloc) NoAgentProcessAttachment(process, this);
 }

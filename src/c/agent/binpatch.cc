@@ -91,11 +91,9 @@ fat_bool_t PatchSet::prepare_apply() {
     return F_TRUE;
   }
   for (size_t i = 0; i < requests().length(); i++) {
-    fat_bool_t applied = requests()[i].prepare_apply(&platform_, alloc());
-    if (!applied) {
+    F_TRY_EXCEPT(requests()[i].prepare_apply(&platform_, alloc()));
       status_ = FAILED;
-      return applied;
-    }
+    F_YRT();
   }
   status_ = PREPARED;
   return F_TRUE;
@@ -138,11 +136,9 @@ fat_bool_t PatchSet::open_for_patching() {
   DEBUG("Opening original code for writing");
   // Try opening the region for writing.
   tclib::Blob region = determine_patch_range();
-  fat_bool_t opened = memory_manager().open_for_writing(region, &old_perms_);
-  if (!opened) {
+  F_TRY_EXCEPT(memory_manager().open_for_writing(region, &old_perms_));
     status_= FAILED;
-    return opened;
-  }
+  F_YRT();
   // Validate that writing works.
   DEBUG("Validating that code is writable");
   if (validate_open_for_patching()) {
@@ -173,11 +169,9 @@ bool PatchSet::validate_open_for_patching() {
 fat_bool_t PatchSet::close_after_patching(Status success_status) {
   DEBUG("Closing original code for writing");
   tclib::Blob region = determine_patch_range();
-  fat_bool_t closed = memory_manager().close_for_writing(region, old_perms_);
-  if (!closed) {
+  F_TRY_EXCEPT(memory_manager().close_for_writing(region, old_perms_));
     status_ = FAILED;
-    return closed;
-  }
+  F_YRT();
   instruction_set().flush_instruction_cache(region);
   DEBUG("Successfully closed original code");
   status_ = success_status;
@@ -346,12 +340,11 @@ bool ProximityAllocator::Block::ensure_capacity(uint64_t size, ProximityAllocato
     succeeded =  owner->direct_->alloc_executable(0,
         static_cast<size_t>(owner->block_size_), &block);
   }
-  if (!succeeded) {
+  F_TRY_EXCEPT(succeeded);
     // We could get no memory so we deactivate this block such that we'll ignore
     // it from here on.
     is_active_ = false;
-    return false;
-  }
+  F_YRT();
   next_ = reinterpret_cast<uint64_t>(block.start());
   limit_ = reinterpret_cast<uint64_t>(block.end());
   return true;

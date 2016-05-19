@@ -92,7 +92,7 @@ class Options;
 class StreamingLog : public tclib::Log {
 public:
   StreamingLog() : out_(NULL) { }
-  virtual bool record(log_entry_t *entry);
+  virtual fat_bool_t record(log_entry_t *entry);
   void set_destination(StreamServiceConnector *out) { out_ = out; }
 
 private:

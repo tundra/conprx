@@ -52,10 +52,10 @@ fat_bool_t fat_main(int argc, char *argv[], int *exit_code_out) {
   OutStream *trace_stream = open_trace_stream();
   if (trace_stream != NULL) {
     observer.set_out(trace_stream);
-    observer.install(launcher.socket());
+    observer.install(launcher.attachment()->socket());
   }
 
-  F_TRY(launcher.process_messages());
+  F_TRY(launcher.attachment()->process_messages());
   F_TRY(launcher.join(exit_code_out));
 
   if (trace_stream != NULL)

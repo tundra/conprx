@@ -54,7 +54,7 @@ void LogEntry::init(plankton::Seed payload, plankton::Factory *factory) {
       new_c_string(timestamp));
 }
 
-bool StreamingLog::record(log_entry_t *entry) {
+fat_bool_t StreamingLog::record(log_entry_t *entry) {
   LogEntry entry_data(entry);
   NativeVariant entry_var(&entry_data);
   rpc::OutgoingRequest req(Variant::null(), "log", 1, &entry_var);

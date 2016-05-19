@@ -483,7 +483,7 @@ private:
 // A log that ignores everything.
 class SilentLog : public Log {
 public:
-  virtual bool record(log_entry_t *entry) { return true; }
+  virtual fat_bool_t record(log_entry_t *entry) { return F_TRUE; }
 };
 
 // Holds the state for the console driver.
